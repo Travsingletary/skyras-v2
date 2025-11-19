@@ -58,7 +58,7 @@ export default function Home() {
     }
   }, [requiredAccessCode]);
 
-  // Initialize userId from localStorage
+  // Initialize userId and conversationId from localStorage
   useEffect(() => {
     if (!isAuthenticated) return;
     
@@ -68,6 +68,12 @@ export default function Home() {
       localStorage.setItem("userId", storedUserId);
     }
     setUserId(storedUserId);
+
+    // Load conversationId from localStorage
+    const storedConversationId = localStorage.getItem("conversationId");
+    if (storedConversationId) {
+      setConversationId(storedConversationId);
+    }
   }, [isAuthenticated]);
 
   // Scroll to bottom when messages change
@@ -207,6 +213,8 @@ export default function Home() {
       // 4) Update conversationId and append assistant message
       if (data.conversationId) {
         setConversationId(data.conversationId);
+        // Persist conversationId to localStorage
+        localStorage.setItem("conversationId", data.conversationId);
       }
 
       if (data.response) {
