@@ -1,0 +1,169 @@
+# SkySky Show Scene Templates
+# Prompts and settings for each scene type
+
+scenes:
+  intro:
+    name: "Direct-to-Camera Intro"
+    description: "School hallway, SkySky confesses guilt"
+    duration: 30
+    midjourney:
+      prompt: "SkySky, 8-year-old girl with curly hair, school hallway, confessing guilt, warm lighting, children's show style, bright colors, 1080x1920 vertical"
+      style: "children's animation"
+      quality: "high"
+    heygen:
+      character: "SkySky"
+      voice: "warm, slightly nervous, then confident"
+      background: "school hallway"
+      duration: 30
+    elevenlabs:
+      voice_id: "sky_sky_voice"
+      text: "Hey friends… I need to tell you something. Today at school, I kinda took credit for something I didn't do."
+      stability: 0.7
+      similarity_boost: 0.8
+
+  reflection:
+    name: "Podcast Reflection"
+    description: "Bedroom, bedtime podcast"
+    duration: 60
+    midjourney:
+      prompt: "SkySky in bedroom, soft lighting, bedtime, podcast microphone, cozy atmosphere, children's show style, 1080x1920 vertical"
+      style: "children's animation"
+      quality: "high"
+    heygen:
+      character: "SkySky"
+      voice: "soft, introspective"
+      background: "bedroom"
+      duration: 60
+    elevenlabs:
+      voice_id: "sky_sky_voice"
+      text: "I guess I didn't lie… but I didn't tell the truth, either. Why is it so hard to do the right thing when everyone's watching?"
+      stability: 0.8
+      similarity_boost: 0.7
+    suno:
+      prompt: "gentle lullaby instrumental, soft piano, warm strings, bedtime music, 60 seconds"
+      style: "lullaby"
+      duration: 60
+
+  imaginary_land:
+    name: "Imaginary Land"
+    description: "Golden cloud meadow, meets Luma"
+    duration: 90
+    midjourney:
+      prompt: "golden cloud meadow, rainbow bridge, Luma color-shifting cloud being, ethereal dream world, magical atmosphere, children's fantasy, 1080x1920 vertical"
+      style: "fantasy animation"
+      quality: "high"
+    heygen:
+      character: "SkySky and Luma"
+      voice: "SkySky: curious, Luma: ethereal, echo-y, childlike wisdom"
+      background: "golden cloud meadow"
+      duration: 90
+    elevenlabs:
+      voice_id: "luma_voice"
+      text: "Hello, little one. I am Luma, and I change color when people tell the truth or hide it. What color do you think you are right now?"
+      stability: 0.6
+      similarity_boost: 0.9
+
+  song_performance:
+    name: "Song Performance"
+    description: "Full musical number"
+    duration: 90
+    midjourney:
+      prompt: "SkySky performing on stage, musical number, bright lights, energetic, children's show performance, 1080x1920 vertical"
+      style: "musical animation"
+      quality: "high"
+    heygen:
+      character: "SkySky"
+      voice: "confident, musical"
+      background: "stage performance"
+      duration: 90
+    suno:
+      prompt: "Shine with the Truth - upbeat soulful children's song, 90 BPM, light percussion, synth sparkle, piano and claps, positive message about honesty"
+      style: "children's pop"
+      duration: 90
+      lyrics: |
+        Sometimes I hide, afraid to say,
+        The truth I kept just fades away.
+        But when I'm real, the light comes through,
+        The sky shines brighter — me and you.
+        
+        Shine with the truth, let your light show,
+        When you're honest, that's when you glow.
+        No need to hide, no need to fear,
+        The truth will always bring us near.
+
+  resolution:
+    name: "Real-World Resolution"
+    description: "School hallway, confession & closure"
+    duration: 45
+    midjourney:
+      prompt: "SkySky, teacher Ms. Luna, and friend Nia in school hallway, warm light rays, resolution scene, children's show style, 1080x1920 vertical"
+      style: "children's animation"
+      quality: "high"
+    heygen:
+      character: "SkySky, Ms. Luna, Nia"
+      voice: "SkySky: brave, Ms. Luna: calm and affirming, Nia: gentle and forgiving"
+      background: "school hallway"
+      duration: 45
+    elevenlabs:
+      voice_id: "sky_sky_voice"
+      text: "Ms. Luna, I need to say something. The art idea wasn't mine. It was Nia's. I'm sorry I didn't tell the truth before."
+      stability: 0.7
+      similarity_boost: 0.8
+
+# Character voice settings
+characters:
+  sky_sky:
+    name: "SkySky"
+    age: "8 years old"
+    voice_description: "Warm, slightly nervous at first, then confident"
+    elevenlabs_voice_id: "sky_sky_voice"
+    
+  luma:
+    name: "Luma"
+    age: "Ageless cloud being"
+    voice_description: "Ethereal, echo-y, childlike wisdom"
+    elevenlabs_voice_id: "luma_voice"
+    
+  ms_luna:
+    name: "Ms. Luna"
+    age: "Adult teacher"
+    voice_description: "Calm, affirming, supportive"
+    elevenlabs_voice_id: "ms_luna_voice"
+    
+  nia:
+    name: "Nia"
+    age: "8 years old"
+    voice_description: "Gentle, forgiving, understanding"
+    elevenlabs_voice_id: "nia_voice"
+
+# Music and audio settings
+audio:
+  intro_music:
+    style: "soft chime motif"
+    duration: 30
+    mood: "introspective"
+    
+  dreamland_music:
+    style: "bright synth sparkle"
+    duration: 90
+    mood: "magical"
+    
+  song_music:
+    style: "piano + claps"
+    duration: 90
+    mood: "upbeat, soulful"
+    
+  resolution_music:
+    style: "sunlight SFX + gentle whoosh"
+    duration: 45
+    mood: "warm, hopeful"
+
+# Visual style notes
+visual_style:
+  color_palette: "Sky-World: baby blues, golden haze, cotton-pink clouds"
+  light_effects: "Light bursts every time truth is spoken"
+  transitions: "Cloud-puff dissolves between scenes"
+  aspect_ratio: "1080x1920 (vertical for mobile/social)"
+  quality: "High definition, children's animation style"
+
+

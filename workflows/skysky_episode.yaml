@@ -1,0 +1,61 @@
+id: skysky_episode_v1
+name: SkySky Show Episode v1
+owner: marcus
+summary: >-
+  Canonical five-scene workflow for producing a SkySky Show episode.
+  Marcus orchestrates, Giorgio generates creative assets, Letitia archives
+  everything, and Jamal (future) publishes deliverables.
+context:
+  theme_inputs:
+    - prompt
+    - age_range
+    - moral_lesson
+  outputs:
+    - episode_brief
+    - asset_bundle
+    - distribution_package
+states:
+  - name: brief_intake
+    agent: marcus
+    goal: Capture the prompt, episode metadata, and stakeholder constraints.
+    inputs:
+      - request_form
+      - latest_memory.snapshot
+    produces:
+      - episode_brief
+  - name: scene_generation
+    agent: giorgio
+    goal: Generate scene scripts plus creative assets per episode_brief.
+    requires: episode_brief
+    for_each:
+      collection: scenes
+      steps:
+        - task: midjourney_backgrounds
+          tool: midjourney
+        - task: heygen_video
+          tool: heygen
+        - task: elevenlabs_voice
+          tool: elevenlabs
+    emits_event: asset.generated
+  - name: asset_catalog
+    agent: letitia
+    goal: Attach metadata, tag assets, and expose search handles.
+    requires: asset.generated
+    produces:
+      - asset_bundle
+    emits_event: file.uploaded
+  - name: qc_and_notes
+    agent: marcus
+    goal: Run quality checklist, collect notes, and request fixes.
+    requires:
+      - asset_bundle
+      - feedback
+    decision_points:
+      - if: blockers_present
+        then: reroute_to: scene_generation
+  - name: distribution_package
+    agent: jamal
+    goal: Package episode for delivery channels (YouTube, podcast, learning portal).
+    requires: asset_bundle
+    produces:
+      - distribution_package

@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: skyras_v2
+      POSTGRES_USER: skyras
+      POSTGRES_PASSWORD: dev_password
+    ports: ["5432:5432"]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  fastapi-hub:
+    build: ./services/hub
+    ports: ["8000:8000"]
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://skyras:dev_password@postgres:5432/skyras_v2
+      - MARCUS_SERVICE_URL=http://marcus:8001
+      - LETITIA_SERVICE_URL=http://letitia:8002
+    depends_on: [redis, postgres]
+    volumes:
+      - ./shared:/app/shared
+
+  marcus:
+    build: ./services/marcus
+    ports: ["8001:8001"]
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://skyras:dev_password@postgres:5432/skyras_v2
+      - HUB_SERVICE_URL=http://fastapi-hub:8000
+    depends_on: [redis, fastapi-hub]
+    volumes:
+      - ./shared:/app/shared
+
+  letitia:
+    build: ./services/letitia
+    ports: ["8002:8002"]
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://skyras:dev_password@postgres:5432/skyras_v2
+      - HUB_SERVICE_URL=http://fastapi-hub:8000
+    depends_on: [redis, fastapi-hub]
+    volumes:
+      - ./shared:/app/shared
+
+  giorgio:
+    build: ./services/giorgio
+    ports: ["8003:8003"]
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://skyras:dev_password@postgres:5432/skyras_v2
+      - HUB_SERVICE_URL=http://fastapi-hub:8000
+      - SKYSKY_ROOT=/mnt/skysky
+      - MIDJOURNEY_API_KEY=${MIDJOURNEY_API_KEY}
+      - HEYGEN_API_KEY=${HEYGEN_API_KEY}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+      - SUNO_API_KEY=${SUNO_API_KEY}
+    depends_on: [redis, fastapi-hub]
+    volumes:
+      - ./shared:/app/shared
+      - ${SKYSKY_ROOT}:/mnt/skysky
+
+volumes:
+  redis_data:
+  postgres_data:
+
