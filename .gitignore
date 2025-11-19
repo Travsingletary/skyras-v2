@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Environment variables
+.env
+.env.local
+frontend/.env.local
+*.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Build outputs
+.next/
+frontend/.next/
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# PM2
+.pm2/
+
+# TypeScript
+*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
+
+# Temporary files
+*.tmp
+.cache/
+
+# Supabase
+supabase/.temp/
+
+# Agent kit data
+.agentkit-data.json
+

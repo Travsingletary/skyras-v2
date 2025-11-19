@@ -1,0 +1,75 @@
+heygen:
+  name: HeyGen
+  base_url: https://docs.heygen.com
+  category: video
+  auth_type: api_key
+  portal_url: https://www.heygen.com/
+  status_page_url: 
+
+elevenlabs:
+  name: ElevenLabs
+  base_url: https://api.elevenlabs.io/docs
+  category: voice
+  auth_type: api_key
+  portal_url: https://elevenlabs.io
+  status_page_url: 
+
+leonardo:
+  name: Leonardo AI
+  base_url: https://docs.leonardo.ai
+  category: images
+  auth_type: api_key
+  portal_url: https://leonardo.ai
+  status_page_url: 
+
+n8n:
+  name: n8n
+  base_url: https://docs.n8n.io
+  category: orchestration
+  auth_type: none
+  portal_url: https://n8n.io
+  status_page_url: 
+
+supabase:
+  name: Supabase
+  base_url: https://supabase.com/docs
+  category: storage_db
+  auth_type: none
+  portal_url: https://supabase.com
+  status_page_url: https://status.supabase.com
+
+socialite:
+  name: Socialite
+  base_url: https://socialite.dev/docs
+  category: distribution
+  auth_type: none
+  portal_url: https://socialite.dev
+  status_page_url: 
+
+suno:
+  name: Suno
+  base_url: https://docs.suno.ai
+  category: music
+  auth_type: api_key
+  portal_url: https://suno.ai
+  status_page_url: 
+
+boomy:
+  name: Boomy
+  base_url: https://api.boomy.com/docs
+  category: music
+  auth_type: api_key
+  portal_url: https://boomy.com
+  status_page_url: 
+
+mubert:
+  name: Mubert
+  base_url: https://mubert.com/api
+  category: music
+  auth_type: api_key
+  portal_url: https://mubert.com
+  status_page_url: 
+
+
+
+

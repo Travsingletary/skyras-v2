@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Studio Console</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+        <div class="text-lg font-semibold text-gray-900">SkyRas v2</div>
+        <div class="space-x-4 text-sm">
+            <a href="/" class="text-gray-600 hover:text-blue-600">Chat Console</a>
+            <a href="/studio" class="text-blue-600 font-medium">Studio Console</a>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto py-8 px-4 space-y-8">
+        <section class="bg-white shadow rounded-lg p-6">
+            <h1 class="text-2xl font-semibold text-gray-900 mb-4">Daily Studio Run</h1>
+            <form id="studioForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Goal</label>
+                    <input type="text" id="goalInput" value="Plan SkySky content for today." class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Project</label>
+                    <select id="projectSelect" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="SkySky">SkySky</option>
+                        <option value="RufusGold">Rufus Gold</option>
+                        <option value="SoulSyntax">Soul Syntax</option>
+                        <option value="SteadyStream">SteadyStream</option>
+                    </select>
+                </div>
+                <div class="flex items-center space-x-4 text-sm text-gray-700">
+                    <label class="inline-flex items-center space-x-2">
+                        <input type="checkbox" id="includeSkySky" checked class="rounded border-gray-300" />
+                        <span>Include SkySky episode</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-2">
+                        <input type="checkbox" id="expandTasks" class="rounded border-gray-300" />
+                        <span>Expanded agent run</span>
+                    </label>
+                </div>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Run Studio</button>
+            </form>
+
+            <div id="studioResult" class="mt-6 hidden">
+                <h2 class="text-xl font-semibold text-gray-900 mb-2">Result</h2>
+                <p class="text-sm text-gray-600 mb-4" id="resultGoal"></p>
+
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Daily Tasks</h3>
+                    <ul id="taskList" class="mt-2 space-y-1 text-sm text-gray-800"></ul>
+                </div>
+
+                <div id="skySection" class="mt-6 hidden">
+                    <h3 class="text-lg font-semibold text-gray-900">SkySky Episode</h3>
+                    <p class="text-sm text-gray-600" id="skyMeta"></p>
+                    <ul id="skyBeats" class="mt-2 space-y-1 text-sm text-gray-800"></ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-900">Content Shipping</h2>
+                    <p class="text-sm text-gray-500">Generate Jamal's posting plan from today's studio run.</p>
+                </div>
+                <button id="shipButton" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Generate Posting Plan</button>
+            </div>
+            <div id="planSection" class="hidden">
+                <p class="text-sm text-gray-600" id="planMeta"></p>
+                <ul id="planSlots" class="mt-2 space-y-1 text-sm text-gray-800"></ul>
+            </div>
+            <p id="planEmpty" class="text-sm text-gray-500">No posting plan generated yet.</p>
+        </section>
+
+        <section class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-xl font-semibold text-gray-900">Run History</h2>
+                <div class="flex items-center space-x-2 text-sm">
+                    <select id="historyWorkflow" class="border border-gray-300 rounded px-2 py-1">
+                        <option value="">All Workflows</option>
+                        <option value="dailyStudioRun">Daily Studio</option>
+                        <option value="dailyGrowthLoop">Daily Growth</option>
+                        <option value="skySkyEpisode">SkySky Episode</option>
+                    </select>
+                    <select id="historyProject" class="border border-gray-300 rounded px-2 py-1">
+                        <option value="">All Projects</option>
+                        <option value="SkySky">SkySky</option>
+                    </select>
+                    <button id="refreshHistory" class="text-sm text-blue-600">Refresh</button>
+                </div>
+            </div>
+            <table class="w-full mt-4 text-sm">
+                <thead>
+                    <tr class="text-left text-gray-500 border-b">
+                        <th class="py-2">Workflow</th>
+                        <th class="py-2">Status</th>
+                        <th class="py-2">Started</th>
+                        <th class="py-2">Finished</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTable"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        async function runStudio(event) {
+            event.preventDefault();
+            const goal = document.getElementById('goalInput').value;
+            const includeSkySky = document.getElementById('includeSkySky').checked;
+            const expand = document.getElementById('expandTasks').checked;
+            const project = document.getElementById('projectSelect').value;
+
+            const response = await fetch('/api/studio/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ goal, includeSkySky, expand, project })
+            });
+
+            if (!response.ok) {
+                alert('Studio run failed');
+                return;
+            }
+
+            const data = await response.json();
+            renderResult(data.data);
+            loadHistory();
+        }
+
+        function renderResult(result) {
+            const container = document.getElementById('studioResult');
+            container.classList.remove('hidden');
+            document.getElementById('resultGoal').textContent = `${result.goal} (${result.project || 'SkySky'})`;
+
+            const tasks = result.dailyPlan?.tasks || [];
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = tasks
+                .map(task => {
+                    const status = task.status || 'planned';
+                    return `<li>[${status}] (${task.owner}) ${task.description}</li>`;
+                })
+                .join('');
+
+            if (result.skySkyEpisodePlan) {
+                document.getElementById('skySection').classList.remove('hidden');
+                const meta = result.skySkyEpisodePlan.input;
+                document.getElementById('skyMeta').textContent = `Lesson: ${meta.lesson} | Theme: ${meta.theme || 'n/a'} | Age: ${meta.ageRange || 'n/a'}`;
+                document.getElementById('skyBeats').innerHTML = result.skySkyEpisodePlan.beats
+                    .map(beat => `<li>[${beat.stage}] ${beat.description}</li>`)
+                    .join('');
+            } else {
+                document.getElementById('skySection').classList.add('hidden');
+            }
+
+        }
+
+        async function runShipping() {
+            const goal = document.getElementById('goalInput').value;
+            const project = document.getElementById('projectSelect').value;
+            const response = await fetch('/api/studio/ship', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ goal, project })
+            });
+
+            if (!response.ok) {
+                alert('Content shipping failed');
+                return;
+            }
+
+            const data = await response.json();
+            renderShipping(data.data);
+            loadHistory();
+        }
+
+        function renderShipping(result) {
+            const section = document.getElementById('planSection');
+            const empty = document.getElementById('planEmpty');
+            section.classList.remove('hidden');
+            empty.classList.add('hidden');
+            document.getElementById('planMeta').textContent = `Campaign: ${result.postingPlan.campaignName} | Project: ${result.project}`;
+            document.getElementById('planSlots').innerHTML = result.postingPlan.slots
+                .map(slot => `<li>${slot.time} — ${slot.platform} (${slot.contentType}) ${slot.note ? '- ' + slot.note : ''}</li>`)
+                .join('');
+        }
+
+        async function loadHistory() {
+            const workflow = document.getElementById('historyWorkflow').value;
+            const project = document.getElementById('historyProject').value;
+            const params = new URLSearchParams();
+            if (workflow) params.append('workflow', workflow);
+            if (project) params.append('project', project);
+            const response = await fetch('/api/studio/history?' + params.toString());
+            if (!response.ok) return;
+            const data = await response.json();
+            const tbody = document.getElementById('historyTable');
+            tbody.innerHTML = data.data
+                .map(run => `
+                    <tr class="border-b">
+                        <td class="py-2">${run.workflow}</td>
+                        <td class="py-2">${run.status}</td>
+                        <td class="py-2">${run.startedAt}</td>
+                        <td class="py-2">${run.finishedAt}</td>
+                    </tr>
+                `)
+                .join('');
+        }
+
+        document.getElementById('studioForm').addEventListener('submit', runStudio);
+        document.getElementById('refreshHistory').addEventListener('click', loadHistory);
+        document.getElementById('shipButton').addEventListener('click', runShipping);
+        loadHistory();
+    </script>
+</body>
+</html>
