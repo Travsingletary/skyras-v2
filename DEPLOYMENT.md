@@ -102,16 +102,22 @@ See `frontend/.env.local.example`
    - **Install Command**: `npm install` (default)
 
 4. **Set Environment Variables** (in Vercel dashboard)
+   
+   **Required:**
    ```
-   NEXT_PUBLIC_API_BASE_URL=https://your-backend-url.onrender.com
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_ANON_KEY=your_supabase_anon_key
+   NEXT_PUBLIC_API_BASE_URL=https://skyras-backend.onrender.com
+   NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025
+   SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
+   SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6eGVkaXhwYnZpdnBzbnp0anNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODkyMTksImV4cCI6MjA3ODk2NTIxOX0.xDUS_lPMxQvI-J1ZaafWOhaAhqwRW-whr-PrYFQh1RQ
+   ```
+   
+   **Optional (for studio features):**
+   ```
    IMAGE_STORAGE_BUCKET=generated-images
    IMAGE_PROVIDER_NAME=replicate-sdxl
    IMAGE_PROVIDER_BASE_URL=https://api.replicate.com/v1
    REPLICATE_MODEL_ID=your_model_id
    REPLICATE_API_TOKEN=your_replicate_token
-   NEXT_PUBLIC_ACCESS_CODE=your_secret_passcode
    ```
 
 5. **Deploy**

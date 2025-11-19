@@ -56,7 +56,7 @@ git push origin main
 PORT=4000
 NODE_ENV=production
 OPENAI_API_KEY=sk-proj-...your-key...
-SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
+SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.c=o
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ELEVENLABS_API_KEY=your-elevenlabs-key (optional)
