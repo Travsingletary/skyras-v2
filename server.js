@@ -265,7 +265,8 @@ app.post('/api/chat', async (req, res) => {
     const onboardingAnswers = onboardingState?.answers || {};
     const currentQuestion = getOnboardingQuestion(onboardingAnswers);
     const isOnboardingComplete = !currentQuestion && Object.keys(onboardingAnswers).length > 0;
-    const isFirstMessage = !onboardingState || Object.keys(onboardingAnswers).length === 0;
+    // Check if this is truly the first message (no onboarding state OR no current question set)
+    const isFirstMessage = !onboardingState || (!onboardingState.currentQuestion && Object.keys(onboardingAnswers).length === 0);
 
     if (isFirstMessage) {
       // Start onboarding
