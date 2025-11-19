@@ -32,15 +32,21 @@ function requireEnv(name: string, value: string) {
   }
 }
 
-requireEnv("REPLICATE_API_TOKEN", REPLICATE_API_TOKEN);
-requireEnv("REPLICATE_MODEL_ID", REPLICATE_MODEL_ID);
+// Only validate at runtime when functions are called, not at build time
+function validateConfig() {
+  requireEnv("REPLICATE_API_TOKEN", REPLICATE_API_TOKEN);
+  requireEnv("REPLICATE_MODEL_ID", REPLICATE_MODEL_ID);
+}
 
-console.info("[SDXL adapter] configured", {
-  provider: PROVIDER_NAME,
-  baseUrl: PROVIDER_BASE_URL,
-  hasToken: !!REPLICATE_API_TOKEN,
-  model: REPLICATE_MODEL_ID,
-});
+// Only log if we have the config (don't fail build if missing)
+if (REPLICATE_API_TOKEN && REPLICATE_MODEL_ID) {
+  console.info("[SDXL adapter] configured", {
+    provider: PROVIDER_NAME,
+    baseUrl: PROVIDER_BASE_URL,
+    hasToken: !!REPLICATE_API_TOKEN,
+    model: REPLICATE_MODEL_ID,
+  });
+}
 
 function getDims(size?: string): { width: number; height: number } {
   switch (size) {
@@ -109,6 +115,7 @@ function buildPrompt(prompt: string, style?: string): string {
 }
 
 export async function executeCreate(args: CreateImageArgs): Promise<ProviderResult> {
+  validateConfig(); // Validate only when function is called
   const { width, height } = getDims(args.size);
   const prediction = await createPrediction({
     version: REPLICATE_MODEL_ID,
@@ -135,6 +142,7 @@ export async function executeCreate(args: CreateImageArgs): Promise<ProviderResu
 }
 
 export async function executeEdit(args: EditImageArgs): Promise<ProviderResult> {
+  validateConfig(); // Validate only when function is called
   const { width, height } = getDims(args.size);
   const prediction = await createPrediction({
     version: REPLICATE_MODEL_ID,
