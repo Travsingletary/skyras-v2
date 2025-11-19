@@ -200,6 +200,10 @@ app.post('/api/chat', async (req, res) => {
           .eq('user_id', userId)
           .single();
 
+        if (convError) {
+          console.error('Error fetching conversation:', convError);
+        }
+
         if (convData) {
           conversation = convData;
           onboardingState = convData.onboarding_state || null;
@@ -218,14 +222,26 @@ app.post('/api/chat', async (req, res) => {
           .select()
           .single();
 
-        if (newConv) {
+        if (createError) {
+          console.error('Error creating conversation:', createError);
+          // Generate fallback conversationId if Supabase fails
+          convId = `conv_${userId}_${Date.now()}`;
+          onboardingState = {};
+        } else if (newConv) {
           convId = newConv.id;
           conversation = newConv;
+          onboardingState = {};
+        } else {
+          // Fallback if insert returns no data
+          convId = `conv_${userId}_${Date.now()}`;
           onboardingState = {};
         }
       }
     } else {
       // Fallback: use in-memory state (for development without Supabase)
+      if (!convId) {
+        convId = `conv_${userId}_${Date.now()}`;
+      }
       onboardingState = onboardingState || {};
     }
 
@@ -401,20 +417,23 @@ app.post('/api/chat', async (req, res) => {
     }
 
     // Save assistant response to database
-    if (supabase && convId) {
-      const { data: msgData } = await supabase.from('messages').insert({
+    if (supabase && convId && !convId.startsWith('conv_')) {
+      // Only try to save if convId is a real UUID (not fallback)
+      const { data: msgData, error: msgError } = await supabase.from('messages').insert({
         conversation_id: convId,
         user_id: userId,
         role: 'assistant',
         content: response
       }).select().single();
 
-      if (msgData) {
+      if (msgError) {
+        console.error('Error saving assistant message:', msgError);
+      } else if (msgData) {
         assistantMessageId = msgData.id;
       }
 
       // Update conversation with onboarding state and workflow
-      await supabase
+      const { error: updateError } = await supabase
         .from('conversations')
         .update({
           onboarding_state: updatedOnboardingState,
@@ -422,6 +441,10 @@ app.post('/api/chat', async (req, res) => {
           updated_at: new Date().toISOString()
         })
         .eq('id', convId);
+
+      if (updateError) {
+        console.error('Error updating conversation:', updateError);
+      }
     }
 
     res.json({
