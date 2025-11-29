@@ -4,8 +4,11 @@ require('ts-node/register');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const { createClient } = require('@supabase/supabase-js');
+const WebSocket = require('ws');
+const ElevenLabs = require('elevenlabs-node');
 
 const { runDailyStudioRun } = require('./agentkit/workflows/dailyStudioRun');
 const { runDailyGrowthLoop } = require('./agentkit/workflows/dailyGrowthLoop');
@@ -32,6 +35,36 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+// File upload configuration
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept common file types
+    const allowedMimes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/pdf',
+      'text/plain',
+      'text/markdown',
+      'application/json',
+      'audio/mpeg',
+      'audio/wav',
+      'video/mp4',
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not supported`));
+    }
+  }
+});
 
 // Proxy to new FastAPI v2 backend (microservices)
 app.use('/api/v2', createProxyMiddleware({
@@ -133,6 +166,95 @@ app.post('/api/studio/ship', async (req, res) => {
   } catch (error) {
     console.error('Shipping run failed:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// File upload endpoint
+app.post('/api/upload', upload.array('files', 10), async (req, res) => {
+  try {
+    const { userId, conversationId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId is required'
+      });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No files uploaded'
+      });
+    }
+
+    const uploadedFiles = [];
+
+    // Process each file
+    for (const file of req.files) {
+      const fileData = {
+        id: `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        filename: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        buffer: file.buffer,
+        uploadedAt: new Date().toISOString()
+      };
+
+      // If Supabase is configured, save file metadata
+      if (supabase && conversationId) {
+        try {
+          // Save file metadata to database
+          const { data: fileRecord, error: fileError } = await supabase
+            .from('files')
+            .insert({
+              id: fileData.id,
+              conversation_id: conversationId,
+              user_id: userId,
+              filename: file.originalname,
+              mimetype: file.mimetype,
+              size: file.size,
+              created_at: fileData.uploadedAt
+            })
+            .select()
+            .single();
+
+          if (fileError) {
+            console.error('Error saving file metadata:', fileError);
+          }
+
+          // Optionally: Upload file to Supabase Storage
+          // const { data: storageData, error: storageError } = await supabase.storage
+          //   .from('user-files')
+          //   .upload(`${userId}/${conversationId}/${fileData.id}`, file.buffer, {
+          //     contentType: file.mimetype
+          //   });
+
+        } catch (dbError) {
+          console.error('Database error:', dbError);
+        }
+      }
+
+      uploadedFiles.push({
+        id: fileData.id,
+        filename: fileData.filename,
+        mimetype: fileData.mimetype,
+        size: fileData.size
+      });
+    }
+
+    res.json({
+      success: true,
+      files: uploadedFiles,
+      message: `Successfully uploaded ${uploadedFiles.length} file(s)`
+    });
+
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'File upload failed'
+    });
   }
 });
 
@@ -512,12 +634,169 @@ app.get('/api/workflows', async (req, res) => {
   }
 });
 
+// ElevenLabs voice endpoints
+const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
+
+// Text-to-speech endpoint
+app.post('/api/voice/tts', async (req, res) => {
+  try {
+    const { text, voiceId = 'EXAVITQu4vr4xnSDxMaL' } = req.body; // Default: Bella voice
+
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        error: 'Text is required'
+      });
+    }
+
+    if (!elevenLabsApiKey) {
+      return res.status(500).json({
+        success: false,
+        error: 'ElevenLabs API key not configured'
+      });
+    }
+
+    const voice = new ElevenLabs({
+      apiKey: elevenLabsApiKey,
+      voiceId: voiceId,
+    });
+
+    const audioStream = await voice.textToSpeech({
+      text: text,
+      modelId: 'eleven_monolingual_v1',
+    });
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    audioStream.pipe(res);
+
+  } catch (error) {
+    console.error('TTS error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Text-to-speech failed'
+    });
+  }
+});
+
+// Get available voices
+app.get('/api/voice/voices', async (req, res) => {
+  try {
+    if (!elevenLabsApiKey) {
+      return res.status(500).json({
+        success: false,
+        error: 'ElevenLabs API key not configured'
+      });
+    }
+
+    const voices = await ElevenLabs.getVoices(elevenLabsApiKey);
+    res.json({
+      success: true,
+      voices: voices
+    });
+
+  } catch (error) {
+    console.error('Voices fetch error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch voices'
+    });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'SkyRas v2 Backend running' });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 SkyRas v2 running on port ${PORT}`);
   console.log(`📱 Open: http://localhost:${PORT}`);
+});
+
+// WebSocket server for real-time voice conversations
+const wss = new WebSocket.Server({ server });
+
+wss.on('connection', (ws) => {
+  console.log('WebSocket client connected');
+
+  let elevenLabsWs = null;
+
+  ws.on('message', async (message) => {
+    try {
+      const data = JSON.parse(message);
+
+      if (data.type === 'start_voice_session') {
+        // Initialize ElevenLabs WebSocket connection
+        if (!elevenLabsApiKey) {
+          ws.send(JSON.stringify({
+            type: 'error',
+            error: 'ElevenLabs API key not configured'
+          }));
+          return;
+        }
+
+        const voiceId = data.voiceId || 'EXAVITQu4vr4xnSDxMaL';
+        const wsUrl = `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=eleven_monolingual_v1`;
+
+        elevenLabsWs = new WebSocket(wsUrl, {
+          headers: {
+            'xi-api-key': elevenLabsApiKey
+          }
+        });
+
+        elevenLabsWs.on('open', () => {
+          ws.send(JSON.stringify({ type: 'voice_session_started' }));
+
+          // Send initial config
+          elevenLabsWs.send(JSON.stringify({
+            text: ' ',
+            voice_settings: {
+              stability: 0.5,
+              similarity_boost: 0.75
+            }
+          }));
+        });
+
+        elevenLabsWs.on('message', (audioData) => {
+          // Forward audio chunks to client
+          ws.send(audioData);
+        });
+
+        elevenLabsWs.on('error', (error) => {
+          console.error('ElevenLabs WebSocket error:', error);
+          ws.send(JSON.stringify({
+            type: 'error',
+            error: error.message
+          }));
+        });
+
+      } else if (data.type === 'text_chunk' && elevenLabsWs) {
+        // Forward text chunk to ElevenLabs for streaming TTS
+        elevenLabsWs.send(JSON.stringify({
+          text: data.text,
+          try_trigger_generation: true
+        }));
+
+      } else if (data.type === 'end_voice_session' && elevenLabsWs) {
+        // End the stream
+        elevenLabsWs.send(JSON.stringify({ text: '' }));
+        elevenLabsWs.close();
+        elevenLabsWs = null;
+      }
+
+    } catch (error) {
+      console.error('WebSocket message error:', error);
+      ws.send(JSON.stringify({
+        type: 'error',
+        error: error.message
+      }));
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('WebSocket client disconnected');
+    if (elevenLabsWs) {
+      elevenLabsWs.close();
+    }
+  });
 });

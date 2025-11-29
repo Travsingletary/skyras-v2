@@ -35,8 +35,12 @@ export default function Home() {
   const [accessCode, setAccessCode] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recognitionRef = useRef<any>(null);
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
   const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE || "";
@@ -109,6 +113,81 @@ export default function Home() {
 
   const removeFile = (index: number) => {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Play voice response using ElevenLabs TTS
+  const playVoiceResponse = async (text: string) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/voice/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, voiceId: 'EXAVITQu4vr4xnSDxMaL' })
+      });
+
+      if (!response.ok) {
+        console.warn('Voice playback not available');
+        return;
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      await audio.play();
+      audio.onended = () => URL.revokeObjectURL(audioUrl);
+    } catch (error) {
+      console.warn('Voice playback error:', error);
+    }
+  };
+
+  // Start voice recording
+  const startRecording = async () => {
+    try {
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setMessage(transcript);
+          setVoiceStatus(null);
+          setIsRecording(false);
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error('Speech recognition error:', event.error);
+          setVoiceStatus('Speech recognition failed. Please type your message.');
+          setIsRecording(false);
+        };
+
+        recognition.onend = () => {
+          setIsRecording(false);
+        };
+
+        recognition.start();
+        recognitionRef.current = recognition;
+        setIsRecording(true);
+        setVoiceStatus('Listening...');
+      } else {
+        setVoiceStatus('Voice input not supported in this browser.');
+        setTimeout(() => setVoiceStatus(null), 3000);
+      }
+    } catch (error) {
+      console.error('Microphone access error:', error);
+      setVoiceStatus('Microphone access denied');
+      setIsRecording(false);
+    }
+  };
+
+  // Stop voice recording
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
+    setIsRecording(false);
+    setVoiceStatus(null);
   };
 
   const handleSend = async () => {
@@ -224,6 +303,9 @@ export default function Home() {
           content: data.response,
         };
         setMessages((prev) => [...prev, assistantMessage]);
+        
+        // Play voice response
+        playVoiceResponse(data.response);
       }
 
       // Update user message with actual file IDs
@@ -481,15 +563,35 @@ export default function Home() {
               )}
             </button>
 
-            {/* Mic Button (disabled) */}
+            {/* Mic Button */}
             <button
-              disabled
-              className="flex items-center justify-center w-11 h-11 rounded-lg border border-zinc-300 bg-white opacity-50 cursor-not-allowed"
-              title="Voice coming soon"
+              type="button"
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onMouseLeave={stopRecording}
+              onTouchStart={(e) => {
+                e.preventDefault();
+                startRecording();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                stopRecording();
+              }}
+              className={`flex items-center justify-center w-11 h-11 rounded-lg border transition-colors ${
+                isRecording
+                  ? 'bg-red-500 text-white border-red-500'
+                  : 'border-zinc-300 bg-white hover:bg-zinc-50'
+              }`}
+              title={isRecording ? 'Recording... Release to stop' : 'Hold to record voice message'}
             >
-              🎙
+              🎙️
             </button>
           </div>
+          
+          {/* Voice Status */}
+          {voiceStatus && (
+            <div className="text-xs text-zinc-500 mt-2">{voiceStatus}</div>
+          )}
         </div>
       </div>
     </div>
