@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
+export const dynamic = 'force-dynamic';
+
 interface Message {
   id: string;
   role: "user" | "assistant";
