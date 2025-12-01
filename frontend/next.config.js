@@ -7,9 +7,6 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   output: 'standalone',
-  experimental: {
-    isrMemoryCacheSize: 0,
-  },
   generateBuildId: async () => {
     return 'build'
   },
