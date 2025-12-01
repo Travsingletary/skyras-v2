@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import Anthropic from "@anthropic-ai/sdk";
 import { AgentDelegation, AgentExecutionContext, AgentRunInput, AgentRunResult, BaseAgent } from "@/agents/core/BaseAgent";
 import { createLogger } from "@/lib/logger";
 import {
@@ -17,6 +18,7 @@ import type {
   DistributionPayload,
   LicensingAuditFile,
 } from "./marcusActions";
+import { getMarcusPreferences, formatPreferencesContext } from "./marcusPreferences";
 
 function loadSystemPrompt() {
   const promptPath = path.join(process.cwd(), "src/agents/marcus/marcusSystemPrompt.md");
@@ -35,6 +37,8 @@ const DISTRIBUTION_KEYWORDS = /(post|posting plan|schedule|distribution|publish|
 const CATALOG_KEYWORDS = /(catalog|tag|metadata|save asset|store asset)/i;
 
 class MarcusAgent extends BaseAgent {
+  private anthropic: Anthropic | null = null;
+
   constructor() {
     super({
       name: "Marcus",
@@ -42,6 +46,56 @@ class MarcusAgent extends BaseAgent {
       systemPrompt: SYSTEM_PROMPT,
       logger: createLogger("MarcusAgent"),
     });
+
+    // Initialize Anthropic client if API key is available and valid
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (apiKey && apiKey.startsWith('sk-ant-') && apiKey.length > 20) {
+      this.anthropic = new Anthropic({ apiKey });
+    }
+  }
+
+  /**
+   * Generate an AI response using Claude for general chat queries
+   *
+   * This method integrates Marcus Prime Directives and user preferences
+   * to provide personalized, action-oriented responses.
+   */
+  private async generateAIResponse(prompt: string, context: AgentExecutionContext, userId?: string): Promise<string> {
+    if (!this.anthropic) {
+      return "I'm currently in keyword-based mode. For full AI chat capabilities, please configure ANTHROPIC_API_KEY in your environment.";
+    }
+
+    try {
+      // Load user preferences (currently hard-coded for Trav, future: load from Supabase)
+      const preferences = getMarcusPreferences(userId);
+      const preferencesContext = formatPreferencesContext(preferences);
+
+      // Combine system prompt with user-specific context
+      const enhancedSystemPrompt = `${SYSTEM_PROMPT}\n\n${preferencesContext}`;
+
+      context.logger.debug("Generating AI response with preferences", {
+        userId: preferences.userId,
+        maxTasks: preferences.taskStyle.maxTasksPerResponse
+      });
+
+      const message = await this.anthropic.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 1024,
+        system: enhancedSystemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+      });
+
+      const textContent = message.content.find((block) => block.type === "text");
+      return textContent && textContent.type === "text" ? textContent.text : "No response generated.";
+    } catch (error) {
+      context.logger.error("AI response generation failed", { error });
+      return `I encountered an error generating a response: ${(error as Error).message}`;
+    }
   }
 
   protected async handleRun(input: AgentRunInput, context: AgentExecutionContext): Promise<AgentRunResult> {
@@ -159,6 +213,57 @@ class MarcusAgent extends BaseAgent {
         }
       } else {
         outputLines.push("Catalog request missing name/project in metadata.");
+      }
+    }
+
+    // If no specific keywords matched, generate AI response for general chat
+    const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog;
+    if (!hasSpecificAction) {
+      context.logger.info("No specific action keywords detected, generating AI response");
+      const userId = input.metadata?.userId as string | undefined;
+      const aiResponse = await this.generateAIResponse(input.prompt, context, userId);
+      return {
+        output: aiResponse,
+        delegations,
+        notes: notesPayload,
+      };
+    }
+
+    // If delegations occurred, wrap results with AI-enhanced explanation
+    // This applies Prime Directives to delegation results
+    if (delegations.length > 0 && this.anthropic) {
+      const userId = input.metadata?.userId as string | undefined;
+      const preferences = getMarcusPreferences(userId);
+      const preferencesContext = formatPreferencesContext(preferences);
+      const enhancedSystemPrompt = `${SYSTEM_PROMPT}\n\n${preferencesContext}`;
+
+      try {
+        const delegationSummary = outputLines.join('\n');
+        const wrapperPrompt = `I delegated the following tasks:\n\n${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented.`;
+
+        const message = await this.anthropic.messages.create({
+          model: "claude-3-haiku-20240307",
+          max_tokens: 512,
+          system: enhancedSystemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: wrapperPrompt,
+            },
+          ],
+        });
+
+        const textContent = message.content.find((block) => block.type === "text");
+        if (textContent && textContent.type === "text") {
+          return {
+            output: textContent.text,
+            delegations,
+            notes: notesPayload,
+          };
+        }
+      } catch (error) {
+        context.logger.error("Failed to wrap delegation results", { error });
+        // Fall through to default output
       }
     }
 
