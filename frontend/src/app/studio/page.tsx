@@ -38,8 +38,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
-
   // Initialize userId from localStorage
   useEffect(() => {
     let storedUserId = localStorage.getItem("userId");
@@ -86,10 +84,9 @@ export default function Home() {
           });
           formData.append("userId", userId);
 
-          const uploadRes = await fetch(`${apiBaseUrl}/api/upload`, {
-            method: "POST",
-            body: formData,
-          });
+          // File upload disabled - requires backend integration
+          console.warn('[Upload] File upload disabled');
+          throw new Error('File upload not implemented');
 
           if (!uploadRes.ok) {
             const uploadError = await uploadRes.text();
@@ -112,8 +109,8 @@ export default function Home() {
         }
       }
 
-      // Send chat message
-      console.log(`[Chat] Sending message to ${apiBaseUrl}/api/chat`);
+      // Send chat message to Next.js API route
+      console.log('[Chat] Sending message to /api/chat');
       console.log("[Chat] Payload:", {
         conversationId,
         userId,
@@ -121,7 +118,7 @@ export default function Home() {
         files: fileIds.map((id) => ({ fileId: id })),
       });
 
-      const res = await fetch(`${apiBaseUrl}/api/chat`, {
+      const res = await fetch('/api/chat', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

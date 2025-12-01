@@ -6,6 +6,7 @@ import { AgentDelegation, AgentExecutionContext, AgentRunInput, AgentRunResult, 
 import { createLogger } from "@/lib/logger";
 import {
   collectStudioNotes,
+  fetchLinkContent,
   logPlanToSupabase,
   runCatalogSave,
   runCreativeGeneration,
@@ -17,6 +18,7 @@ import type {
   CreativeGenerationPayload,
   DistributionPayload,
   LicensingAuditFile,
+  LinkFetchPayload,
 } from "./marcusActions";
 import { getMarcusPreferences, formatPreferencesContext } from "./marcusPreferences";
 
@@ -35,6 +37,7 @@ const LICENSING_KEYWORDS = /(license|licensing|watermark|demo)/i;
 const CREATIVE_KEYWORDS = /(idea|script|prompt|concept|scene|treatment|story|cover art|sora|skit|marketing hook|shot|outline)/i;
 const DISTRIBUTION_KEYWORDS = /(post|posting plan|schedule|distribution|publish|rollout|slots)/i;
 const CATALOG_KEYWORDS = /(catalog|tag|metadata|save asset|store asset)/i;
+const URL_PATTERN = /https?:\/\/[^\s]+/gi;
 
 class MarcusAgent extends BaseAgent {
   private anthropic: Anthropic | null = null;
@@ -73,21 +76,33 @@ class MarcusAgent extends BaseAgent {
       // Combine system prompt with user-specific context
       const enhancedSystemPrompt = `${SYSTEM_PROMPT}\n\n${preferencesContext}`;
 
-      context.logger.debug("Generating AI response with preferences", {
+      // Load conversation history from memory (last 10 exchanges = 20 messages)
+      const history = await context.memory.history(20);
+
+      // Convert memory records to Anthropic message format
+      const conversationMessages = history.map((record) => ({
+        role: record.role,
+        content: record.content,
+      }));
+
+      // Add current prompt as the latest user message
+      conversationMessages.push({
+        role: "user" as const,
+        content: prompt,
+      });
+
+      context.logger.debug("Generating AI response with preferences and memory", {
         userId: preferences.userId,
-        maxTasks: preferences.taskStyle.maxTasksPerResponse
+        maxTasks: preferences.taskStyle.maxTasksPerResponse,
+        historyLength: history.length,
+        totalMessages: conversationMessages.length
       });
 
       const message = await this.anthropic.messages.create({
         model: "claude-3-haiku-20240307",
         max_tokens: 1024,
         system: enhancedSystemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+        messages: conversationMessages,
       });
 
       const textContent = message.content.find((block) => block.type === "text");
@@ -216,8 +231,28 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
+    // Check for URLs in the prompt and fetch them
+    const urls = input.prompt.match(URL_PATTERN);
+    let fetchedLinks = false;
+    if (urls && urls.length > 0) {
+      fetchedLinks = true;
+      for (const url of urls) {
+        try {
+          const linkPayload: LinkFetchPayload = {
+            url,
+            context: input.prompt,
+          };
+          const fetchResult = await fetchLinkContent(context, linkPayload);
+          outputLines.push(fetchResult.summary);
+          notesPayload[`link_${urls.indexOf(url)}`] = fetchResult.data;
+        } catch (error) {
+          outputLines.push(`Failed to fetch ${url}: ${(error as Error).message}`);
+        }
+      }
+    }
+
     // If no specific keywords matched, generate AI response for general chat
-    const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog;
+    const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog || fetchedLinks;
     if (!hasSpecificAction) {
       context.logger.info("No specific action keywords detected, generating AI response");
       const userId = input.metadata?.userId as string | undefined;
@@ -238,19 +273,27 @@ class MarcusAgent extends BaseAgent {
       const enhancedSystemPrompt = `${SYSTEM_PROMPT}\n\n${preferencesContext}`;
 
       try {
+        // Load conversation history for context-aware wrapping
+        const history = await context.memory.history(20);
+        const conversationMessages = history.map((record) => ({
+          role: record.role,
+          content: record.content,
+        }));
+
         const delegationSummary = outputLines.join('\n');
         const wrapperPrompt = `I delegated the following tasks:\n\n${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented.`;
+
+        // Add wrapper prompt as latest user message
+        conversationMessages.push({
+          role: "user" as const,
+          content: wrapperPrompt,
+        });
 
         const message = await this.anthropic.messages.create({
           model: "claude-3-haiku-20240307",
           max_tokens: 512,
           system: enhancedSystemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: wrapperPrompt,
-            },
-          ],
+          messages: conversationMessages,
         });
 
         const textContent = message.content.find((block) => block.type === "text");

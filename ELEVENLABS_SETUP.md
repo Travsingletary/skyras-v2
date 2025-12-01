@@ -147,3 +147,6 @@ After setting up the API key:
 
 **Note**: The backend already has all the code to use `ELEVENLABS_API_KEY`. You just need to add the key to your environment variables!
 
+
+
+

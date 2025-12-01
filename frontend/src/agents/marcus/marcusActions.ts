@@ -48,6 +48,11 @@ export interface CatalogPayload {
   metadata?: Record<string, unknown>;
 }
 
+export interface LinkFetchPayload {
+  url: string;
+  context?: string;
+}
+
 export async function collectStudioNotes(context: AgentExecutionContext): Promise<MarcusActionResult> {
   const files = await listFiles(".");
   context.logger.debug("Scanned repo root for notes", { count: files.length });
@@ -127,4 +132,72 @@ export async function runCatalogSave(context: AgentExecutionContext, payload: Ca
   });
 
   return { delegation, result };
+}
+
+export async function fetchLinkContent(context: AgentExecutionContext, payload: LinkFetchPayload): Promise<MarcusActionResult> {
+  if (!payload.url) {
+    throw new Error("url is required for link fetching");
+  }
+
+  try {
+    context.logger.debug("Fetching link content", { url: payload.url });
+
+    const response = await fetch(payload.url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; MarcusBot/1.0; +https://skyras.com)',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    });
+
+    if (!response.ok) {
+      return {
+        summary: `Failed to fetch link: HTTP ${response.status}`,
+        data: { url: payload.url, status: response.status, statusText: response.statusText },
+      };
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      const json = await response.json();
+      return {
+        summary: `Fetched JSON content from ${payload.url}`,
+        data: { url: payload.url, contentType: 'json', content: json },
+      };
+    } else if (contentType.includes('text/html')) {
+      const html = await response.text();
+      // Extract title and meta description for preview
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const descMatch = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+
+      return {
+        summary: `Fetched HTML content from ${payload.url}`,
+        data: {
+          url: payload.url,
+          contentType: 'html',
+          title: titleMatch?.[1] || 'No title found',
+          description: descMatch?.[1] || 'No description found',
+          contentLength: html.length,
+          preview: html.slice(0, 1000), // First 1000 chars as preview
+        },
+      };
+    } else {
+      const text = await response.text();
+      return {
+        summary: `Fetched text content from ${payload.url}`,
+        data: {
+          url: payload.url,
+          contentType: contentType || 'text/plain',
+          content: text.slice(0, 2000), // First 2000 chars
+          contentLength: text.length,
+        },
+      };
+    }
+  } catch (error) {
+    context.logger.error("Link fetch failed", { error, url: payload.url });
+    return {
+      summary: `Failed to fetch link: ${(error as Error).message}`,
+      data: { url: payload.url, error: (error as Error).message },
+    };
+  }
 }
