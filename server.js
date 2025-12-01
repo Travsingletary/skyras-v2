@@ -638,29 +638,10 @@ app.get('/api/workflows', async (req, res) => {
 const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY;
 
 // Text-to-speech endpoint
-app.post('/api/voice/tts', express.text({ type: '*/*', limit: '10mb' }), async (req, res) => {
+app.post('/api/voice/tts', async (req, res) => {
   try {
-    // Parse JSON manually to handle any escaping issues
-    let parsedBody;
-    try {
-      // If body is already parsed by json middleware
-      if (typeof req.body === 'object' && req.body !== null) {
-        parsedBody = req.body;
-      } else {
-        // Parse manually
-        parsedBody = JSON.parse(req.body);
-      }
-    } catch (parseError) {
-      console.error('[TTS] JSON parse error:', parseError.message);
-      console.error('[TTS] Raw body:', req.body);
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid JSON in request body'
-      });
-    }
-
-    console.log('[TTS] Request received, text length:', parsedBody.text?.length);
-    const { text, voiceId = 'EXAVITQu4vr4xnSDxMaL' } = parsedBody;
+    console.log('[TTS] Request received, text length:', req.body?.text?.length);
+    const { text, voiceId = 'EXAVITQu4vr4xnSDxMaL' } = req.body;
 
     if (!text) {
       return res.status(400).json({
