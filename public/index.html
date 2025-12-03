@@ -39,9 +39,18 @@
           <div class="p-4 border-b border-gray-200 bg-gray-50">
             <div class="flex items-center justify-between">
               <h1 class="text-xl font-semibold text-gray-900">SkyRas v2</h1>
-              <div class="flex items-center space-x-2">
-                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span class="text-sm text-gray-600">Marcus</span>
+              <div class="flex items-center space-x-3">
+                <button
+                  id="newChatButton"
+                  class="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                  title="Start a new conversation"
+                >
+                  + New Chat
+                </button>
+                <div class="flex items-center space-x-2">
+                  <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span class="text-sm text-gray-600">Marcus</span>
+                </div>
               </div>
             </div>
             <p class="text-sm text-gray-500 mt-1">Chat with your AI project manager</p>
@@ -163,9 +172,9 @@
       const messageInput = document.getElementById('messageInput');
       const sendButton = document.getElementById('sendButton');
       const voiceButton = document.getElementById('voiceButton');
+      const newChatButton = document.getElementById('newChatButton');
 
       // Session state
-      let conversationId = null; // Will be set after first message
       // Generate a valid UUID v4 for temp users
       const generateUUID = () => {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -178,6 +187,10 @@
       if (!localStorage.getItem('temp-user-id')) {
         localStorage.setItem('temp-user-id', userId);
       }
+
+      // Persist conversation ID in localStorage for memory across page refreshes
+      let conversationId = localStorage.getItem('conversation-id') || null;
+
       let uploadedFiles = []; // Store uploaded file IDs
 
       function formatTime(date = new Date()) {
@@ -344,6 +357,38 @@
       });
 
       // =====================================================
+      // NEW CHAT BUTTON
+      // =====================================================
+
+      newChatButton.addEventListener('click', () => {
+        if (confirm('Start a new conversation? This will clear your current chat.')) {
+          // Clear conversation ID
+          conversationId = null;
+          localStorage.removeItem('conversation-id');
+
+          // Clear messages
+          messagesContainer.innerHTML = `
+            <div class="text-center text-gray-500 mt-8">
+              <div class="text-4xl mb-4">🤖</div>
+              <p class="text-lg font-medium">Welcome to SkyRas v2!</p>
+              <p class="text-sm mt-2">Start chatting with Marcus to manage your projects.</p>
+              <div class="mt-4 text-xs text-gray-400 space-y-1">
+                <p>Try: "Show me tasks due this week"</p>
+                <p>Or: "What's behind schedule?"</p>
+              </div>
+            </div>
+          `;
+
+          // Reset dashboard
+          dashboardEmpty.classList.remove('hidden');
+          dashboardContent.classList.add('hidden');
+          if (pollingInterval) clearInterval(pollingInterval);
+
+          console.log('New conversation started');
+        }
+      });
+
+      // =====================================================
       // VOICE HANDLING (PLACEHOLDER)
       // =====================================================
 
@@ -432,6 +477,7 @@
           // Update conversationId if this was the first message
           if (chatData.conversationId && !conversationId) {
             conversationId = chatData.conversationId;
+            localStorage.setItem('conversation-id', conversationId);
             console.log('Conversation started:', conversationId);
           }
 
