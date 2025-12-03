@@ -110,12 +110,43 @@
         </div>
       </div>
 
-      <div class="hidden lg:flex flex-1 p-6">
-        <div id="projectView" class="h-full flex items-center justify-center w-full">
+      <!-- Action Dashboard Panel (Right) -->
+      <div id="dashboard" class="hidden lg:flex lg:w-2/3 flex-col bg-gray-50 p-6 overflow-y-auto">
+        <!-- Empty State -->
+        <div id="dashboardEmpty" class="flex h-full items-center justify-center">
           <div class="text-center text-gray-500">
-            <div class="text-6xl mb-4">📊</div>
-            <h2 class="text-2xl font-semibold mb-2">Project Dashboard</h2>
-            <p class="text-lg">Chat with Marcus to see your project data here.</p>
+            <div class="mb-4 text-6xl">📊</div>
+            <h2 class="mb-2 text-2xl font-semibold">Action Dashboard</h2>
+            <p class="text-lg">Start chatting to see live activity</p>
+          </div>
+        </div>
+
+        <!-- Dashboard Content (hidden initially) -->
+        <div id="dashboardContent" class="hidden space-y-6">
+          <!-- Recent Actions Section -->
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900 mb-3">Recent Actions</h2>
+            <div id="actionsContainer" class="space-y-2">
+              <!-- Action cards will be inserted here -->
+            </div>
+          </div>
+
+          <!-- Active Tasks Section -->
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900 mb-3">
+              Active Tasks <span id="taskCount" class="text-sm text-gray-500"></span>
+            </h2>
+            <div id="tasksContainer" class="space-y-2">
+              <!-- Task cards will be inserted here -->
+            </div>
+          </div>
+
+          <!-- Workflow Section (if exists) -->
+          <div id="workflowSection" class="hidden">
+            <h2 class="text-lg font-semibold text-gray-900 mb-3">Workflow Progress</h2>
+            <div id="workflowContainer">
+              <!-- Workflow progress will be inserted here -->
+            </div>
           </div>
         </div>
       </div>
@@ -414,6 +445,11 @@
           // Clear uploaded files after successful chat
           uploadedFiles = [];
 
+          // NEW: Update dashboard with action results
+          if (chatData.actionResults && chatData.actionResults.length > 0) {
+            updateDashboardWithActions(chatData.actionResults, chatData);
+          }
+
         } catch (error) {
           console.error('Chat error:', error);
           addMessage(`❌ Error: ${error.message}`, 'agent', 'System');
@@ -423,6 +459,231 @@
           sendButton.textContent = 'Send';
         }
       });
+
+      // =====================================================
+      // ACTION DASHBOARD LOGIC
+      // =====================================================
+
+      // Dashboard state
+      let trackedTaskIds = [];
+      let trackedWorkflowId = null;
+      let pollingInterval = null;
+
+      // Get dashboard elements
+      const dashboardEmpty = document.getElementById('dashboardEmpty');
+      const dashboardContent = document.getElementById('dashboardContent');
+      const actionsContainer = document.getElementById('actionsContainer');
+      const tasksContainer = document.getElementById('tasksContainer');
+      const workflowSection = document.getElementById('workflowSection');
+      const workflowContainer = document.getElementById('workflowContainer');
+      const taskCount = document.getElementById('taskCount');
+
+      // Action icons mapping
+      const actionIcons = {
+        'CREATE_TASK': '📝',
+        'DELEGATE_TO_AGENT': '👤',
+        'RUN_WORKFLOW_PLAN': '⚙️',
+        'UPDATE_TASK_STATUS': '🔄',
+        'ATTACH_FILE_TO_TASK': '📎',
+        'WRITE_SUMMARY_NOTE': '📋'
+      };
+
+      // Status colors (Tailwind classes)
+      function getStatusColor(status) {
+        const colors = {
+          'pending': 'bg-gray-100 text-gray-800',
+          'in_progress': 'bg-blue-100 text-blue-800',
+          'completed': 'bg-green-100 text-green-800',
+          'failed': 'bg-red-100 text-red-800'
+        };
+        return colors[status] || 'bg-gray-100 text-gray-800';
+      }
+
+      // Agent colors
+      function getAgentColor(agent) {
+        const colors = {
+          'Marcus': 'bg-blue-100 text-blue-800',
+          'Giorgio': 'bg-purple-100 text-purple-800',
+          'Letitia': 'bg-pink-100 text-pink-800',
+          'Jamal': 'bg-orange-100 text-orange-800'
+        };
+        return colors[agent] || 'bg-gray-100 text-gray-800';
+      }
+
+      // Render action card
+      function renderActionCard(action) {
+        const icon = actionIcons[action.actionType] || '⚡';
+        const statusBadge = action.success
+          ? '<span class="text-xs px-2 py-1 rounded bg-green-100 text-green-800">✓ Success</span>'
+          : '<span class="text-xs px-2 py-1 rounded bg-red-100 text-red-800">✗ Failed</span>';
+
+        let details = '';
+        if (action.taskId) {
+          details += `<p class="text-xs text-gray-500 mt-1">Task ID: ${action.taskId.substring(0, 8)}...</p>`;
+        }
+        if (action.workflowId) {
+          details += `<p class="text-xs text-gray-500 mt-1">Workflow ID: ${action.workflowId.substring(0, 8)}...</p>`;
+        }
+        if (action.error) {
+          details += `<p class="text-xs text-red-600 mt-1">Error: ${action.error}</p>`;
+        }
+
+        return `
+          <div class="p-3 bg-white rounded-lg border border-gray-200">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="text-lg">${icon}</span>
+                <span class="text-sm font-medium text-gray-900">${action.actionType}</span>
+              </div>
+              ${statusBadge}
+            </div>
+            ${details}
+          </div>
+        `;
+      }
+
+      // Render task card
+      function renderTaskCard(task) {
+        const statusColor = getStatusColor(task.status);
+        const agentColor = getAgentColor(task.agent);
+
+        return `
+          <div class="p-3 bg-white rounded-lg border border-gray-200">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-medium text-gray-900">${task.title}</span>
+              <div class="flex items-center space-x-1">
+                <span class="text-xs px-2 py-1 rounded ${agentColor}">${task.agent}</span>
+                <span class="text-xs px-2 py-1 rounded ${statusColor}">${task.status}</span>
+              </div>
+            </div>
+            ${task.description ? `<p class="text-xs text-gray-600 mb-2">${task.description}</p>` : ''}
+            ${task.result ? `<p class="text-xs text-green-700 bg-green-50 p-2 rounded mt-2"><strong>Result:</strong> ${task.result}</p>` : ''}
+            ${task.error ? `<p class="text-xs text-red-700 bg-red-50 p-2 rounded mt-2"><strong>Error:</strong> ${task.error}</p>` : ''}
+          </div>
+        `;
+      }
+
+      // Update dashboard with action results
+      function updateDashboardWithActions(actionResults, chatData) {
+        // Show dashboard content, hide empty state
+        dashboardEmpty.classList.add('hidden');
+        dashboardContent.classList.remove('hidden');
+
+        // Render actions
+        actionsContainer.innerHTML = actionResults.map(renderActionCard).join('');
+
+        // Track task IDs and workflow ID
+        trackedTaskIds = chatData.taskIds || [];
+        trackedWorkflowId = chatData.workflowId || null;
+
+        // Start polling for task updates
+        startPolling();
+
+        // Initial task fetch
+        pollTaskUpdates();
+      }
+
+      // Start polling for task updates
+      function startPolling() {
+        if (pollingInterval) clearInterval(pollingInterval);
+        pollingInterval = setInterval(pollTaskUpdates, 5000); // Poll every 5 seconds
+      }
+
+      // Poll for task updates
+      async function pollTaskUpdates() {
+        if (!conversationId) return;
+
+        try {
+          const response = await fetch(`/api/tasks?conversationId=${conversationId}`);
+          if (!response.ok) return;
+
+          const data = await response.json();
+          if (data.tasks && data.tasks.length > 0) {
+            renderTasks(data.tasks);
+
+            // Update workflow if exists
+            if (trackedWorkflowId) {
+              pollWorkflowProgress();
+            }
+          }
+        } catch (error) {
+          console.error('Error polling tasks:', error);
+        }
+      }
+
+      // Render tasks
+      function renderTasks(tasks) {
+        if (!tasks || tasks.length === 0) {
+          tasksContainer.innerHTML = '<p class="text-sm text-gray-500">No tasks yet</p>';
+          taskCount.textContent = '';
+          return;
+        }
+
+        tasksContainer.innerHTML = tasks.map(renderTaskCard).join('');
+        taskCount.textContent = `(${tasks.length})`;
+      }
+
+      // Poll workflow progress
+      async function pollWorkflowProgress() {
+        if (!trackedWorkflowId) return;
+
+        try {
+          const response = await fetch(`/api/workflows/${trackedWorkflowId}`);
+          if (!response.ok) return;
+
+          const data = await response.json();
+          if (data.workflow) {
+            renderWorkflow(data.workflow, data.steps, data.tasks);
+          }
+        } catch (error) {
+          console.error('Error polling workflow:', error);
+        }
+      }
+
+      // Render workflow progress
+      function renderWorkflow(workflow, steps, tasks) {
+        workflowSection.classList.remove('hidden');
+
+        const totalSteps = steps.length;
+        const completedSteps = steps.filter(s => s.status === 'completed').length;
+
+        let stepsHTML = steps.map((step, index) => {
+          const statusColor = getStatusColor(step.status);
+          const agentColor = getAgentColor(step.agent);
+          const stepTasks = tasks.filter(t => t.workflow_step_id === step.id);
+
+          return `
+            <div class="p-3 bg-white rounded-lg border border-gray-200 mb-2">
+              <div class="flex items-center justify-between mb-1">
+                <div class="flex items-center space-x-2">
+                  <span class="text-xs font-semibold text-gray-500">Step ${index + 1}/${totalSteps}</span>
+                  <span class="text-sm font-medium text-gray-900">${step.description}</span>
+                </div>
+                <div class="flex items-center space-x-1">
+                  <span class="text-xs px-2 py-1 rounded ${agentColor}">${step.agent}</span>
+                  <span class="text-xs px-2 py-1 rounded ${statusColor}">${step.status}</span>
+                </div>
+              </div>
+              ${step.instruction ? `<p class="text-xs text-gray-600">${step.instruction}</p>` : ''}
+              ${stepTasks.length > 0 ? `<p class="text-xs text-gray-500 mt-1">${stepTasks.length} task(s)</p>` : ''}
+            </div>
+          `;
+        }).join('');
+
+        workflowContainer.innerHTML = `
+          <div class="mb-3">
+            <h3 class="text-md font-semibold text-gray-900">${workflow.name}</h3>
+            <p class="text-sm text-gray-600">${workflow.description || ''}</p>
+            <div class="mt-2 flex items-center space-x-2">
+              <div class="flex-1 bg-gray-200 rounded-full h-2">
+                <div class="bg-blue-600 h-2 rounded-full" style="width: ${(completedSteps / totalSteps) * 100}%"></div>
+              </div>
+              <span class="text-xs text-gray-600">${completedSteps}/${totalSteps} completed</span>
+            </div>
+          </div>
+          ${stepsHTML}
+        `;
+      }
     </script>
   </body>
 </html>
