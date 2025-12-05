@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 
-export const dynamic = 'force-dynamic';
-
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -26,21 +24,10 @@ interface UploadResponse {
   error?: string;
 }
 
-// Marcus intro message (UI-only, not sent to backend)
-const MARCUS_INTRO = `Hey! I'm Marcus, your workflow builder. I help content creators and marketers build systems that actually fit their life.
-
-Let's get you set up. What do you do? (freelance creator, agency, in-house, etc.)`;
-
 export default function Home() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'marcus-intro',
-      role: 'assistant',
-      content: MARCUS_INTRO
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [message, setMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,35 +35,24 @@ export default function Home() {
   const [accessCode, setAccessCode] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recognitionRef = useRef<any>(null);
 
-  // SAFETY LOCK: Prevent duplicate submissions
-  const isSendingRef = useRef<boolean>(false);
-
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
   const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE || "";
 
   // Check authentication on mount
   useEffect(() => {
-    // Skip access gate in development for faster iteration
-    if (process.env.NODE_ENV === "development") {
-      setIsAuthenticated(true);
-      return;
-    }
-
-    // In production: only gate if access code is configured
+    const storedAuth = localStorage.getItem("marcus_access");
     const expectedCode = requiredAccessCode;
+    
+    // If no access code is required, allow access
     if (!expectedCode || expectedCode === "") {
       setIsAuthenticated(true);
       return;
     }
 
-    // Check if user already authenticated via localStorage
-    const storedAuth = localStorage.getItem("marcus_access");
+    // Check if user is already authenticated
     if (storedAuth === expectedCode) {
       setIsAuthenticated(true);
     }
@@ -85,7 +61,7 @@ export default function Home() {
   // Initialize userId and conversationId from localStorage
   useEffect(() => {
     if (!isAuthenticated) return;
-
+    
     let storedUserId = localStorage.getItem("userId");
     if (!storedUserId) {
       storedUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -109,21 +85,14 @@ export default function Home() {
     e.preventDefault();
     setAccessError(null);
 
-    // Development bypass (should never reach here due to useEffect, but safe fallback)
-    if (process.env.NODE_ENV === "development") {
-      setIsAuthenticated(true);
-      return;
-    }
-
     const expectedCode = requiredAccessCode;
-
-    // Production: if no code configured, allow access
+    
+    // If no access code is required, allow access
     if (!expectedCode || expectedCode === "") {
       setIsAuthenticated(true);
       return;
     }
 
-    // Production with code: validate input
     if (accessCode === expectedCode) {
       localStorage.setItem("marcus_access", accessCode);
       setIsAuthenticated(true);
@@ -148,7 +117,7 @@ export default function Home() {
       console.log('[Voice] Playing TTS response');
 
       // Call backend TTS endpoint
-      const response = await fetch('http://localhost:4000/api/voice/tts', {
+      const response = await fetch(`${apiBaseUrl}/api/voice/tts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -181,75 +150,16 @@ export default function Home() {
     }
   };
 
-  // Start voice recording
-  const startRecording = async () => {
-    try {
-      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-
-        recognition.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          setMessage(transcript);
-          setVoiceStatus(null);
-          setIsRecording(false);
-        };
-
-        recognition.onerror = (event: any) => {
-          console.error('Speech recognition error:', event.error);
-          setVoiceStatus('Speech recognition failed. Please type your message.');
-          setIsRecording(false);
-        };
-
-        recognition.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognition.start();
-        recognitionRef.current = recognition;
-        setIsRecording(true);
-        setVoiceStatus('Listening...');
-      } else {
-        setVoiceStatus('Voice input not supported in this browser.');
-        setTimeout(() => setVoiceStatus(null), 3000);
-      }
-    } catch (error) {
-      console.error('Microphone access error:', error);
-      setVoiceStatus('Microphone access denied');
-      setIsRecording(false);
-    }
-  };
-
-  // Stop voice recording
-  const stopRecording = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      recognitionRef.current = null;
-    }
-    setIsRecording(false);
-    setVoiceStatus(null);
-  };
-
   const handleSend = async () => {
-    // SAFETY CHECK #1: Block if already sending
-    if (isSendingRef.current) {
-      console.log('[Safety] Blocked duplicate send attempt');
-      return;
-    }
-
     if (!message.trim() && pendingFiles.length === 0) return;
 
-    // SAFETY CHECK #2: Set lock IMMEDIATELY
-    isSendingRef.current = true;
     setIsLoading(true);
     setError(null);
 
     // Store message text and files before clearing
     const messageText = message;
     const filesToUpload = [...pendingFiles];
-
+    
     // 1) Optimistically append user message
     const userMessage: Message = {
       id: `msg_${Date.now()}`,
@@ -273,16 +183,50 @@ export default function Home() {
         fileInputRef.current.value = "";
       }
 
-      // 2) File upload temporarily disabled (requires backend integration)
+      // 2) Upload files if any
       const fileIds: string[] = [];
       if (filesToUpload.length > 0) {
-        console.warn('[Upload] File upload disabled - requires backend integration');
-        // Clear files for now
-        // TODO: Implement file upload to Next.js API route
+        console.log(`[Upload] Starting upload of ${filesToUpload.length} file(s)...`);
+        try {
+          const formData = new FormData();
+          filesToUpload.forEach((file) => {
+            formData.append("files", file);
+          });
+          formData.append("userId", userId);
+          if (conversationId) {
+            formData.append("conversationId", conversationId);
+          }
+
+          const uploadRes = await fetch(`${apiBaseUrl}/api/upload`, {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!uploadRes.ok) {
+            const uploadError = await uploadRes.text();
+            throw new Error(`Upload failed: ${uploadError}`);
+          }
+
+          const uploadData = (await uploadRes.json()) as UploadResponse;
+          console.log("[Upload] Success:", uploadData);
+
+          if (uploadData.files && uploadData.files.length > 0) {
+            fileIds.push(...uploadData.files.map((f) => f.id));
+          } else if (uploadData.success && (uploadData as any).data?.files) {
+            fileIds.push(...(uploadData as any).data.files.map((f: any) => f.id));
+          }
+        } catch (uploadErr) {
+          console.error("[Upload Error]:", uploadErr);
+          setError(`File upload failed: ${(uploadErr as Error).message}`);
+          setIsLoading(false);
+          // Remove the optimistic message on error
+          setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
+          return;
+        }
       }
 
-      // 3) POST to Next.js API route /api/chat
-      console.log('[Chat] Sending message to /api/chat');
+      // 3) POST to /api/chat
+      console.log(`[Chat] Sending message to ${apiBaseUrl}/api/chat`);
       const chatPayload = {
         conversationId,
         userId,
@@ -291,7 +235,7 @@ export default function Home() {
       };
       console.log("[Chat] Payload:", chatPayload);
 
-      const res = await fetch('/api/chat', {
+      const res = await fetch(`${apiBaseUrl}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(chatPayload),
@@ -353,7 +297,6 @@ export default function Home() {
       setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
     } finally {
       setIsLoading(false);
-      isSendingRef.current = false; // RELEASE LOCK
     }
   };
 
@@ -422,7 +365,8 @@ export default function Home() {
             >
               Dashboard
             </Link>
-            <div className="text-xs text-zinc-500 text-right">
+            <div className="text-xs text-zinc-500 space-y-1 text-right">
+              <div>API: <span className="font-mono">{apiBaseUrl}</span></div>
               <div>User: <span className="font-mono">{userId || "loading..."}</span></div>
             </div>
           </div>
@@ -530,16 +474,13 @@ export default function Home() {
           )}
 
           {/* Input Row */}
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }} className="flex items-end gap-2">
+          <div className="flex items-end gap-2">
             <div className="flex-1">
               <textarea
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter" && !e.shiftKey && (e.metaKey || e.ctrlKey)) {
                     e.preventDefault();
                     handleSend();
                   }
@@ -570,7 +511,7 @@ export default function Home() {
 
             {/* Send Button */}
             <button
-              type="submit"
+              onClick={handleSend}
               disabled={isLoading || (!message.trim() && pendingFiles.length === 0)}
               className="flex items-center justify-center w-11 h-11 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               title="Send message"
@@ -582,35 +523,15 @@ export default function Home() {
               )}
             </button>
 
-            {/* Mic Button */}
+            {/* Mic Button (disabled) */}
             <button
-              type="button"
-              onMouseDown={startRecording}
-              onMouseUp={stopRecording}
-              onMouseLeave={stopRecording}
-              onTouchStart={(e) => {
-                e.preventDefault();
-                startRecording();
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-                stopRecording();
-              }}
-              className={`flex items-center justify-center w-11 h-11 rounded-lg border transition-colors ${
-                isRecording
-                  ? 'bg-red-500 text-white border-red-500'
-                  : 'border-zinc-300 bg-white hover:bg-zinc-50'
-              }`}
-              title={isRecording ? 'Recording... Release to stop' : 'Hold to record voice message'}
+              disabled
+              className="flex items-center justify-center w-11 h-11 rounded-lg border border-zinc-300 bg-white opacity-50 cursor-not-allowed"
+              title="Voice coming soon"
             >
-              🎙️
+              🎙
             </button>
-          </form>
-
-          {/* Voice Status */}
-          {voiceStatus && (
-            <div className="text-xs text-zinc-500 mt-2">{voiceStatus}</div>
-          )}
+          </div>
         </div>
       </div>
     </div>
