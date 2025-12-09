@@ -2,7 +2,7 @@
 
 ## ✅ Configuration Ready
 
-Your `vercel.json` is configured with:
+Your Vercel dashboard settings should be:
 - **Root Directory**: `frontend`
 - **Framework**: `nextjs` (auto-detected)
 - **Build Command**: `npm run build`

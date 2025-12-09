@@ -37,6 +37,7 @@ export default function Home() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'Local';
 
   // Initialize userId from localStorage
   useEffect(() => {
@@ -84,9 +85,10 @@ export default function Home() {
           });
           formData.append("userId", userId);
 
-          // File upload disabled - requires backend integration
-          console.warn('[Upload] File upload disabled');
-          throw new Error('File upload not implemented');
+          const uploadRes = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
 
           if (!uploadRes.ok) {
             const uploadError = await uploadRes.text();

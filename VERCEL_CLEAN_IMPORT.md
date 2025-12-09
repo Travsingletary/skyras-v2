@@ -110,8 +110,8 @@ After deployment, test:
 ## Troubleshooting
 
 **If monorepo prompt doesn't appear:**
-- Vercel should auto-detect `frontend/` from `vercel.json`
-- If not, manually set Root Directory to `frontend` in project settings
+- Set Root Directory to `frontend` in Vercel dashboard project settings
+- If not set automatically, manually configure it in project settings
 
 **If build fails:**
 - Check build logs in Vercel dashboard

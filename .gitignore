@@ -46,3 +46,6 @@ supabase/.temp/
 # Agent kit data
 .agentkit-data.json
 
+# File uploads (local storage)
+uploads/
+frontend/uploads/
