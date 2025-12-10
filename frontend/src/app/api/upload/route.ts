@@ -6,7 +6,8 @@ import {
   validateTotalSize,
   validateFileCount,
   FILE_LIMITS,
-} from '@/lib/fileStorage';
+  isStorageConfigured,
+} from '@/lib/fileStorage.supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,8 +101,8 @@ export async function POST(request: NextRequest) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        // Save file
-        const savedFile = await saveFile(buffer, file.name);
+        // Save file to Supabase Storage
+        const savedFile = await saveFile(buffer, file.name, userId);
 
         uploadedFiles.push({
           fileId: savedFile.fileId,
@@ -109,6 +110,7 @@ export async function POST(request: NextRequest) {
           size: file.size,
           type: file.type || 'application/octet-stream',
           path: savedFile.path,
+          url: savedFile.url, // Public URL from Supabase
         });
       } catch (error) {
         console.error(`Error saving file ${file.name}:`, error);
@@ -130,7 +132,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return success with file IDs
+    // Return success with file IDs and URLs
     return NextResponse.json({
       success: true,
       data: {
@@ -140,6 +142,8 @@ export async function POST(request: NextRequest) {
           name: f.name,
           size: f.size,
           type: f.type,
+          url: f.url, // Public URL for accessing the file
+          path: f.path, // Storage path
         })),
         uploadedCount: uploadedFiles.length,
         totalCount: files.length,
@@ -177,7 +181,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { getFileMetadata } = await import('@/lib/fileStorage');
+    const { getFileMetadata } = await import('@/lib/fileStorage.supabase');
+
+    // fileId is actually the storage path in Supabase
     const metadata = await getFileMetadata(fileId);
 
     if (!metadata) {
@@ -193,9 +199,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        fileId: metadata.fileId,
+        path: metadata.path,
         size: metadata.size,
         created: metadata.created.toISOString(),
+        contentType: metadata.contentType,
       },
     });
   } catch (error) {
