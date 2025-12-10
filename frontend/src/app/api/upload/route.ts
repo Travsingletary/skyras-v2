@@ -9,6 +9,7 @@ import {
   isStorageConfigured,
 } from '@/lib/fileStorage.supabase';
 import { filesDb } from '@/lib/database';
+import { createAutoProcessingRecords, generateWorkflowSuggestions } from '@/lib/fileProcessing';
 
 export async function POST(request: NextRequest) {
   try {
@@ -126,6 +127,13 @@ export async function POST(request: NextRequest) {
           metadata: {},
         });
 
+        // Auto-create processing records based on file type
+        const { created: processingCount, records: processingRecords } = await createAutoProcessingRecords(
+          fileRecord.id,
+          file.type || 'application/octet-stream',
+          fileExtension
+        );
+
         uploadedFiles.push({
           id: fileRecord.id,
           fileId: savedFile.fileId,
@@ -134,6 +142,7 @@ export async function POST(request: NextRequest) {
           type: file.type || 'application/octet-stream',
           path: savedFile.path,
           url: savedFile.url, // Public URL from Supabase
+          processingCount, // Number of auto-created processing jobs
         });
       } catch (error) {
         console.error(`Error saving file ${file.name}:`, error);
@@ -155,7 +164,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return success with file IDs and URLs
+    // Generate workflow suggestions based on uploaded files
+    const workflowSuggestions = generateWorkflowSuggestions(
+      uploadedFiles.map(f => ({ fileType: f.type, fileName: f.name }))
+    );
+
+    // Return success with file IDs, URLs, and workflow suggestions
     return NextResponse.json({
       success: true,
       data: {
@@ -168,9 +182,11 @@ export async function POST(request: NextRequest) {
           type: f.type,
           url: f.url, // Public URL for accessing the file
           path: f.path, // Storage path
+          processingCount: f.processingCount, // Number of auto-processing jobs
         })),
         uploadedCount: uploadedFiles.length,
         totalCount: files.length,
+        workflowSuggestions, // Suggested workflows based on file types
         ...(fileValidationErrors.length > 0 && {
           partialSuccess: true,
           warnings: fileValidationErrors,
