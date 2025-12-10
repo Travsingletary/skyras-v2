@@ -49,3 +49,4 @@ supabase/.temp/
 # File uploads (local storage)
 uploads/
 frontend/uploads/
+.vercel
