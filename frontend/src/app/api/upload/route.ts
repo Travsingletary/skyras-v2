@@ -8,12 +8,14 @@ import {
   FILE_LIMITS,
   isStorageConfigured,
 } from '@/lib/fileStorage.supabase';
+import { filesDb } from '@/lib/database';
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const userId = formData.get('userId') as string | null;
+    const projectId = formData.get('projectId') as string | null;
 
     // Validate userId
     if (!userId) {
@@ -88,11 +90,13 @@ export async function POST(request: NextRequest) {
 
     // Save all files
     const uploadedFiles: Array<{
+      id: string;
       fileId: string;
       name: string;
       size: number;
       type: string;
       path: string;
+      url: string;
     }> = [];
 
     for (const file of files) {
@@ -104,7 +108,26 @@ export async function POST(request: NextRequest) {
         // Save file to Supabase Storage
         const savedFile = await saveFile(buffer, file.name, userId);
 
+        // Get file extension
+        const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
+
+        // Save file metadata to database
+        const fileRecord = await filesDb.create({
+          user_id: userId,
+          project_id: projectId || undefined,
+          original_name: savedFile.originalName,
+          storage_path: savedFile.path,
+          public_url: savedFile.url,
+          file_type: file.type || 'application/octet-stream',
+          file_size: file.size,
+          file_extension: fileExtension,
+          processing_status: 'pending',
+          processing_results: {},
+          metadata: {},
+        });
+
         uploadedFiles.push({
+          id: fileRecord.id,
           fileId: savedFile.fileId,
           name: savedFile.originalName,
           size: file.size,
@@ -138,7 +161,8 @@ export async function POST(request: NextRequest) {
       data: {
         fileIds: uploadedFiles.map(f => f.fileId),
         files: uploadedFiles.map(f => ({
-          fileId: f.fileId,
+          id: f.id, // Database record ID
+          fileId: f.fileId, // Storage file ID
           name: f.name,
           size: f.size,
           type: f.type,
@@ -165,7 +189,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Optional: GET endpoint to retrieve file info
+// GET endpoint to retrieve file info from database
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const fileId = searchParams.get('fileId');
@@ -181,12 +205,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { getFileMetadata } = await import('@/lib/fileStorage.supabase');
+    // Get file metadata from database
+    const fileRecord = await filesDb.getById(fileId);
 
-    // fileId is actually the storage path in Supabase
-    const metadata = await getFileMetadata(fileId);
-
-    if (!metadata) {
+    if (!fileRecord) {
       return NextResponse.json(
         {
           success: false,
@@ -199,10 +221,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        path: metadata.path,
-        size: metadata.size,
-        created: metadata.created.toISOString(),
-        contentType: metadata.contentType,
+        id: fileRecord.id,
+        name: fileRecord.original_name,
+        url: fileRecord.public_url,
+        path: fileRecord.storage_path,
+        size: fileRecord.file_size,
+        type: fileRecord.file_type,
+        extension: fileRecord.file_extension,
+        projectId: fileRecord.project_id,
+        status: fileRecord.processing_status,
+        results: fileRecord.processing_results,
+        created: fileRecord.created_at,
+        updated: fileRecord.updated_at,
       },
     });
   } catch (error) {
