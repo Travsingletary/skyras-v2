@@ -6,10 +6,6 @@ export const metadata: Metadata = {
   description: "AI workflow builder for content creators",
 };
 
-// Force dynamic rendering for all pages
-export const dynamic = 'force-dynamic';
-export const dynamicParams = true;
-
 export default function RootLayout({
   children,
 }: Readonly<{
