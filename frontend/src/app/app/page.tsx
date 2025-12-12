@@ -38,7 +38,6 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
   const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE || "";
 
   // Check authentication on mount
@@ -116,8 +115,8 @@ export default function Home() {
     try {
       console.log('[Voice] Playing TTS response');
 
-      // Call backend TTS endpoint
-      const response = await fetch(`${apiBaseUrl}/api/voice/tts`, {
+      // Same-origin (Next) API route. If not implemented, this will 404 harmlessly.
+      const response = await fetch(`/api/voice/tts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -197,7 +196,7 @@ export default function Home() {
             formData.append("conversationId", conversationId);
           }
 
-          const uploadRes = await fetch(`${apiBaseUrl}/api/upload`, {
+          const uploadRes = await fetch(`/api/upload`, {
             method: "POST",
             body: formData,
           });
@@ -226,7 +225,7 @@ export default function Home() {
       }
 
       // 3) POST to /api/chat
-      console.log(`[Chat] Sending message to ${apiBaseUrl}/api/chat`);
+      console.log(`[Chat] Sending message to /api/chat`);
       const chatPayload = {
         conversationId,
         userId,
@@ -235,7 +234,7 @@ export default function Home() {
       };
       console.log("[Chat] Payload:", chatPayload);
 
-      const res = await fetch(`${apiBaseUrl}/api/chat`, {
+      const res = await fetch(`/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(chatPayload),
@@ -366,7 +365,7 @@ export default function Home() {
               Dashboard
             </Link>
             <div className="text-xs text-zinc-500 space-y-1 text-right">
-              <div>API: <span className="font-mono">{apiBaseUrl}</span></div>
+              <div>API: <span className="font-mono">same-origin</span></div>
               <div>User: <span className="font-mono">{userId || "loading..."}</span></div>
             </div>
           </div>

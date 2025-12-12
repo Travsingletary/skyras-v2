@@ -37,8 +37,6 @@ export default function Dashboard() {
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
   const [userId, setUserId] = useState<string>("");
 
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
-
   useEffect(() => {
     // Get userId from localStorage
     const storedUserId = localStorage.getItem("userId");
@@ -52,7 +50,7 @@ export default function Dashboard() {
     // Fetch workflows
     const fetchWorkflows = async () => {
       try {
-        const res = await fetch(`${apiBaseUrl}/api/workflows?userId=${storedUserId}`);
+        const res = await fetch(`/api/workflows?userId=${storedUserId}`);
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${await res.text()}`);
         }
@@ -71,7 +69,7 @@ export default function Dashboard() {
     };
 
     fetchWorkflows();
-  }, [apiBaseUrl]);
+  }, []);
 
   if (loading) {
     return (

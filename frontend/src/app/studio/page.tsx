@@ -59,7 +59,9 @@ export default function Home() {
   const [workflowSuggestions, setWorkflowSuggestions] = useState<WorkflowSuggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'Local';
+  // Do not use NEXT_PUBLIC_API_BASE_URL for internal Next.js API routes.
+  // We always call same-origin `/api/*` in production to avoid CORS issues.
+  const apiBaseUrl = "same-origin";
 
   // Initialize userId from localStorage
   useEffect(() => {

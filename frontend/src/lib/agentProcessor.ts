@@ -7,9 +7,19 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+let anthropicClient: Anthropic | null = null;
+
+function getAnthropicClient(): Anthropic {
+  if (anthropicClient) return anthropicClient;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    // Important: do NOT instantiate the SDK without a key. Some SDK versions
+    // throw at construction time, which can crash a serverless invocation.
+    throw new Error('ANTHROPIC_API_KEY is not set');
+  }
+  anthropicClient = new Anthropic({ apiKey });
+  return anthropicClient;
+}
 
 export type AgentName = 'cassidy' | 'letitia' | 'giorgio' | 'jamal';
 
@@ -142,6 +152,8 @@ export async function processTask(context: TaskContext): Promise<ProcessingResul
   }
 
   try {
+    const anthropic = getAnthropicClient();
+
     // Build the user prompt with task context
     let userPrompt = `Task: ${context.title}\n\n${context.description}\n\n`;
 

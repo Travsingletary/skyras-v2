@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 
 import { createJamalAgent } from "@/agents/jamal";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+
 export async function GET() {
   const jamal = createJamalAgent();
   await jamal.run({
