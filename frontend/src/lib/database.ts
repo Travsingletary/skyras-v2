@@ -236,6 +236,23 @@ export const fileProcessingDb = {
       error_message: errorMessage,
     });
   },
+
+  async getByUserId(userId: string): Promise<FileProcessing[]> {
+    // Get all processing records for files owned by this user
+    const files = await filesDb.getByUserId(userId);
+    const fileIds = files.map(f => f.id);
+
+    if (fileIds.length === 0) {
+      return [];
+    }
+
+    const { data, error} = await supabase
+      .from('file_processing')
+      .select({ file_id: fileIds });  // Pass array as filter, wrapper converts to .in()
+
+    if (error) throw new Error(`Failed to get user processing records: ${error.message || JSON.stringify(error)}`);
+    return (data as FileProcessing[]) || [];
+  },
 };
 
 // ============================================================================

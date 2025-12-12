@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import FilePreview from "@/components/FilePreview";
+import WorkflowSuggestions from "@/components/WorkflowSuggestions";
 
 export const dynamic = 'force-dynamic';
 
 interface ChatResponse {
   success?: boolean;
+  conversationId?: string;
   data?: {
     output?: string;
     delegations?: { agent: string; task: string; status: string }[];
@@ -27,6 +31,22 @@ interface Message {
   timestamp: Date;
 }
 
+interface UploadedFile {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+  processingCount?: number;
+}
+
+interface WorkflowSuggestion {
+  workflowType: string;
+  title: string;
+  description: string;
+  agents: string[];
+}
+
 export default function Home() {
   const [message, setMessage] = useState("Run a creative concept for SkySky");
   const [messages, setMessages] = useState<Message[]>([]);
@@ -35,6 +55,8 @@ export default function Home() {
   const [userId, setUserId] = useState<string>("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [workflowSuggestions, setWorkflowSuggestions] = useState<WorkflowSuggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'Local';
@@ -56,6 +78,62 @@ export default function Home() {
 
   const removeFile = (index: number) => {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRemoveUploadedFile = (fileId: string) => {
+    setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
+  };
+
+  const handleCreateWorkflow = async (suggestion: WorkflowSuggestion) => {
+    if (!userId) {
+      setError("User ID not initialized");
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          name: suggestion.title,
+          type: suggestion.workflowType,
+          planMarkdown: suggestion.description,
+          tasks: [
+            {
+              title: `Review ${suggestion.workflowType} workflow`,
+              description: suggestion.description,
+            },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to create workflow');
+      }
+
+      const data = await res.json();
+      console.log('[Workflow] Created:', data);
+
+      // Show success message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg_${Date.now()}`,
+          content: `✓ Workflow "${suggestion.title}" created successfully`,
+          sender: 'agent',
+          timestamp: new Date(),
+        },
+      ]);
+
+      // Clear suggestion after creation
+      setWorkflowSuggestions((prev) =>
+        prev.filter((s) => s.workflowType !== suggestion.workflowType)
+      );
+    } catch (err) {
+      console.error('[Workflow] Error:', err);
+      setError(`Failed to create workflow: ${(err as Error).message}`);
+    }
   };
 
   const handleSend = async () => {
@@ -98,10 +176,21 @@ export default function Home() {
           const uploadData = await uploadRes.json();
           console.log("[Upload] Success:", uploadData);
 
+          // Extract file IDs for chat
           if (uploadData.success && uploadData.data?.fileIds) {
             fileIds.push(...uploadData.data.fileIds);
           } else if (uploadData.fileIds) {
             fileIds.push(...uploadData.fileIds);
+          }
+
+          // Store uploaded files data for preview
+          if (uploadData.success && uploadData.data?.files) {
+            setUploadedFiles((prev) => [...prev, ...uploadData.data.files]);
+          }
+
+          // Store workflow suggestions
+          if (uploadData.success && uploadData.data?.workflowSuggestions) {
+            setWorkflowSuggestions(uploadData.data.workflowSuggestions);
           }
         } catch (uploadErr) {
           console.error("[Upload] Error:", uploadErr);
@@ -141,6 +230,11 @@ export default function Home() {
 
       setResponse(data);
 
+      // Update conversationId if returned
+      if (data.conversationId) {
+        setConversationId(data.conversationId);
+      }
+
       // Append assistant message if present
       if (data.data?.message) {
         const assistantMessage: Message = {
@@ -173,12 +267,28 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-zinc-50 p-6 text-zinc-900">
       <div className="mx-auto max-w-4xl space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-2xl font-semibold">SkyRas v2 · Agent Console</h1>
-          <p className="text-sm text-zinc-600">
-            Marcus will delegate to Giorgio (creative), Cassidy (compliance), Jamal (distribution), and Letitia (cataloging)
-            based on your request.
-          </p>
+        <header className="flex items-start justify-between">
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold">SkyRas v2 · Agent Console</h1>
+            <p className="text-sm text-zinc-600">
+              Marcus will delegate to Giorgio (creative), Cassidy (compliance), Jamal (distribution), and Letitia (cataloging)
+              based on your request.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <Link
+              href="/workflows"
+              className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
+            >
+              📋 Workflows
+            </Link>
+            <Link
+              href="/analytics"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              📊 Analytics
+            </Link>
+          </div>
         </header>
 
         {/* Connection Status */}
@@ -206,6 +316,23 @@ export default function Home() {
               </button>
             </div>
             <p className="mt-2 text-sm text-red-700 font-mono">{error}</p>
+          </div>
+        )}
+
+        {/* Uploaded Files Preview */}
+        {uploadedFiles.length > 0 && (
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <FilePreview files={uploadedFiles} onRemove={handleRemoveUploadedFile} />
+          </div>
+        )}
+
+        {/* Workflow Suggestions */}
+        {workflowSuggestions.length > 0 && (
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <WorkflowSuggestions
+              suggestions={workflowSuggestions}
+              onCreateWorkflow={handleCreateWorkflow}
+            />
           </div>
         )}
 
