@@ -255,16 +255,19 @@ export default function Home() {
         localStorage.setItem("conversationId", data.conversationId);
       }
 
-      if (data.response) {
+      // Extract response from API format: data.data.output or data.data.message.content
+      const responseText = (data as any).data?.output || (data as any).data?.message?.content || data.response;
+
+      if (responseText) {
         const assistantMessage: Message = {
-          id: data.assistantMessageId || `msg_${Date.now()}`,
+          id: (data as any).data?.message?.id || data.assistantMessageId || `msg_${Date.now()}`,
           role: "assistant",
-          content: data.response,
+          content: responseText,
         };
         setMessages((prev) => [...prev, assistantMessage]);
 
         // Play voice response
-        playVoiceResponse(data.response);
+        playVoiceResponse(responseText);
       }
 
       // Update user message with actual file IDs
