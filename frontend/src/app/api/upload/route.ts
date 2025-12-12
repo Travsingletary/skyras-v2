@@ -11,8 +11,24 @@ import {
 import { filesDb } from '@/lib/database';
 import { createAutoProcessingRecords, generateWorkflowSuggestions } from '@/lib/fileProcessing';
 
+export const runtime = "nodejs";
+
 export async function POST(request: NextRequest) {
   try {
+    // Check if storage is configured
+    const storageConfigured = await isStorageConfigured();
+    if (!storageConfigured) {
+      console.warn('[Upload] Supabase storage not configured - uploads will fail');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'File storage is not configured. Please contact administrator.',
+          details: ['Supabase storage bucket "user-uploads" is not available'],
+        },
+        { status: 503 }
+      );
+    }
+
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const userId = formData.get('userId') as string | null;
