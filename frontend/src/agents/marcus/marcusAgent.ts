@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
-
 import Anthropic from "@anthropic-ai/sdk";
 import { AgentDelegation, AgentExecutionContext, AgentRunInput, AgentRunResult, BaseAgent } from "@/agents/core/BaseAgent";
 import { createLogger } from "@/lib/logger";
@@ -21,18 +18,9 @@ import type {
   LinkFetchPayload,
 } from "./marcusActions";
 import { getMarcusPreferences, formatPreferencesContext } from "./marcusPreferences";
+import { MARCUS_SYSTEM_PROMPT } from "./marcusSystemPrompt";
 
-function loadSystemPrompt() {
-  const promptPath = path.join(process.cwd(), "src/agents/marcus/marcusSystemPrompt.md");
-  try {
-    return fs.readFileSync(promptPath, "utf-8");
-  } catch (err) {
-    console.warn("Failed to load Marcus system prompt", err);
-    return "You are Marcus, a helpful manager.";
-  }
-}
-
-const SYSTEM_PROMPT = loadSystemPrompt();
+const SYSTEM_PROMPT = MARCUS_SYSTEM_PROMPT;
 const LICENSING_KEYWORDS = /(license|licensing|watermark|demo)/i;
 const CREATIVE_KEYWORDS = /(idea|script|prompt|concept|scene|treatment|story|cover art|sora|skit|marketing hook|shot|outline)/i;
 const DISTRIBUTION_KEYWORDS = /(post|posting plan|schedule|distribution|publish|rollout|slots)/i;

@@ -6,10 +6,8 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  output: 'standalone',
-  generateBuildId: async () => {
-    return 'build'
-  },
+  // Removed 'output: standalone' for Vercel compatibility
+  // Removed custom generateBuildId - let Vercel handle it
 };
 
 module.exports = nextConfig;
