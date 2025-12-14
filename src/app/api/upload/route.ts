@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  saveFile,
   validateFileType,
   validateFileSize,
   validateTotalSize,
   validateFileCount,
   FILE_LIMITS,
-  isStorageConfigured,
+  generateFileId,
 } from '@/lib/fileStorage.supabase';
 import { filesDb } from '@/lib/database';
 import { createAutoProcessingRecords, generateWorkflowSuggestions } from '@/lib/fileProcessing';
+import { StorageFactory } from '@/lib/storage/StorageFactory';
+import type { StorageProvider } from '@/lib/storage/StorageAdapter';
+import crypto from 'node:crypto';
 
 export async function POST(request: NextRequest) {
   try {
@@ -89,6 +91,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get configured storage adapter
+    const provider = (process.env.DEFAULT_STORAGE_PROVIDER as StorageProvider) || 'supabase';
+    const adapter = StorageFactory.getAdapter(provider);
+
+    // Check if storage is configured
+    const isConfigured = await adapter.isConfigured();
+    if (!isConfigured) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'File storage is not configured. Please contact administrator.',
+          details: [`Storage provider '${provider}' is not available`],
+        },
+        { status: 503 }
+      );
+    }
+
     // Save all files
     const uploadedFiles: Array<{
       id: string;
@@ -98,6 +117,7 @@ export async function POST(request: NextRequest) {
       type: string;
       path: string;
       url: string;
+      processingCount?: number;
     }> = [];
 
     for (const file of files) {
@@ -106,25 +126,43 @@ export async function POST(request: NextRequest) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        // Save file to Supabase Storage
-        const savedFile = await saveFile(buffer, file.name, userId);
-
-        // Get file extension
+        // Generate unique file ID and storage path
+        const fileId = generateFileId();
+        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
         const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
+        const storagePath = `${today}/${userId}/${fileId}${fileExtension}`;
+
+        // Upload file via storage adapter
+        const uploadResult = await adapter.upload({
+          buffer,
+          path: storagePath,
+          contentType: file.type || 'application/octet-stream',
+          isPublic: false, // Default to private for security
+        });
+
+        // Get expiration time from environment (default 1 hour)
+        const expiresIn = parseInt(process.env.SIGNED_URL_DEFAULT_EXPIRY || '3600', 10);
+
+        // Generate signed URL for immediate access
+        const signedUrl = await adapter.getSignedUrl(storagePath, expiresIn);
+        const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
         // Save file metadata to database
         const fileRecord = await filesDb.create({
           user_id: userId,
           project_id: projectId || undefined,
-          original_name: savedFile.originalName,
-          storage_path: savedFile.path,
-          public_url: savedFile.url,
+          original_name: file.name,
+          storage_path: storagePath,
+          public_url: signedUrl,
           file_type: file.type || 'application/octet-stream',
           file_size: file.size,
           file_extension: fileExtension,
           processing_status: 'pending',
           processing_results: {},
           metadata: {},
+          storage_provider: provider,
+          is_public: false,
+          signed_url_expires_at: expiresAt.toISOString(),
         });
 
         // Auto-create processing records based on file type
@@ -136,13 +174,13 @@ export async function POST(request: NextRequest) {
 
         uploadedFiles.push({
           id: fileRecord.id,
-          fileId: savedFile.fileId,
-          name: savedFile.originalName,
+          fileId: fileId,
+          name: file.name,
           size: file.size,
           type: file.type || 'application/octet-stream',
-          path: savedFile.path,
-          url: savedFile.url, // Public URL from Supabase
-          processingCount, // Number of auto-created processing jobs
+          path: storagePath,
+          url: signedUrl,
+          processingCount,
         });
       } catch (error) {
         console.error(`Error saving file ${file.name}:`, error);

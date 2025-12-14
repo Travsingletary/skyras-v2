@@ -15,6 +15,7 @@ export type ProcessingType = 'licensing' | 'cataloging' | 'script_gen' | 'distri
 export type AgentName = 'marcus' | 'giorgio' | 'cassidy' | 'jamal' | 'letitia';
 export type CalendarProvider = 'google' | 'outlook' | 'apple';
 export type SyncStatus = 'synced' | 'pending' | 'failed';
+export type StorageProvider = 'supabase' | 'qnap' | 'local' | 's3';
 
 // ============================================================================
 // PROJECT
@@ -55,6 +56,9 @@ export interface File {
   processing_status: ProcessingStatus;
   processing_results: Record<string, any>;
   metadata: Record<string, any>;
+  storage_provider: StorageProvider;
+  is_public: boolean;
+  signed_url_expires_at?: string;
 }
 
 export interface FileInsert extends Omit<File, 'id' | 'created_at' | 'updated_at'> {
