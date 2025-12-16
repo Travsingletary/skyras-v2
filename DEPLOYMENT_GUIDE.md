@@ -53,6 +53,7 @@ OPENAI_API_KEY=sk-proj-...your-key...
 SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
+RBAC_ENFORCE=false
 ELEVENLABS_API_KEY=your-elevenlabs-key-if-needed
 ```
 
@@ -109,7 +110,19 @@ NEXT_PUBLIC_API_BASE_URL=https://your-backend-url.onrender.com
 NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025
 SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+RBAC_ENFORCE=false
 ```
+
+### Storage Bucket (Supabase)
+
+- Bucket name: `user-uploads`
+- **Private**: `true` (recommended)
+- If private, you must have storage policies that allow uploads and reads (or rely on signed URLs).
+
+### RBAC (Week 1)
+
+- DB migration: `frontend/supabase/migrations/0005_rbac_week1_foundation.sql`
+- Enforcement is **feature-flagged** via `RBAC_ENFORCE=true` (server-side). Keep `false` until you assign roles to your `userId` values.
 
 **Optional (for studio features):**
 ```

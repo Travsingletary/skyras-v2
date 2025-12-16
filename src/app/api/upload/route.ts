@@ -11,6 +11,7 @@ import { filesDb } from '@/lib/database';
 import { createAutoProcessingRecords, generateWorkflowSuggestions } from '@/lib/fileProcessing';
 import { StorageFactory } from '@/lib/storage/StorageFactory';
 import type { StorageProvider } from '@/lib/storage/StorageAdapter';
+import { requirePermission } from '@/lib/rbac';
 import crypto from 'node:crypto';
 
 export async function POST(request: NextRequest) {
@@ -28,6 +29,19 @@ export async function POST(request: NextRequest) {
           error: 'userId is required',
         },
         { status: 400 }
+      );
+    }
+
+    // RBAC (Week 1): optionally enforce permission checks server-side
+    try {
+      await requirePermission(userId, 'files.upload');
+    } catch (e) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: (e as Error).message,
+        },
+        { status: 403 }
       );
     }
 

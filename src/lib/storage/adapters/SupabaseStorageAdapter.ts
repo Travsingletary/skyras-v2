@@ -231,37 +231,22 @@ export class SupabaseStorageAdapter implements StorageAdapter {
 
   /**
    * Check if Supabase Storage is properly configured
+   *
+   * Note: We don't try to list buckets because the anon key typically doesn't have
+   * permission for that operation. Instead, we just verify the client is initialized.
+   * If the bucket doesn't exist or there are permission issues, the actual upload
+   * will fail with a clear error message.
    */
   async isConfigured(): Promise<boolean> {
     const client = getSupabaseStorageClient();
 
     if (!client) {
+      console.error('Supabase client not initialized. Check SUPABASE_URL and SUPABASE_ANON_KEY.');
       return false;
     }
 
-    try {
-      // Try to list buckets to verify connection
-      const { data, error } = await client.storage.listBuckets();
-
-      if (error) {
-        console.error('Supabase storage check failed:', error);
-        return false;
-      }
-
-      // Check if our bucket exists
-      const bucketExists = data?.some((bucket) => bucket.name === this.bucket);
-
-      if (!bucketExists) {
-        console.warn(
-          `Storage bucket '${this.bucket}' does not exist. Please create it in Supabase dashboard.`
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Supabase storage configuration error:', error);
-      return false;
-    }
+    // Client is initialized - assume bucket exists
+    // If it doesn't, the upload operation will fail with a clear error
+    return true;
   }
 }

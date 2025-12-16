@@ -12,6 +12,7 @@ interface TableApi {
 
 export interface SupabaseClientLike {
   from: (table: string) => TableApi;
+  rpc: <T = unknown>(fn: string, args?: Record<string, unknown>) => Promise<{ data: T | null; error: Error | null }>;
 }
 
 let supabaseJsClient: SupabaseClient | null = null;
@@ -122,6 +123,13 @@ class MockSupabaseClient implements SupabaseClientLike {
       },
     };
   }
+
+  async rpc<T = unknown>(_fn: string, _args?: Record<string, unknown>): Promise<{ data: T | null; error: Error | null }> {
+    return {
+      data: null,
+      error: new Error('Supabase RPC is not implemented in MockSupabaseClient'),
+    };
+  }
 }
 
 let cachedClient: SupabaseClientLike | null = null;
@@ -130,7 +138,7 @@ export function getSupabaseClient(): SupabaseClientLike {
   if (cachedClient) return cachedClient;
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
   if (url && key) {
     const client = createClient(url, key, { auth: { persistSession: false } });
@@ -164,6 +172,10 @@ export function getSupabaseClient(): SupabaseClientLike {
           return { data: (data as TableRow[]) ?? [], error: error as Error | null };
         },
       }),
+      rpc: async <T = unknown>(fn: string, args?: Record<string, unknown>) => {
+        const { data, error } = await client.rpc(fn, args ?? {});
+        return { data: (data as T) ?? null, error: error as Error | null };
+      },
     } satisfies SupabaseClientLike;
     return cachedClient;
   }
