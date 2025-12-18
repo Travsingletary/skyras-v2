@@ -41,6 +41,11 @@ export default function WorkflowsPage() {
     const storedUserId = localStorage.getItem('userId');
     if (storedUserId) {
       setUserId(storedUserId);
+    } else {
+      // Generate a userId if one doesn't exist
+      const newUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('userId', newUserId);
+      setUserId(newUserId);
     }
   }, []);
 
@@ -50,13 +55,19 @@ export default function WorkflowsPage() {
     async function fetchWorkflows() {
       try {
         setLoading(true);
-        const res = await fetch(`/api/workflows?userId=${userId}`);
+        setError(null);
+        const res = await fetch(`/api/workflows?userId=${encodeURIComponent(userId)}`);
         const data = await res.json();
 
         if (data.success) {
-          setWorkflows(data.data.workflows || []);
+          const workflows = data.data?.workflows || [];
+          setWorkflows(workflows);
+          if (workflows.length === 0) {
+            console.log(`[WorkflowsPage] No workflows found for userId: ${userId}`);
+          }
         } else {
           setError(data.error || 'Failed to fetch workflows');
+          console.error('[WorkflowsPage] API error:', data);
         }
       } catch (err) {
         setError('Network error fetching workflows');
@@ -170,18 +181,36 @@ export default function WorkflowsPage() {
         </div>
 
         {/* Workflows List */}
-        {workflows.length === 0 ? (
+        {workflows.length === 0 && !loading ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <div className="text-6xl mb-4">📋</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No workflows yet</h3>
             <p className="text-gray-600 mb-6">
-              Upload files in the Studio to get AI-powered workflow suggestions
+              {userId ? (
+                <>No workflows found for your account. Ask Marcus to create a workflow, or upload files in the Studio.</>
+              ) : (
+                <>Please start a conversation with Marcus first to get a user ID.</>
+              )}
             </p>
-            <Link
-              href="/studio"
-              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Go to Studio
+            <div className="flex gap-3 justify-center">
+              <Link
+                href="/app"
+                className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Chat with Marcus
+              </Link>
+              <Link
+                href="/studio"
+                className="inline-block px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Go to Studio
+              </Link>
+            </div>
+            {userId && (
+              <p className="text-xs text-gray-500 mt-4">
+                User ID: {userId}
+              </p>
+            )}
             </Link>
           </div>
         ) : (

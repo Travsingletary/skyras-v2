@@ -123,9 +123,17 @@ export const workflowsDb = {
   },
 
   async getByUserId(userId: string): Promise<Workflow[]> {
-    const { data, error } = await supabase.from('workflows').select({ user_id: userId });
-    if (error) throw new Error(`Failed to get user workflows: ${error.message || JSON.stringify(error)}`);
-    return (data as Workflow[]) || [];
+    // Use proper filter syntax for SupabaseClientLike
+    const { data, error } = await supabase.from('workflows').select({ user_id: userId } as Record<string, unknown>);
+    if (error) {
+      console.error('[workflowsDb.getByUserId] Query error:', error);
+      throw new Error(`Failed to get user workflows: ${error.message || JSON.stringify(error)}`);
+    }
+    // Filter client-side (SupabaseClientLike select may return all rows, filter by user_id)
+    const workflows = (data as Workflow[]) || [];
+    const filtered = workflows.filter(w => w.user_id === userId);
+    console.log(`[workflowsDb.getByUserId] Found ${filtered.length} workflows for userId: ${userId}`);
+    return filtered;
   },
 
   async update(id: string, updates: WorkflowUpdate): Promise<Workflow> {

@@ -3,6 +3,7 @@ import { AgentDelegation, AgentExecutionContext, AgentRunInput, AgentRunResult, 
 import { createLogger } from "@/lib/logger";
 import {
   collectStudioNotes,
+  createWorkflow,
   fetchLinkContent,
   logPlanToSupabase,
   runCatalogSave,
@@ -16,6 +17,7 @@ import type {
   DistributionPayload,
   LicensingAuditFile,
   LinkFetchPayload,
+  WorkflowCreationPayload,
 } from "./marcusActions";
 import { getMarcusPreferences, formatPreferencesContext } from "./marcusPreferences";
 import { MARCUS_SYSTEM_PROMPT } from "./marcusSystemPrompt";
@@ -25,6 +27,7 @@ const LICENSING_KEYWORDS = /(license|licensing|watermark|demo)/i;
 const CREATIVE_KEYWORDS = /(idea|script|prompt|concept|scene|treatment|story|cover art|sora|skit|marketing hook|shot|outline)/i;
 const DISTRIBUTION_KEYWORDS = /(post|posting plan|schedule|distribution|publish|rollout|slots)/i;
 const CATALOG_KEYWORDS = /(catalog|tag|metadata|save asset|store asset)/i;
+const WORKFLOW_KEYWORDS = /(create workflow|make workflow|new workflow|workflow plan|build workflow|generate workflow)/i;
 const URL_PATTERN = /https?:\/\/[^\s]+/gi;
 
 class MarcusAgent extends BaseAgent {
@@ -219,6 +222,37 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
+    // Check for workflow creation requests
+    const shouldCreateWorkflow = WORKFLOW_KEYWORDS.test(input.prompt);
+    if (shouldCreateWorkflow) {
+      const userId = (input.metadata?.userId as string | undefined);
+      if (!userId) {
+        outputLines.push("Workflow creation requested but userId is missing in metadata.");
+      } else {
+        try {
+          // Extract workflow details from prompt or metadata
+          const workflowPayload: WorkflowCreationPayload = {
+            userId,
+            projectId: (input.metadata?.projectId as string | undefined) || 
+                      (input.metadata?.project as string | undefined),
+            name: (input.metadata?.workflowName as string | undefined) || 
+                  `Workflow ${new Date().toLocaleDateString()}`,
+            type: (input.metadata?.workflowType as WorkflowCreationPayload["type"]) || "custom",
+            planMarkdown: input.metadata?.planMarkdown as string | undefined,
+            summary: input.metadata?.workflowSummary as string | undefined,
+            agentName: "marcus",
+            tasks: input.metadata?.workflowTasks as WorkflowCreationPayload["tasks"] | undefined,
+          };
+
+          const workflowResult = await createWorkflow(context, workflowPayload);
+          outputLines.push(workflowResult.summary);
+          notesPayload.workflow = workflowResult.data;
+        } catch (error) {
+          outputLines.push(`Workflow creation failed: ${(error as Error).message}`);
+        }
+      }
+    }
+
     // Check for URLs in the prompt and fetch them
     const urls = input.prompt.match(URL_PATTERN);
     let fetchedLinks = false;
@@ -240,7 +274,7 @@ class MarcusAgent extends BaseAgent {
     }
 
     // If no specific keywords matched, generate AI response for general chat
-    const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog || fetchedLinks;
+    const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog || shouldCreateWorkflow || fetchedLinks;
     if (!hasSpecificAction) {
       context.logger.info("No specific action keywords detected, generating AI response");
       const userId = input.metadata?.userId as string | undefined;

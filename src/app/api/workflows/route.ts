@@ -8,23 +8,24 @@ export async function GET(request: NextRequest) {
   const userId = searchParams.get('userId');
   const projectId = searchParams.get('projectId');
 
-  if (!userId && !projectId) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'userId or projectId parameter is required',
-      },
-      { status: 400 }
-    );
-  }
+  // If no userId or projectId, try to get workflows for 'public' user (fallback)
+  // This helps when userId doesn't match or user hasn't been assigned yet
+  const effectiveUserId = userId || 'public';
 
   try {
-    let workflows;
+    let workflows: Awaited<ReturnType<typeof workflowsDb.getByProjectId>> | Awaited<ReturnType<typeof workflowsDb.getByUserId>> | undefined;
 
     if (projectId) {
       workflows = await workflowsDb.getByProjectId(projectId);
-    } else if (userId) {
-      workflows = await workflowsDb.getByUserId(userId);
+    } else {
+      // Try user's workflows first, then fallback to 'public' if none found
+      workflows = await workflowsDb.getByUserId(effectiveUserId);
+      
+      // If no workflows found and userId was provided, also check 'public' workflows
+      if (workflows.length === 0 && userId && userId !== 'public') {
+        const publicWorkflows = await workflowsDb.getByUserId('public');
+        workflows = publicWorkflows;
+      }
     }
 
     return NextResponse.json({
@@ -122,19 +123,41 @@ export async function POST(request: NextRequest) {
     const workflow = await workflowsDb.create(workflowData);
 
     // Create tasks if provided
-    let createdTasks = [];
+    let createdTasks: any[] = [];
     if (tasks && tasks.length > 0) {
-      const taskData: WorkflowTaskInsert[] = tasks.map((task: any, index: number) => ({
-        workflow_id: workflow.id,
-        title: task.title,
-        description: task.description || undefined,
-        status: 'pending',
-        position: task.position !== undefined ? task.position : index,
-        due_date: task.dueDate || undefined,
-        metadata: task.metadata || {},
-      }));
+      const taskData: WorkflowTaskInsert[] = tasks.map((task: any, index: number) => {
+        // Determine agent_name from task metadata, workflow type, or default
+        const agentName = task.agentName || 
+                         task.metadata?.agent_name ||
+                         (type === 'licensing' ? 'cassidy' :
+                          type === 'creative' ? 'giorgio' :
+                          type === 'distribution' ? 'jamal' :
+                          type === 'cataloging' ? 'letitia' : 'marcus');
+
+        return {
+          workflow_id: workflow.id,
+          title: task.title,
+          description: task.description || undefined,
+          status: 'pending',
+          position: task.position !== undefined ? task.position : index,
+          due_date: task.dueDate || undefined,
+          agent_name: agentName,
+          metadata: {
+            ...(task.metadata || {}),
+            agent_name: agentName,
+            action: task.action || task.metadata?.action,
+            payload: task.payload || task.metadata?.payload,
+          },
+        };
+      });
 
       createdTasks = await workflowTasksDb.createMany(taskData);
+
+      // Notify agents of new tasks (fire and forget)
+      const { notifyAgentsOfWorkflowTasks } = await import('@/lib/taskNotifications');
+      notifyAgentsOfWorkflowTasks(workflow.id).catch(err => {
+        console.warn('Failed to notify agents of workflow tasks:', err);
+      });
     }
 
     return NextResponse.json({
