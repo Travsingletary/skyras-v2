@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       conversationId: finalConversationId,
+      assistantMessageId: messageId,
+      response: responseText,
       data: {
         message: {
           id: messageId,

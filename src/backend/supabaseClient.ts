@@ -141,6 +141,15 @@ export function getSupabaseClient(): SupabaseClientLike {
   // Support both old (SERVICE_ROLE_KEY) and new (SECRET_KEY) naming conventions
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY;
 
+  // Debug logging
+  console.log('[SupabaseClient] Initializing with:', {
+    hasUrl: !!url,
+    hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    hasSecretKey: !!process.env.SUPABASE_SECRET_KEY,
+    hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
+    usingKey: key?.substring(0, 20) + '...',
+  });
+
   if (url && key) {
     const client = createClient(url, key, { auth: { persistSession: false } });
     supabaseJsClient = client;
