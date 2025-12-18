@@ -138,7 +138,8 @@ export function getSupabaseClient(): SupabaseClientLike {
   if (cachedClient) return cachedClient;
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  // Support both old (SERVICE_ROLE_KEY) and new (SECRET_KEY) naming conventions
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY;
 
   if (url && key) {
     const client = createClient(url, key, { auth: { persistSession: false } });
