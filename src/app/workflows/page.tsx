@@ -35,12 +35,21 @@ export default function WorkflowsPage() {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string>('');
+  // CRITICAL: Initialize to 'public' immediately so API calls use correct userId from first render
+  const [userId] = useState<string>('public');
 
   useEffect(() => {
-    const storedUserId = localStorage.getItem('userId');
-    if (storedUserId) {
-      setUserId(storedUserId);
+    // HARD RULE: Use 'public' as userId until user scoping is complete
+    const standardUserId = 'public';
+
+    // Force clear old userId if it's different from localStorage (only in browser)
+    if (typeof window !== 'undefined') {
+      const existingUserId = localStorage.getItem('userId');
+      if (existingUserId && existingUserId !== standardUserId) {
+        console.log('[Workflows] Clearing old userId:', existingUserId, '→', standardUserId);
+        localStorage.removeItem('userId');
+      }
+      localStorage.setItem('userId', standardUserId);
     }
   }, []);
 

@@ -26,10 +26,11 @@ export async function notifyAgentOfTask(
     // Option 1: Trigger agent polling via API (if running in same process)
     // In production, this could be a webhook or message queue
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-      const pollUrl = apiBaseUrl 
-        ? `${apiBaseUrl}/api/agents/poll`
-        : '/api/agents/poll';
+      // Construct absolute URL for server-side fetch
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ||
+                        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
+                         'http://localhost:3000');
+      const pollUrl = `${apiBaseUrl}/api/agents/poll`;
 
       // Fire and forget - don't wait for response
       fetch(pollUrl, {
