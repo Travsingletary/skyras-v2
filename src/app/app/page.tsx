@@ -89,12 +89,10 @@ export default function Home() {
   useEffect(() => {
     if (!isAuthenticated) return;
     
-    let storedUserId = localStorage.getItem("userId");
-    if (!storedUserId) {
-      storedUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem("userId", storedUserId);
-    }
-    setUserId(storedUserId);
+    // HARD RULE: Use 'public' as userId until user scoping is complete
+    const standardUserId = 'public';
+    localStorage.setItem("userId", standardUserId);
+    setUserId(standardUserId);
 
     // Load conversationId from localStorage
     const storedConversationId = localStorage.getItem("conversationId");

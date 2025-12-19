@@ -27,15 +27,45 @@ interface TaskExecutionResult {
 }
 
 /**
+ * Get all active workflows from all users
+ */
+async function getAllActiveWorkflows() {
+  try {
+    // Query for all workflows with status 'active'
+    const { getSupabaseClient } = await import('@/backend/supabaseClient');
+    const supabase = getSupabaseClient();
+
+    const { data, error } = await supabase
+      .from('workflows')
+      .select('*')
+      .eq('status', 'active');
+
+    if (error) {
+      console.error('[getAllActiveWorkflows] Error:', error);
+      return [];
+    }
+
+    return data || [];
+  } catch (error) {
+    console.error('[getAllActiveWorkflows] Error:', error);
+    return [];
+  }
+}
+
+/**
  * Poll for pending tasks assigned to a specific agent
  */
 export async function pollForTasks(
   agentName: AgentName,
-  limit = 5
+  limit = 5,
+  userId?: string
 ): Promise<WorkflowTask[]> {
   try {
-    // Get all active workflows
-    const allWorkflows = await workflowsDb.getByUserId('public');
+    // Get all active workflows for all users if no userId specified
+    // This allows agents to work on tasks from any user
+    const allWorkflows = userId
+      ? await workflowsDb.getByUserId(userId)
+      : await getAllActiveWorkflows();
     
     // Collect tasks from all active workflows
     const allTasks: WorkflowTask[] = [];

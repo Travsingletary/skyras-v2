@@ -9,15 +9,11 @@ export default function WorkflowsPage() {
   const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
-    const storedUserId = localStorage.getItem('userId');
-    if (storedUserId) {
-      setUserId(storedUserId);
-    } else {
-      // Generate a userId if one doesn't exist
-      const newUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem('userId', newUserId);
-      setUserId(newUserId);
-    }
+    // HARD RULE: Use 'public' as userId until user scoping is complete
+    // This ensures workflows created by Marcus auto-execution are visible
+    const standardUserId = 'public';
+    localStorage.setItem('userId', standardUserId);
+    setUserId(standardUserId);
   }, []);
 
   // Use real-time hook instead of polling
