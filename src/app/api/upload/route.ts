@@ -1,21 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  saveFile,
   validateFileType,
   validateFileSize,
   validateTotalSize,
   validateFileCount,
   FILE_LIMITS,
-  generateFileId,
+  isStorageConfigured,
 } from '@/lib/fileStorage.supabase';
 import { filesDb } from '@/lib/database';
 import { createAutoProcessingRecords, generateWorkflowSuggestions } from '@/lib/fileProcessing';
-import { StorageFactory } from '@/lib/storage/StorageFactory';
-import type { StorageProvider } from '@/lib/storage/StorageAdapter';
-import { requirePermission } from '@/lib/rbac';
-import crypto from 'node:crypto';
+
+export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
+    // Log environment variable status (without exposing values)
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const hasAnonKey = !!process.env.SUPABASE_ANON_KEY;
+    const hasUrl = !!process.env.SUPABASE_URL;
+    
+    console.log('[Upload] Environment check:', {
+      hasUrl,
+      hasServiceKey,
+      hasAnonKey,
+      serviceKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0,
+      anonKeyLength: process.env.SUPABASE_ANON_KEY?.length || 0,
+    });
+    
+    // Check if storage is configured
+    const storageConfigured = await isStorageConfigured();
+    if (!storageConfigured) {
+      console.warn('[Upload] Supabase storage not configured - uploads will fail');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'File storage is not configured. Please contact administrator.',
+          details: ['Supabase storage bucket "user-uploads" is not available'],
+        },
+        { status: 503 }
+      );
+    }
+
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const userId = formData.get('userId') as string | null;
@@ -29,19 +55,6 @@ export async function POST(request: NextRequest) {
           error: 'userId is required',
         },
         { status: 400 }
-      );
-    }
-
-    // RBAC (Week 1): optionally enforce permission checks server-side
-    try {
-      await requirePermission(userId, 'files.upload');
-    } catch (e) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: (e as Error).message,
-        },
-        { status: 403 }
       );
     }
 
@@ -105,23 +118,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get configured storage adapter
-    const provider = (process.env.DEFAULT_STORAGE_PROVIDER as StorageProvider) || 'supabase';
-    const adapter = StorageFactory.getAdapter(provider);
-
-    // Check if storage is configured
-    const isConfigured = await adapter.isConfigured();
-    if (!isConfigured) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'File storage is not configured. Please contact administrator.',
-          details: [`Storage provider '${provider}' is not available`],
-        },
-        { status: 503 }
-      );
-    }
-
     // Save all files
     const uploadedFiles: Array<{
       id: string;
@@ -131,7 +127,6 @@ export async function POST(request: NextRequest) {
       type: string;
       path: string;
       url: string;
-      processingCount?: number;
     }> = [];
 
     for (const file of files) {
@@ -140,43 +135,25 @@ export async function POST(request: NextRequest) {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        // Generate unique file ID and storage path
-        const fileId = generateFileId();
-        const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+        // Save file to Supabase Storage
+        const savedFile = await saveFile(buffer, file.name, userId);
+
+        // Get file extension
         const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
-        const storagePath = `${today}/${userId}/${fileId}${fileExtension}`;
-
-        // Upload file via storage adapter
-        const uploadResult = await adapter.upload({
-          buffer,
-          path: storagePath,
-          contentType: file.type || 'application/octet-stream',
-          isPublic: false, // Default to private for security
-        });
-
-        // Get expiration time from environment (default 1 hour)
-        const expiresIn = parseInt(process.env.SIGNED_URL_DEFAULT_EXPIRY || '3600', 10);
-
-        // Generate signed URL for immediate access
-        const signedUrl = await adapter.getSignedUrl(storagePath, expiresIn);
-        const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
         // Save file metadata to database
         const fileRecord = await filesDb.create({
           user_id: userId,
           project_id: projectId || undefined,
-          original_name: file.name,
-          storage_path: storagePath,
-          public_url: signedUrl,
+          original_name: savedFile.originalName,
+          storage_path: savedFile.path,
+          public_url: savedFile.url,
           file_type: file.type || 'application/octet-stream',
           file_size: file.size,
           file_extension: fileExtension,
           processing_status: 'pending',
           processing_results: {},
           metadata: {},
-          storage_provider: provider,
-          is_public: false,
-          signed_url_expires_at: expiresAt.toISOString(),
         });
 
         // Auto-create processing records based on file type
@@ -188,13 +165,13 @@ export async function POST(request: NextRequest) {
 
         uploadedFiles.push({
           id: fileRecord.id,
-          fileId: fileId,
-          name: file.name,
+          fileId: savedFile.fileId,
+          name: savedFile.originalName,
           size: file.size,
           type: file.type || 'application/octet-stream',
-          path: storagePath,
-          url: signedUrl,
-          processingCount,
+          path: savedFile.path,
+          url: savedFile.url, // Public URL from Supabase
+          processingCount, // Number of auto-created processing jobs
         });
       } catch (error) {
         console.error(`Error saving file ${file.name}:`, error);

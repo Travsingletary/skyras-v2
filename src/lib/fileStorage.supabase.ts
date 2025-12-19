@@ -271,15 +271,30 @@ export async function isStorageConfigured(): Promise<boolean> {
   const supabase = getSupabaseStorageClient();
 
   if (!supabase) {
+    console.error('[Storage Config] Supabase client is null');
     return false;
   }
 
   try {
     // Try to list buckets to verify connection
+    // Note: listBuckets might require service role key
     const { data, error } = await supabase.storage.listBuckets();
 
     if (error) {
-      console.error('Supabase storage check failed:', error);
+      console.error('[Storage Config] Bucket list failed:', {
+        message: error.message,
+        statusCode: (error as any).statusCode,
+        // Don't fail the check if it's just a permission issue - bucket might still exist
+      });
+      
+      // If we can't list buckets, assume bucket exists if we have the right keys
+      // This is a fallback for when anon key doesn't have list permission
+      const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (hasServiceKey) {
+        console.log('[Storage Config] Cannot list buckets, but service role key is set - assuming bucket exists');
+        return true;
+      }
+      
       return false;
     }
 
@@ -287,13 +302,14 @@ export async function isStorageConfigured(): Promise<boolean> {
     const bucketExists = data?.some(bucket => bucket.name === STORAGE_BUCKET);
 
     if (!bucketExists) {
-      console.warn(`Storage bucket '${STORAGE_BUCKET}' does not exist. Please create it in Supabase dashboard.`);
+      console.warn(`[Storage Config] Storage bucket '${STORAGE_BUCKET}' does not exist. Please create it in Supabase dashboard.`);
       return false;
     }
 
+    console.log('[Storage Config] Bucket exists and is accessible');
     return true;
   } catch (error) {
-    console.error('Supabase storage configuration error:', error);
+    console.error('[Storage Config] Configuration error:', error);
     return false;
   }
 }

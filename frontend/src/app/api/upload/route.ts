@@ -15,6 +15,19 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
+    // Log environment variable status (without exposing values)
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const hasAnonKey = !!process.env.SUPABASE_ANON_KEY;
+    const hasUrl = !!process.env.SUPABASE_URL;
+    
+    console.log('[Upload] Environment check:', {
+      hasUrl,
+      hasServiceKey,
+      hasAnonKey,
+      serviceKeyLength: process.env.SUPABASE_SERVICE_ROLE_KEY?.length || 0,
+      anonKeyLength: process.env.SUPABASE_ANON_KEY?.length || 0,
+    });
+    
     // Check if storage is configured
     const storageConfigured = await isStorageConfigured();
     if (!storageConfigured) {
