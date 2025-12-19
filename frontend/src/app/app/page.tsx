@@ -51,7 +51,8 @@ export default function Home() {
   const [accessError, setAccessError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(() => {
-    // Check localStorage for voice preference
+    // Check localStorage for voice preference (only in browser, not SSR)
+    if (typeof window === 'undefined') return true; // Default for SSR
     const stored = localStorage.getItem('voiceEnabled');
     return stored !== null ? stored === 'true' : true; // Default to enabled
   });
@@ -71,9 +72,18 @@ export default function Home() {
 
   // Check authentication on mount
   useEffect(() => {
+    // SSR-safe: Only access localStorage in browser
+    if (typeof window === 'undefined') {
+      // During SSR, check if access code is required
+      if (!requiredAccessCode || requiredAccessCode === "" || requiredAccessCode === "undefined") {
+        setIsAuthenticated(true);
+      }
+      return;
+    }
+
     const storedAuth = localStorage.getItem("marcus_access");
     const expectedCode = requiredAccessCode;
-    
+
     // If no access code is required (empty or undefined), allow access immediately
     if (!expectedCode || expectedCode === "" || expectedCode === "undefined") {
       setIsAuthenticated(true);
@@ -89,6 +99,8 @@ export default function Home() {
   // Initialize userId and conversationId from localStorage
   useEffect(() => {
     if (!isAuthenticated) return;
+    // SSR-safe: Only access localStorage in browser
+    if (typeof window === 'undefined') return;
 
     // HARD RULE: Use 'public' as userId until user scoping is complete
     const standardUserId = 'public';
