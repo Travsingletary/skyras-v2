@@ -40,7 +40,8 @@ interface UploadResponse {
 
 export default function Home() {
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string>("");
+  // CRITICAL: Initialize to 'public' immediately so API calls use correct userId from first render
+  const [userId] = useState<string>("public");
   const [messages, setMessages] = useState<Message[]>([]);
   const [message, setMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -93,15 +94,14 @@ export default function Home() {
     // HARD RULE: Use 'public' as userId until user scoping is complete
     const standardUserId = 'public';
 
-    // Force clear old userId if it's different
+    // Force clear old userId if it's different from localStorage
     const existingUserId = localStorage.getItem("userId");
-    if (existingUserId !== standardUserId) {
+    if (existingUserId && existingUserId !== standardUserId) {
       console.log('[Chat] Clearing old userId:', existingUserId, '→', standardUserId);
       localStorage.removeItem("userId");
     }
 
     localStorage.setItem("userId", standardUserId);
-    setUserId(standardUserId);
 
     // Load conversationId from localStorage
     const storedConversationId = localStorage.getItem("conversationId");
