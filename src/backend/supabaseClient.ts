@@ -192,7 +192,7 @@ export function getSupabaseStorageClient(): SupabaseClient | null {
   const anonKey = process.env.SUPABASE_ANON_KEY;
   
   if (!url) {
-    console.error('[Supabase] SUPABASE_URL not configured');
+    console.error('[Supabase Storage] SUPABASE_URL not configured');
     return null;
   }
   
@@ -201,8 +201,15 @@ export function getSupabaseStorageClient(): SupabaseClient | null {
   const key = serviceKey || anonKey;
   
   if (!key) {
-    console.error('[Supabase] Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY is configured');
+    console.error('[Supabase Storage] Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY is configured');
     return null;
+  }
+  
+  // Log which key we're using (but not the actual key value)
+  if (serviceKey) {
+    console.log('[Supabase Storage] Using SERVICE_ROLE_KEY (full permissions)');
+  } else {
+    console.warn('[Supabase Storage] Using ANON_KEY (relies on RLS policies - may have permission issues)');
   }
   
   // Create a new client for storage operations

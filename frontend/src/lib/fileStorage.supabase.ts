@@ -85,11 +85,33 @@ export async function saveFile(
   const supabase = getSupabaseStorageClient();
 
   if (!supabase) {
-    throw new Error('Supabase client not initialized. Check SUPABASE_URL and SUPABASE_ANON_KEY environment variables.');
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const hasAnonKey = !!process.env.SUPABASE_ANON_KEY;
+    const hasUrl = !!process.env.SUPABASE_URL;
+    
+    console.error('[Storage] Supabase client not initialized:', {
+      hasUrl,
+      hasServiceKey,
+      hasAnonKey,
+    });
+    
+    throw new Error(
+      `Supabase client not initialized. Check environment variables: ` +
+      `SUPABASE_URL=${hasUrl ? '✓' : '✗'}, ` +
+      `SUPABASE_SERVICE_ROLE_KEY=${hasServiceKey ? '✓' : '✗'}, ` +
+      `SUPABASE_ANON_KEY=${hasAnonKey ? '✓' : '✗'}`
+    );
   }
 
   const id = fileId || generateFileId();
   const storagePath = getStoragePath(userId, id, originalName);
+
+  console.log('[Storage] Attempting upload:', {
+    bucket: STORAGE_BUCKET,
+    path: storagePath,
+    size: buffer.length,
+    hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+  });
 
   // Upload to Supabase Storage
   const { data, error } = await supabase.storage
@@ -100,7 +122,14 @@ export async function saveFile(
     });
 
   if (error) {
-    throw new Error(`Failed to upload file to Supabase: ${error.message}`);
+    console.error('[Storage] Upload error:', {
+      message: error.message,
+      statusCode: (error as any).statusCode,
+      error: error,
+      bucket: STORAGE_BUCKET,
+      path: storagePath,
+    });
+    throw new Error(`Failed to upload file to Supabase: ${error.message} (Status: ${(error as any).statusCode || 'unknown'})`);
   }
 
   // Get public URL
