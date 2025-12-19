@@ -30,6 +30,11 @@ export interface CreativeGenerationPayload {
   style?: string;
   characters?: string[];
   beats?: string[];
+  // Video generation options
+  imageUrl?: string;
+  duration?: number;
+  aspectRatio?: string;
+  model?: string;
 }
 
 export interface DistributionPayload {
@@ -80,22 +85,13 @@ export async function collectStudioNotes(context: AgentExecutionContext): Promis
   };
 }
 
-export async function logPlanToSupabase(context: AgentExecutionContext, payload: Record<string, unknown>): Promise<MarcusActionResult> {
-  const response = await context.supabase.from("studio_plans").insert(payload);
-  if (response.error) {
-    context.logger.warn("Supabase insert failed", { error: response.error.message });
-    return { summary: "Failed to log plan", data: response.error.message };
-  }
-
-  return { summary: "Plan logged to Supabase (mock)", data: response.data };
-}
 
 export async function runLicensingAudit(context: AgentExecutionContext, payload: LicensingAuditPayload) {
   if (!payload.projectId || !Array.isArray(payload.files) || payload.files.length === 0) {
     throw new Error("projectId and a non-empty files array are required for licensing audit");
   }
 
-  const delegation = context.delegateTo("compliance", `scanFilesForLicensing:${payload.projectId}`);
+  const delegation = await context.delegateTo("compliance", `scanFilesForLicensing:${payload.projectId}`);
   const compliance = createComplianceAgent();
   const result = await compliance.run({
     prompt: `Licensing audit for project ${payload.projectId}`,
@@ -111,7 +107,7 @@ export async function runCreativeGeneration(context: AgentExecutionContext, payl
   }
 
   const action = payload.action ?? "generateScriptOutline";
-  const delegation = context.delegateTo("giorgio", `${action}:${payload.project}`);
+  const delegation = await context.delegateTo("giorgio", `${action}:${payload.project}`);
   const giorgio = createGiorgioAgent();
   const result = await giorgio.run({
     prompt: `Creative request for ${payload.project}`,
@@ -126,7 +122,7 @@ export async function runDistributionPlan(context: AgentExecutionContext, payloa
     throw new Error("project is required for distribution planning");
   }
 
-  const delegation = context.delegateTo("jamal", `postingPlan:${payload.project}`);
+  const delegation = await context.delegateTo("jamal", `postingPlan:${payload.project}`);
   const jamal = createJamalAgent();
   const result = await jamal.run({
     prompt: `Posting plan for ${payload.project}`,
@@ -141,7 +137,7 @@ export async function runCatalogSave(context: AgentExecutionContext, payload: Ca
     throw new Error("project and name are required for catalog save");
   }
 
-  const delegation = context.delegateTo("letitia", `catalog:${payload.project}:${payload.name}`);
+  const delegation = await context.delegateTo("letitia", `catalog:${payload.project}:${payload.name}`);
   const letitia = createLetitiaAgent();
   const result = await letitia.run({
     prompt: `Catalog asset for ${payload.project}`,

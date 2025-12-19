@@ -800,6 +800,12 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-4">
             <Link
+              href="/workflows"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Workflows
+            </Link>
+            <Link
               href="/dashboard"
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >

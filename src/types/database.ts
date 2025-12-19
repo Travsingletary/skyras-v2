@@ -7,7 +7,7 @@ export type ProjectStatus = 'active' | 'archived' | 'completed';
 export type WorkflowType = 'licensing' | 'creative' | 'distribution' | 'cataloging' | 'custom';
 export type WorkflowStatus = 'active' | 'completed' | 'paused' | 'cancelled';
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'skipped' | 'failed';
 
 export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type ProcessingType = 'licensing' | 'cataloging' | 'script_gen' | 'distribution';
@@ -109,6 +109,11 @@ export interface WorkflowTask {
   completed_at?: string;
   calendar_event_id?: string;
   metadata: Record<string, any>;
+  // Real-time tracking fields (added in migration 0007)
+  agent_name?: string;
+  results?: Record<string, any>;
+  error_message?: string;
+  started_at?: string;
 }
 
 export interface WorkflowTaskInsert extends Omit<WorkflowTask, 'id' | 'created_at' | 'updated_at'> {

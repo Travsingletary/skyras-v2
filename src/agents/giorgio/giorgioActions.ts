@@ -8,7 +8,12 @@ export interface CreativeInput {
   characters?: string[];
   style?: string;
   tone?: string;
-  beats?: string;
+  beats?: string | string[];
+  // Video generation options
+  imageUrl?: string;
+  duration?: number;
+  aspectRatio?: string;
+  model?: string;
 }
 
 function ensureProject(input: CreativeInput) {
@@ -45,6 +50,75 @@ export async function generateSoraPrompt(_: unknown, input: CreativeInput): Prom
     beats: input.beats ?? ["Establish world", "Character focus", "Signature move"],
   };
   return createResponse(input.project, input.style, `Sora prompt drafted for ${input.project}.`, creativity);
+}
+
+export async function generateRunwayVideo(context: AgentExecutionContext, input: CreativeInput & { imageUrl?: string; duration?: number; aspectRatio?: string; model?: string }): Promise<AgentRunResult> {
+  ensureProject(input);
+  
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  const videoUrl = apiBaseUrl 
+    ? `${apiBaseUrl}/api/tools/generateVideo`
+    : '/api/tools/generateVideo';
+
+  try {
+    // Build the video prompt
+    const videoPrompt = `${input.context || input.project}${input.mood ? ` in a ${input.mood} mood` : ''}${input.style ? `, ${input.style} style` : ''}${input.characters && Array.isArray(input.characters) && input.characters.length ? `, featuring ${input.characters.join(' and ')}` : ''}`;
+
+    const response = await fetch(videoUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: videoPrompt,
+        imageUrl: input.imageUrl,
+        duration: input.duration || 5,
+        aspectRatio: input.aspectRatio || '16:9',
+        model: input.model || 'gen3a_turbo',
+        projectId: input.project,
+        agentName: 'giorgio',
+        waitForCompletion: true, // Wait for video to be ready
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Video generation failed: HTTP ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Video generation failed');
+    }
+
+    const creativity = {
+      type: "runway_video",
+      videoId: result.video.id,
+      videoUrl: result.video.videoUrl,
+      thumbnailUrl: result.video.thumbnailUrl,
+      prompt: videoPrompt,
+      duration: result.video.duration,
+      model: input.model || 'gen3a_turbo',
+      project: input.project,
+    };
+
+    return createResponse(
+      input.project,
+      input.style,
+      `Generated ${result.video.duration || 5}s video for ${input.project}. Video ready at: ${result.video.videoUrl}`,
+      creativity
+    );
+  } catch (error) {
+    context.logger.error("Runway video generation failed", { error });
+    return {
+      output: `Failed to generate video: ${(error as Error).message}`,
+      notes: {
+        error: (error as Error).message,
+        metadata: baseMetadata(input.project, input.style),
+      },
+    };
+  }
 }
 
 async function generateWithAI(
@@ -84,7 +158,7 @@ export async function generateScriptOutline(context: AgentExecutionContext, inpu
   
   const systemPrompt = `You are Giorgio, the creative engine for SkyRas Agency. You're bold, imaginative, and deeply understand Trav's creative vision. When brainstorming, be conversational, throw out wild ideas, ask questions, and build on what others say. This is a real creative session - be spontaneous and authentic.`;
   
-  const prompt = `Generate a script outline for ${input.project}${input.context ? ` about: ${input.context}` : ''}${input.mood ? ` with a ${input.mood} mood` : ''}${input.characters?.length ? ` featuring: ${input.characters.join(', ')}` : ''}${input.beats?.length ? ` with these beats: ${input.beats.join(', ')}` : ''}.
+  const prompt = `Generate a script outline for ${input.project}${input.context ? ` about: ${input.context}` : ''}${input.mood ? ` with a ${input.mood} mood` : ''}${input.characters && Array.isArray(input.characters) && input.characters.length ? ` featuring: ${input.characters.join(', ')}` : ''}${input.beats && Array.isArray(input.beats) && input.beats.length ? ` with these beats: ${input.beats.join(', ')}` : ''}.
 
 Be creative, specific, and conversational. Think out loud. What's the hook? What makes this interesting? What's the emotional core?`;
 

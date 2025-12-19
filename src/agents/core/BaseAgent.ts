@@ -32,7 +32,7 @@ export interface AgentExecutionContext {
   supabase: SupabaseClientLike;
   memory: AgentMemory;
   logger: Logger;
-  delegateTo: (agent: string, task: string) => AgentDelegation;
+  delegateTo: (agent: string, task: string) => Promise<AgentDelegation>;
 }
 
 interface AgentOptions {
@@ -202,8 +202,35 @@ export abstract class BaseAgent {
     return this.tools.get(name);
   }
 
-  protected delegateTo(agent: string, task: string): AgentDelegation {
+  protected async delegateTo(
+    agent: string,
+    task: string,
+    workflowId?: string,
+    parentTaskId?: string
+  ): Promise<AgentDelegation> {
     this.logger.info(`Delegating task to ${agent}`, { task });
+
+    // If we have workflow context, create a child task in the database
+    if (workflowId && parentTaskId) {
+      try {
+        const { createDelegationTask } = await import('@/lib/delegationHandler');
+        await createDelegationTask({
+          parentTaskId,
+          workflowId,
+          fromAgent: this.options.name,
+          toAgent: agent as any, // AgentName type
+          taskDescription: task,
+        });
+        this.logger.info(`Created delegation task in workflow ${workflowId}`, {
+          from: this.options.name,
+          to: agent,
+        });
+      } catch (error) {
+        this.logger.error('Failed to create delegation task', { error });
+        // Don't fail the delegation - just log the error
+      }
+    }
+
     return { agent, task, status: "pending" };
   }
 
@@ -270,7 +297,7 @@ export abstract class BaseAgent {
         supabase: this.supabase,
         memory: this.memory,
         logger: this.logger,
-        delegateTo: (agent, task) => this.delegateTo(agent, task),
+        delegateTo: (agent, taskDesc) => this.delegateTo(agent, taskDesc, task.workflow_id, task.id),
       };
 
       const result = await this.handleRun({
