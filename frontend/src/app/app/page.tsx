@@ -265,7 +265,11 @@ export default function Home() {
           // This is a common, expected error when the speech API is temporarily unavailable
           // Don't log as error, just warn and show user-friendly message
           console.warn('[Voice] Network error - speech recognition service temporarily unavailable. This is usually temporary.');
-          setError('Voice input temporarily unavailable due to network issues. Please try again in a moment or type your message.');
+          // Don't show error to user for network issues - it's too common and disruptive
+          // Just silently fail and let them type instead
+          setIsRecording(false);
+          // Optionally show a subtle notification
+          // setError('Voice input temporarily unavailable. Please type your message.');
         } else if (event.error === 'aborted') {
           // User stopped it, don't show error or log
           setIsRecording(false);
