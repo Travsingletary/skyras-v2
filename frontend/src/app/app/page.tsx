@@ -262,10 +262,16 @@ export default function Home() {
           }
         } else if (event.error === 'not-allowed') {
           setError('Microphone access denied. Please allow microphone access in your browser settings.');
+        } else if (event.error === 'network') {
+          // Network error - speech recognition service unavailable
+          console.warn('[Voice] Network error - speech recognition service unavailable. This is usually temporary.');
+          setError('Voice input temporarily unavailable due to network issues. Please try again or type your message.');
+          setIsRecording(false);
         } else if (event.error === 'aborted') {
           // User stopped it, don't show error
           setIsRecording(false);
         } else {
+          console.error('[Voice] Unknown speech recognition error:', event.error);
           setError('Speech recognition failed. Please try typing your message.');
         }
       };
