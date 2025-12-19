@@ -12,6 +12,14 @@ export default function WorkflowsPage() {
     // HARD RULE: Use 'public' as userId until user scoping is complete
     // This ensures workflows created by Marcus auto-execution are visible
     const standardUserId = 'public';
+
+    // Force clear old userId if it's different
+    const existingUserId = localStorage.getItem('userId');
+    if (existingUserId !== standardUserId) {
+      console.log('[Workflows] Clearing old userId:', existingUserId, '→', standardUserId);
+      localStorage.removeItem('userId');
+    }
+
     localStorage.setItem('userId', standardUserId);
     setUserId(standardUserId);
   }, []);

@@ -88,9 +88,17 @@ export default function Home() {
   // Initialize userId and conversationId from localStorage
   useEffect(() => {
     if (!isAuthenticated) return;
-    
+
     // HARD RULE: Use 'public' as userId until user scoping is complete
     const standardUserId = 'public';
+
+    // Force clear old userId if it's different
+    const existingUserId = localStorage.getItem("userId");
+    if (existingUserId !== standardUserId) {
+      console.log('[Chat] Clearing old userId:', existingUserId, '→', standardUserId);
+      localStorage.removeItem("userId");
+    }
+
     localStorage.setItem("userId", standardUserId);
     setUserId(standardUserId);
 
