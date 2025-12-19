@@ -38,6 +38,12 @@ export default function Dashboard() {
   const [userId, setUserId] = useState<string>("");
 
   useEffect(() => {
+    // SSR-safe: Only access localStorage in browser
+    if (typeof window === 'undefined') {
+      setLoading(false);
+      return;
+    }
+
     // Get userId from localStorage
     const storedUserId = localStorage.getItem("userId");
     if (!storedUserId) {

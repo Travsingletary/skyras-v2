@@ -65,6 +65,9 @@ export default function Home() {
 
   // Initialize userId from localStorage
   useEffect(() => {
+    // SSR-safe: Only access localStorage in browser
+    if (typeof window === 'undefined') return;
+
     let storedUserId = localStorage.getItem("userId");
     if (!storedUserId) {
       storedUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
