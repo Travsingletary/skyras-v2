@@ -138,17 +138,7 @@ export function getSupabaseClient(): SupabaseClientLike {
   if (cachedClient) return cachedClient;
 
   const url = process.env.SUPABASE_URL;
-  // Support both old (SERVICE_ROLE_KEY) and new (SECRET_KEY) naming conventions
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY;
-
-  // Debug logging
-  console.log('[SupabaseClient] Initializing with:', {
-    hasUrl: !!url,
-    hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    hasSecretKey: !!process.env.SUPABASE_SECRET_KEY,
-    hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
-    usingKey: key?.substring(0, 20) + '...',
-  });
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
   if (url && key) {
     const client = createClient(url, key, { auth: { persistSession: false } });
@@ -195,5 +185,32 @@ export function getSupabaseClient(): SupabaseClientLike {
 }
 
 export function getSupabaseStorageClient(): SupabaseClient | null {
-  return supabaseJsClient;
+  // For storage operations, we need a client with proper permissions
+  // Prefer service role key for uploads, fallback to anon key
+  const url = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  
+  if (!url) {
+    console.error('[Supabase] SUPABASE_URL not configured');
+    return null;
+  }
+  
+  // Use service role key if available (has full permissions)
+  // Otherwise use anon key (relies on RLS policies)
+  const key = serviceKey || anonKey;
+  
+  if (!key) {
+    console.error('[Supabase] Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY is configured');
+    return null;
+  }
+  
+  // Create a new client for storage operations
+  // This ensures we have the right permissions
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
 }
