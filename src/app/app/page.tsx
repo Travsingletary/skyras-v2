@@ -66,15 +66,16 @@ export default function Home() {
   const fullTranscriptRef = useRef<string>('');
   const hasSentRef = useRef<boolean>(false); // Track if we've already sent the message
 
-  const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE || "";
+  // Access code is optional - if not set, allow access
+  const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE?.trim() || "";
 
   // Check authentication on mount
   useEffect(() => {
     const storedAuth = localStorage.getItem("marcus_access");
     const expectedCode = requiredAccessCode;
     
-    // If no access code is required, allow access
-    if (!expectedCode || expectedCode === "") {
+    // If no access code is required (empty or undefined), allow access immediately
+    if (!expectedCode || expectedCode === "" || expectedCode === "undefined") {
       setIsAuthenticated(true);
       return;
     }
@@ -118,10 +119,10 @@ export default function Home() {
     e.preventDefault();
     setAccessError(null);
 
-    const expectedCode = requiredAccessCode;
+    const expectedCode = requiredAccessCode?.trim() || "";
     
-    // If no access code is required, allow access
-    if (!expectedCode || expectedCode === "") {
+    // If no access code is required (empty or undefined), allow access immediately
+    if (!expectedCode || expectedCode === "" || expectedCode === "undefined") {
       setIsAuthenticated(true);
       return;
     }
