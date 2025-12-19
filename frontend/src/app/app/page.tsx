@@ -50,7 +50,11 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true); // Default to enabled, will be updated in useEffect
+  const [voiceEnabled, setVoiceEnabled] = useState(() => {
+    // Check localStorage for voice preference
+    const stored = localStorage.getItem('voiceEnabled');
+    return stored !== null ? stored === 'true' : true; // Default to enabled
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -65,19 +69,8 @@ export default function Home() {
   // Access code is optional - if not set, allow access
   const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE?.trim() || "";
 
-  // Initialize voice preference from localStorage (client-side only)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('voiceEnabled');
-      if (stored !== null) {
-        setVoiceEnabled(stored === 'true');
-      }
-    }
-  }, []);
-
   // Check authentication on mount
   useEffect(() => {
-    if (typeof window === 'undefined') return;
     const storedAuth = localStorage.getItem("marcus_access");
     const expectedCode = requiredAccessCode;
     
@@ -145,7 +138,11 @@ export default function Home() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setPendingFiles((prev) => [...prev, ...files]);
+    console.log('[File Upload] Selected files:', files.length);
+    if (files.length > 0) {
+      setPendingFiles((prev) => [...prev, ...files]);
+      console.log('[File Upload] Added to pending files. Total:', files.length);
+    }
   };
 
   const removeFile = (index: number) => {
@@ -168,8 +165,12 @@ export default function Home() {
       // Check if browser supports speech recognition
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       
+      console.log('[Voice] SpeechRecognition available:', !!SpeechRecognition);
+      
       if (!SpeechRecognition) {
-        setError('Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.');
+        const errorMsg = 'Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.';
+        console.error('[Voice]', errorMsg);
+        setError(errorMsg);
         return;
       }
 
@@ -321,9 +322,12 @@ export default function Home() {
   };
 
   const handleMicClick = () => {
+    console.log('[Voice] Mic button clicked, isRecording:', isRecording);
     if (isRecording) {
+      console.log('[Voice] Stopping recording...');
       stopRecording();
     } else {
+      console.log('[Voice] Starting recording...');
       startRecording();
     }
   };
