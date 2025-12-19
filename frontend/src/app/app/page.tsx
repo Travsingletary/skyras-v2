@@ -151,6 +151,10 @@ export default function Home() {
 
   // Voice input handlers using Web Speech API
   const startRecording = () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:153',message:'startRecording entry',data:{hasExistingRecognition:!!recognitionRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+    // #endregion
+    
     try {
       // Stop any existing recognition first
       if (recognitionRef.current) {
@@ -164,6 +168,10 @@ export default function Home() {
 
       // Check if browser supports speech recognition
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:169',message:'SpeechRecognition check',data:{available:!!SpeechRecognition,hasWebkit:!!(window as any).webkitSpeechRecognition,hasStandard:!!(window as any).SpeechRecognition,isSecure:location.protocol==='https:'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+      // #endregion
       
       console.log('[Voice] SpeechRecognition available:', !!SpeechRecognition);
       
@@ -238,6 +246,10 @@ export default function Home() {
       };
 
       recognition.onerror = (event: any) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:240',message:'Recognition error',data:{error:event.error,errorType:typeof event.error,hasTranscript:!!fullTranscriptRef.current.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
+        
         // Clear timeout on error
         if (silenceTimeoutRef.current) {
           clearTimeout(silenceTimeoutRef.current);

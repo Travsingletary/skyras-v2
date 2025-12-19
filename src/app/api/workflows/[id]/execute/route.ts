@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { workflowsDb, workflowTasksDb, filesDb } from '@/lib/database';
-import { processTask, simulateTaskProcessing, type AgentName } from '@/lib/agentProcessor';
-import { getReadyTasks } from '@/lib/taskDependencies';
+import { simulateTaskProcessing, type AgentName } from '@/lib/agentProcessor';
 
 export async function POST(
   request: NextRequest,
@@ -21,20 +20,21 @@ export async function POST(
       );
     }
 
-    // Get ready tasks (dependencies satisfied)
-    const readyTasks = await getReadyTasks(workflowId);
+    // Get all pending tasks
+    const tasks = await workflowTasksDb.getByWorkflowId(workflowId);
+    const pendingTasks = tasks.filter(t => t.status === 'pending');
 
-    if (readyTasks.length === 0) {
+    if (pendingTasks.length === 0) {
       return NextResponse.json({
         success: true,
-        message: 'No ready tasks to execute (may be waiting on dependencies)',
+        message: 'No pending tasks to execute',
         data: { executedCount: 0 },
       });
     }
 
-    // Execute tasks sequentially (dependencies already satisfied)
+    // Execute tasks sequentially (respecting dependencies)
     const results = [];
-    for (const task of readyTasks) {
+    for (const task of pendingTasks) {
       // Mark as in_progress
       await workflowTasksDb.update(task.id, {
         status: 'in_progress',
@@ -55,27 +55,17 @@ export async function POST(
         }
       }
 
-      // Get agent_name from task (column or metadata)
-      const agentName = (task as any).agent_name || 
-                       (task.metadata as any)?.agent_name || 
-                       workflow.agent_name as AgentName;
-
       // Process task
       const taskContext = {
         taskId: task.id,
         workflowId: task.workflow_id,
         title: task.title,
         description: task.description,
-        agentName,
+        agentName: task.agent_name as AgentName,
         fileMetadata,
-        action: (task.metadata as any)?.action,
-        payload: (task.metadata as any)?.payload,
       };
 
-      // Use real agent processing (not simulation)
-      const result = simulate 
-        ? await simulateTaskProcessing(taskContext)
-        : await processTask(taskContext);
+      const result = await simulateTaskProcessing(taskContext);
 
       // Update task
       if (result.success) {

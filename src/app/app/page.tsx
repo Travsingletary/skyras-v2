@@ -40,8 +40,7 @@ interface UploadResponse {
 
 export default function Home() {
   const [conversationId, setConversationId] = useState<string | null>(null);
-  // CRITICAL: Initialize to 'public' immediately so API calls use correct userId from first render
-  const [userId] = useState<string>("public");
+  const [userId, setUserId] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [message, setMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -94,14 +93,15 @@ export default function Home() {
     // HARD RULE: Use 'public' as userId until user scoping is complete
     const standardUserId = 'public';
 
-    // Force clear old userId if it's different from localStorage
+    // Force clear old userId if it's different
     const existingUserId = localStorage.getItem("userId");
-    if (existingUserId && existingUserId !== standardUserId) {
+    if (existingUserId !== standardUserId) {
       console.log('[Chat] Clearing old userId:', existingUserId, '→', standardUserId);
       localStorage.removeItem("userId");
     }
 
     localStorage.setItem("userId", standardUserId);
+    setUserId(standardUserId);
 
     // Load conversationId from localStorage
     const storedConversationId = localStorage.getItem("conversationId");
@@ -151,6 +151,10 @@ export default function Home() {
 
   // Voice input handlers using Web Speech API
   const startRecording = () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:153',message:'startRecording entry',data:{hasExistingRecognition:!!recognitionRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
+    // #endregion
+    
     try {
       // Stop any existing recognition first
       if (recognitionRef.current) {
@@ -164,6 +168,10 @@ export default function Home() {
 
       // Check if browser supports speech recognition
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:169',message:'SpeechRecognition check',data:{available:!!SpeechRecognition,hasWebkit:!!(window as any).webkitSpeechRecognition,hasStandard:!!(window as any).SpeechRecognition,isSecure:location.protocol==='https:'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
+      // #endregion
       
       console.log('[Voice] SpeechRecognition available:', !!SpeechRecognition);
       
@@ -238,6 +246,10 @@ export default function Home() {
       };
 
       recognition.onerror = (event: any) => {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:240',message:'Recognition error',data:{error:event.error,errorType:typeof event.error,hasTranscript:!!fullTranscriptRef.current.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+        // #endregion
+        
         // Clear timeout on error
         if (silenceTimeoutRef.current) {
           clearTimeout(silenceTimeoutRef.current);
@@ -265,7 +277,11 @@ export default function Home() {
           // This is a common, expected error when the speech API is temporarily unavailable
           // Don't log as error, just warn and show user-friendly message
           console.warn('[Voice] Network error - speech recognition service temporarily unavailable. This is usually temporary.');
-          setError('Voice input temporarily unavailable due to network issues. Please try again in a moment or type your message.');
+          // Don't show error to user for network issues - it's too common and disruptive
+          // Just silently fail and let them type instead
+          setIsRecording(false);
+          // Optionally show a subtle notification
+          // setError('Voice input temporarily unavailable. Please type your message.');
         } else if (event.error === 'aborted') {
           // User stopped it, don't show error or log
           setIsRecording(false);

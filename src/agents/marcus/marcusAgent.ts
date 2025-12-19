@@ -3,32 +3,28 @@ import { AgentDelegation, AgentExecutionContext, AgentRunInput, AgentRunResult, 
 import { createLogger } from "@/lib/logger";
 import {
   collectStudioNotes,
-  createWorkflow,
   fetchLinkContent,
+  logPlanToSupabase,
   runCatalogSave,
   runCreativeGeneration,
   runDistributionPlan,
   runLicensingAudit,
 } from "./marcusActions";
-import { autoExecuteWorkflow } from "@/lib/autoExecute";
 import type {
   CatalogPayload,
   CreativeGenerationPayload,
   DistributionPayload,
   LicensingAuditFile,
   LinkFetchPayload,
-  WorkflowCreationPayload,
 } from "./marcusActions";
 import { getMarcusPreferences, formatPreferencesContext } from "./marcusPreferences";
 import { MARCUS_SYSTEM_PROMPT } from "./marcusSystemPrompt";
 
 const SYSTEM_PROMPT = MARCUS_SYSTEM_PROMPT;
 const LICENSING_KEYWORDS = /(license|licensing|watermark|demo)/i;
-const CREATIVE_KEYWORDS = /(idea|script|prompt|concept|scene|treatment|story|cover art|sora|skit|marketing hook|shot|outline|video|film|cinematic|runway)/i;
-const VIDEO_KEYWORDS = /(video|film|cinematic|runway|generate video|make video|create video|video clip)/i;
+const CREATIVE_KEYWORDS = /(idea|script|prompt|concept|scene|treatment|story|cover art|sora|skit|marketing hook|shot|outline)/i;
 const DISTRIBUTION_KEYWORDS = /(post|posting plan|schedule|distribution|publish|rollout|slots)/i;
 const CATALOG_KEYWORDS = /(catalog|tag|metadata|save asset|store asset)/i;
-const WORKFLOW_KEYWORDS = /(create workflow|make workflow|new workflow|workflow plan|build workflow|generate workflow)/i;
 const URL_PATTERN = /https?:\/\/[^\s]+/gi;
 
 class MarcusAgent extends BaseAgent {
@@ -109,15 +105,21 @@ class MarcusAgent extends BaseAgent {
     context.logger.info("Handling request", { prompt: input.prompt });
 
     const notes = await collectStudioNotes(context);
+    const supabaseLog = await logPlanToSupabase(context, {
+      prompt: input.prompt,
+      metadata: input.metadata ?? {},
+    });
 
     const delegations: AgentDelegation[] = [];
     const outputLines = [
       `System prompt: ${SYSTEM_PROMPT.split('\n')[0]}`,
       `Notes: ${notes.summary}`,
+      `Supabase: ${supabaseLog.summary}`,
     ];
 
     const notesPayload: Record<string, unknown> = {
       files: notes.data,
+      supabase: supabaseLog.data,
     };
 
     const shouldAuditLicensing = LICENSING_KEYWORDS.test(input.prompt);
@@ -138,32 +140,19 @@ class MarcusAgent extends BaseAgent {
     }
 
     const shouldGenerateCreative = CREATIVE_KEYWORDS.test(input.prompt);
-    const shouldGenerateVideo = VIDEO_KEYWORDS.test(input.prompt);
-    
-    if (shouldGenerateCreative || shouldGenerateVideo) {
+    if (shouldGenerateCreative) {
       const project =
         (input.metadata?.project as string | undefined) ??
         (input.metadata?.projectId as string | undefined) ??
         "SkySky";
-      
-      // Determine action: video generation or other creative work
-      const action = shouldGenerateVideo 
-        ? "generateRunwayVideo"
-        : (input.metadata?.creativeAction as string | undefined) ?? "generateScriptOutline";
-      
       const creativePayload: CreativeGenerationPayload = {
         project,
-        action,
+        action: input.metadata?.creativeAction as string | undefined,
         context: (input.metadata?.context as string | undefined) ?? input.prompt,
         mood: input.metadata?.mood as string | undefined,
         style: input.metadata?.style as string | undefined,
         characters: input.metadata?.characters as string[] | undefined,
         beats: input.metadata?.beats as string[] | undefined,
-        // Video-specific options
-        imageUrl: input.metadata?.imageUrl as string | undefined,
-        duration: input.metadata?.duration as number | undefined,
-        aspectRatio: input.metadata?.aspectRatio as string | undefined,
-        model: input.metadata?.model as string | undefined,
       };
 
       try {
@@ -230,37 +219,6 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
-    // Check for workflow creation requests
-    const shouldCreateWorkflow = WORKFLOW_KEYWORDS.test(input.prompt);
-    if (shouldCreateWorkflow) {
-      const userId = (input.metadata?.userId as string | undefined);
-      if (!userId) {
-        outputLines.push("Workflow creation requested but userId is missing in metadata.");
-      } else {
-        try {
-          // Extract workflow details from prompt or metadata
-          const workflowPayload: WorkflowCreationPayload = {
-            userId,
-            projectId: (input.metadata?.projectId as string | undefined) || 
-                      (input.metadata?.project as string | undefined),
-            name: (input.metadata?.workflowName as string | undefined) || 
-                  `Workflow ${new Date().toLocaleDateString()}`,
-            type: (input.metadata?.workflowType as WorkflowCreationPayload["type"]) || "custom",
-            planMarkdown: input.metadata?.planMarkdown as string | undefined,
-            summary: input.metadata?.workflowSummary as string | undefined,
-            agentName: "marcus",
-            tasks: input.metadata?.workflowTasks as WorkflowCreationPayload["tasks"] | undefined,
-          };
-
-          const workflowResult = await createWorkflow(context, workflowPayload);
-          outputLines.push(workflowResult.summary);
-          notesPayload.workflow = workflowResult.data;
-        } catch (error) {
-          outputLines.push(`Workflow creation failed: ${(error as Error).message}`);
-        }
-      }
-    }
-
     // Check for URLs in the prompt and fetch them
     const urls = input.prompt.match(URL_PATTERN);
     let fetchedLinks = false;
@@ -282,7 +240,7 @@ class MarcusAgent extends BaseAgent {
     }
 
     // If no specific keywords matched, generate AI response for general chat
-    const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog || shouldCreateWorkflow || fetchedLinks;
+    const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog || fetchedLinks;
     if (!hasSpecificAction) {
       context.logger.info("No specific action keywords detected, generating AI response");
       const userId = input.metadata?.userId as string | undefined;
@@ -292,59 +250,6 @@ class MarcusAgent extends BaseAgent {
         delegations,
         notes: notesPayload,
       };
-    }
-
-    // AUTO-EXECUTE: If delegations occurred, create workflow and trigger execution
-    if (delegations.length > 0) {
-      const userId = (input.metadata?.userId as string | undefined) || 'public';
-      const projectId = (input.metadata?.projectId as string | undefined) || 
-                       (input.metadata?.project as string | undefined);
-      
-      try {
-        context.logger.info("Auto-executing workflow from delegations", {
-          delegationCount: delegations.length,
-          userId,
-        });
-
-        // Extract workflow name from prompt or use default
-        const workflowName = input.metadata?.workflowName as string | undefined ||
-                            `Workflow: ${delegations.map(d => d.task).join(', ')}`;
-        
-        const summary = `Auto-executed workflow with ${delegations.length} task(s)`;
-
-        // Auto-execute: Create workflow, tasks, and trigger execution
-        const executionResult = await autoExecuteWorkflow(
-          delegations,
-          userId,
-          projectId,
-          workflowName,
-          summary
-        );
-
-        context.logger.info("Auto-execution completed", {
-          workflowId: executionResult.workflowId,
-          tasksCreated: executionResult.tasksCreated,
-          agentsTriggered: executionResult.agentsTriggered,
-        });
-
-        // Add execution results to notes
-        notesPayload.autoExecution = {
-          workflowId: executionResult.workflowId,
-          tasksCreated: executionResult.tasksCreated,
-          agentsTriggered: executionResult.agentsTriggered,
-          executionResults: executionResult.executionResults,
-        };
-
-        // Update output to include execution status
-        const executionStatus = executionResult.executionResults
-          .map(r => `${r.agentName}: ${r.success ? '✓' : '✗'}`)
-          .join(', ');
-        outputLines.push(`\n[Auto-executed] Workflow ${executionResult.workflowId} created with ${executionResult.tasksCreated} task(s). Agents triggered: ${executionStatus}`);
-      } catch (error) {
-        context.logger.error("Auto-execution failed", { error });
-        outputLines.push(`\n[Warning] Failed to auto-execute workflow: ${(error as Error).message}`);
-        // Don't fail the entire request - delegations still happened
-      }
     }
 
     // If delegations occurred, wrap results with AI-enhanced explanation
@@ -364,7 +269,7 @@ class MarcusAgent extends BaseAgent {
         }));
 
         const delegationSummary = outputLines.join('\n');
-        const wrapperPrompt = `I delegated the following tasks and auto-executed them:\n\n${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented. Mention that the work is already in progress.`;
+        const wrapperPrompt = `I delegated the following tasks:\n\n${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented.`;
 
         // Add wrapper prompt as latest user message
         conversationMessages.push({

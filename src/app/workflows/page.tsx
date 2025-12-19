@@ -2,33 +2,76 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useWorkflowsRealtime } from '@/hooks/useWorkflowsRealtime';
-import type { Workflow, WorkflowTask, WorkflowWithTasks } from '@/types/database';
+
+interface WorkflowTask {
+  id: string;
+  workflow_id: string;
+  title: string;
+  description: string;
+  agent_name: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
+  priority: number;
+  dependencies: string[];
+  results: Record<string, any>;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+}
+
+interface Workflow {
+  id: string;
+  user_id: string;
+  name: string;
+  type: string;
+  status: 'active' | 'completed' | 'cancelled';
+  plan_markdown?: string;
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  tasks?: WorkflowTask[];
+}
 
 export default function WorkflowsPage() {
-  // CRITICAL: Initialize to 'public' immediately so real-time hook uses correct userId from first render
-  const [userId] = useState<string>('public');
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
-    // HARD RULE: Use 'public' as userId until user scoping is complete
-    // This ensures workflows created by Marcus auto-execution are visible
-    const standardUserId = 'public';
-
-    // Force clear old userId if it's different from localStorage
-    const existingUserId = localStorage.getItem('userId');
-    if (existingUserId && existingUserId !== standardUserId) {
-      console.log('[Workflows] Clearing old userId:', existingUserId, '→', standardUserId);
-      localStorage.removeItem('userId');
+    const storedUserId = localStorage.getItem('userId');
+    if (storedUserId) {
+      setUserId(storedUserId);
     }
-
-    localStorage.setItem('userId', standardUserId);
   }, []);
 
-  // Use real-time hook instead of polling
-  const { workflows, loading, error } = useWorkflowsRealtime(userId);
-  
-  // Type assertion: API returns workflows with tasks
-  const workflowsWithTasks = workflows as WorkflowWithTasks[];
+  useEffect(() => {
+    if (!userId) return;
+
+    async function fetchWorkflows() {
+      try {
+        setLoading(true);
+        const res = await fetch(`/api/workflows?userId=${userId}`);
+        const data = await res.json();
+
+        if (data.success) {
+          setWorkflows(data.data.workflows || []);
+        } else {
+          setError(data.error || 'Failed to fetch workflows');
+        }
+      } catch (err) {
+        setError('Network error fetching workflows');
+        console.error('Error fetching workflows:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchWorkflows();
+
+    // Refresh every 5 seconds
+    const interval = setInterval(fetchWorkflows, 5000);
+    return () => clearInterval(interval);
+  }, [userId]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -121,51 +164,34 @@ export default function WorkflowsPage() {
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <p className="text-sm text-gray-600">Total Tasks</p>
             <p className="text-3xl font-semibold text-gray-900 mt-1">
-              {workflowsWithTasks.reduce((sum, w) => sum + (w.tasks?.length || 0), 0)}
+              {workflows.reduce((sum, w) => sum + (w.tasks?.length || 0), 0)}
             </p>
           </div>
         </div>
 
         {/* Workflows List */}
-        {workflowsWithTasks.length === 0 && !loading ? (
+        {workflows.length === 0 ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <div className="text-6xl mb-4">📋</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No workflows yet</h3>
             <p className="text-gray-600 mb-6">
-              {userId ? (
-                <>No workflows found for your account. Ask Marcus to create a workflow, or upload files in the Studio.</>
-              ) : (
-                <>Please start a conversation with Marcus first to get a user ID.</>
-              )}
+              Upload files in the Studio to get AI-powered workflow suggestions
             </p>
-            <div className="flex gap-3 justify-center">
-              <Link
-                href="/app"
-                className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                Chat with Marcus
-              </Link>
-              <Link
-                href="/studio"
-                className="inline-block px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Go to Studio
-              </Link>
-            </div>
-            {userId && (
-              <p className="text-xs text-gray-500 mt-4">
-                User ID: {userId}
-              </p>
-            )}
+            <Link
+              href="/studio"
+              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Go to Studio
+            </Link>
           </div>
         ) : (
           <div className="space-y-4">
-            {workflowsWithTasks.map((workflow) => {
+            {workflows.map((workflow) => {
               const taskStats = {
                 total: workflow.tasks?.length || 0,
-                completed: workflow.tasks?.filter((t: WorkflowTask) => t.status === 'completed').length || 0,
-                inProgress: workflow.tasks?.filter((t: WorkflowTask) => t.status === 'in_progress').length || 0,
-                pending: workflow.tasks?.filter((t: WorkflowTask) => t.status === 'pending').length || 0,
+                completed: workflow.tasks?.filter(t => t.status === 'completed').length || 0,
+                inProgress: workflow.tasks?.filter(t => t.status === 'in_progress').length || 0,
+                pending: workflow.tasks?.filter(t => t.status === 'pending').length || 0,
               };
               const progress = taskStats.total > 0
                 ? Math.round((taskStats.completed / taskStats.total) * 100)
@@ -220,7 +246,7 @@ export default function WorkflowsPage() {
                     <div className="border-t border-gray-100 pt-4">
                       <p className="text-xs text-gray-600 mb-2">Recent Tasks:</p>
                       <div className="space-y-2">
-                        {workflow.tasks.slice(0, 3).map((task: WorkflowTask) => (
+                        {workflow.tasks.slice(0, 3).map((task) => (
                           <div key={task.id} className="flex items-center gap-2 text-sm">
                             <span className={`w-2 h-2 rounded-full ${
                               task.status === 'completed' ? 'bg-green-500' :

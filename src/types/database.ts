@@ -7,7 +7,7 @@ export type ProjectStatus = 'active' | 'archived' | 'completed';
 export type WorkflowType = 'licensing' | 'creative' | 'distribution' | 'cataloging' | 'custom';
 export type WorkflowStatus = 'active' | 'completed' | 'paused' | 'cancelled';
 
-export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'skipped' | 'failed';
+export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
 
 export type ProcessingStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type ProcessingType = 'licensing' | 'cataloging' | 'script_gen' | 'distribution';
@@ -15,7 +15,6 @@ export type ProcessingType = 'licensing' | 'cataloging' | 'script_gen' | 'distri
 export type AgentName = 'marcus' | 'giorgio' | 'cassidy' | 'jamal' | 'letitia';
 export type CalendarProvider = 'google' | 'outlook' | 'apple';
 export type SyncStatus = 'synced' | 'pending' | 'failed';
-export type StorageProvider = 'supabase' | 'qnap' | 'local' | 's3';
 
 // ============================================================================
 // PROJECT
@@ -56,9 +55,6 @@ export interface File {
   processing_status: ProcessingStatus;
   processing_results: Record<string, any>;
   metadata: Record<string, any>;
-  storage_provider: StorageProvider;
-  is_public: boolean;
-  signed_url_expires_at?: string;
 }
 
 export interface FileInsert extends Omit<File, 'id' | 'created_at' | 'updated_at'> {
@@ -109,11 +105,6 @@ export interface WorkflowTask {
   completed_at?: string;
   calendar_event_id?: string;
   metadata: Record<string, any>;
-  // Real-time tracking fields (added in migration 0007)
-  agent_name?: string;
-  results?: Record<string, any>;
-  error_message?: string;
-  started_at?: string;
 }
 
 export interface WorkflowTaskInsert extends Omit<WorkflowTask, 'id' | 'created_at' | 'updated_at'> {

@@ -30,11 +30,6 @@ export interface CreativeGenerationPayload {
   style?: string;
   characters?: string[];
   beats?: string[];
-  // Video generation options
-  imageUrl?: string;
-  duration?: number;
-  aspectRatio?: string;
-  model?: string;
 }
 
 export interface DistributionPayload {
@@ -58,23 +53,6 @@ export interface LinkFetchPayload {
   context?: string;
 }
 
-export interface WorkflowCreationPayload {
-  userId: string;
-  projectId?: string;
-  name: string;
-  type: "licensing" | "creative" | "distribution" | "cataloging" | "custom";
-  planMarkdown?: string;
-  summary?: string;
-  agentName?: string;
-  tasks?: Array<{
-    title: string;
-    description?: string;
-    position?: number;
-    dueDate?: string;
-    metadata?: Record<string, unknown>;
-  }>;
-}
-
 export async function collectStudioNotes(context: AgentExecutionContext): Promise<MarcusActionResult> {
   const files = await listFiles(".");
   context.logger.debug("Scanned repo root for notes", { count: files.length });
@@ -85,13 +63,22 @@ export async function collectStudioNotes(context: AgentExecutionContext): Promis
   };
 }
 
+export async function logPlanToSupabase(context: AgentExecutionContext, payload: Record<string, unknown>): Promise<MarcusActionResult> {
+  const response = await context.supabase.from("studio_plans").insert(payload);
+  if (response.error) {
+    context.logger.warn("Supabase insert failed", { error: response.error.message });
+    return { summary: "Failed to log plan", data: response.error.message };
+  }
+
+  return { summary: "Plan logged to Supabase (mock)", data: response.data };
+}
 
 export async function runLicensingAudit(context: AgentExecutionContext, payload: LicensingAuditPayload) {
   if (!payload.projectId || !Array.isArray(payload.files) || payload.files.length === 0) {
     throw new Error("projectId and a non-empty files array are required for licensing audit");
   }
 
-  const delegation = await context.delegateTo("compliance", `scanFilesForLicensing:${payload.projectId}`);
+  const delegation = context.delegateTo("compliance", `scanFilesForLicensing:${payload.projectId}`);
   const compliance = createComplianceAgent();
   const result = await compliance.run({
     prompt: `Licensing audit for project ${payload.projectId}`,
@@ -107,7 +94,7 @@ export async function runCreativeGeneration(context: AgentExecutionContext, payl
   }
 
   const action = payload.action ?? "generateScriptOutline";
-  const delegation = await context.delegateTo("giorgio", `${action}:${payload.project}`);
+  const delegation = context.delegateTo("giorgio", `${action}:${payload.project}`);
   const giorgio = createGiorgioAgent();
   const result = await giorgio.run({
     prompt: `Creative request for ${payload.project}`,
@@ -122,7 +109,7 @@ export async function runDistributionPlan(context: AgentExecutionContext, payloa
     throw new Error("project is required for distribution planning");
   }
 
-  const delegation = await context.delegateTo("jamal", `postingPlan:${payload.project}`);
+  const delegation = context.delegateTo("jamal", `postingPlan:${payload.project}`);
   const jamal = createJamalAgent();
   const result = await jamal.run({
     prompt: `Posting plan for ${payload.project}`,
@@ -137,7 +124,7 @@ export async function runCatalogSave(context: AgentExecutionContext, payload: Ca
     throw new Error("project and name are required for catalog save");
   }
 
-  const delegation = await context.delegateTo("letitia", `catalog:${payload.project}:${payload.name}`);
+  const delegation = context.delegateTo("letitia", `catalog:${payload.project}:${payload.name}`);
   const letitia = createLetitiaAgent();
   const result = await letitia.run({
     prompt: `Catalog asset for ${payload.project}`,
@@ -211,84 +198,6 @@ export async function fetchLinkContent(context: AgentExecutionContext, payload: 
     return {
       summary: `Failed to fetch link: ${(error as Error).message}`,
       data: { url: payload.url, error: (error as Error).message },
-    };
-  }
-}
-
-export async function createWorkflow(context: AgentExecutionContext, payload: WorkflowCreationPayload): Promise<MarcusActionResult> {
-  if (!payload.userId) {
-    throw new Error("userId is required for workflow creation");
-  }
-  if (!payload.name) {
-    throw new Error("name is required for workflow creation");
-  }
-  if (!payload.type) {
-    throw new Error("type is required for workflow creation");
-  }
-
-  try {
-    context.logger.debug("Creating workflow", { 
-      userId: payload.userId, 
-      name: payload.name, 
-      type: payload.type 
-    });
-
-    // Determine API base URL (use same-origin for Next.js API routes)
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
-    const workflowsUrl = apiBaseUrl 
-      ? `${apiBaseUrl}/api/workflows`
-      : '/api/workflows';
-
-    const response = await fetch(workflowsUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId: payload.userId,
-        projectId: payload.projectId,
-        name: payload.name,
-        type: payload.type,
-        planMarkdown: payload.planMarkdown,
-        summary: payload.summary,
-        agentName: payload.agentName || 'marcus',
-        tasks: payload.tasks,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      context.logger.error("Workflow creation failed", { 
-        status: response.status, 
-        error: errorText 
-      });
-      return {
-        summary: `Failed to create workflow: HTTP ${response.status}`,
-        data: { status: response.status, error: errorText },
-      };
-    }
-
-    const result = await response.json();
-    
-    if (result.success && result.data?.workflow) {
-      context.logger.info("Workflow created successfully", { 
-        workflowId: result.data.workflow.id 
-      });
-      return {
-        summary: `Created workflow "${payload.name}" (${result.data.workflow.id})`,
-        data: result.data,
-      };
-    } else {
-      return {
-        summary: `Workflow creation returned unexpected format`,
-        data: result,
-      };
-    }
-  } catch (error) {
-    context.logger.error("Workflow creation failed", { error });
-    return {
-      summary: `Failed to create workflow: ${(error as Error).message}`,
-      data: { error: (error as Error).message },
     };
   }
 }
