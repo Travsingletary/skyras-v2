@@ -50,11 +50,7 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(() => {
-    // Check localStorage for voice preference
-    const stored = localStorage.getItem('voiceEnabled');
-    return stored !== null ? stored === 'true' : true; // Default to enabled
-  });
+  const [voiceEnabled, setVoiceEnabled] = useState(true); // Default to enabled, will be updated in useEffect
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -69,8 +65,19 @@ export default function Home() {
   // Access code is optional - if not set, allow access
   const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE?.trim() || "";
 
+  // Initialize voice preference from localStorage (client-side only)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('voiceEnabled');
+      if (stored !== null) {
+        setVoiceEnabled(stored === 'true');
+      }
+    }
+  }, []);
+
   // Check authentication on mount
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const storedAuth = localStorage.getItem("marcus_access");
     const expectedCode = requiredAccessCode;
     
