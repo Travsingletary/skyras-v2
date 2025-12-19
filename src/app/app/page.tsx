@@ -138,7 +138,11 @@ export default function Home() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    setPendingFiles((prev) => [...prev, ...files]);
+    console.log('[File Upload] Selected files:', files.length);
+    if (files.length > 0) {
+      setPendingFiles((prev) => [...prev, ...files]);
+      console.log('[File Upload] Added to pending files. Total:', files.length);
+    }
   };
 
   const removeFile = (index: number) => {
@@ -161,8 +165,12 @@ export default function Home() {
       // Check if browser supports speech recognition
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       
+      console.log('[Voice] SpeechRecognition available:', !!SpeechRecognition);
+      
       if (!SpeechRecognition) {
-        setError('Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.');
+        const errorMsg = 'Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.';
+        console.error('[Voice]', errorMsg);
+        setError(errorMsg);
         return;
       }
 
@@ -230,8 +238,6 @@ export default function Home() {
       };
 
       recognition.onerror = (event: any) => {
-        console.error('[Voice] Speech recognition error:', event.error);
-        
         // Clear timeout on error
         if (silenceTimeoutRef.current) {
           clearTimeout(silenceTimeoutRef.current);
@@ -254,10 +260,18 @@ export default function Home() {
           }
         } else if (event.error === 'not-allowed') {
           setError('Microphone access denied. Please allow microphone access in your browser settings.');
+        } else if (event.error === 'network') {
+          // Network error - speech recognition service unavailable
+          // This is a common, expected error when the speech API is temporarily unavailable
+          // Don't log as error, just warn and show user-friendly message
+          console.warn('[Voice] Network error - speech recognition service temporarily unavailable. This is usually temporary.');
+          setError('Voice input temporarily unavailable due to network issues. Please try again in a moment or type your message.');
         } else if (event.error === 'aborted') {
-          // User stopped it, don't show error
+          // User stopped it, don't show error or log
           setIsRecording(false);
         } else {
+          // Only log unexpected errors
+          console.warn('[Voice] Speech recognition error:', event.error);
           setError('Speech recognition failed. Please try typing your message.');
         }
       };
@@ -314,9 +328,12 @@ export default function Home() {
   };
 
   const handleMicClick = () => {
+    console.log('[Voice] Mic button clicked, isRecording:', isRecording);
     if (isRecording) {
+      console.log('[Voice] Stopping recording...');
       stopRecording();
     } else {
+      console.log('[Voice] Starting recording...');
       startRecording();
     }
   };

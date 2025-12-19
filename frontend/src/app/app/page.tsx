@@ -238,8 +238,6 @@ export default function Home() {
       };
 
       recognition.onerror = (event: any) => {
-        console.error('[Voice] Speech recognition error:', event.error);
-        
         // Clear timeout on error
         if (silenceTimeoutRef.current) {
           clearTimeout(silenceTimeoutRef.current);
@@ -264,14 +262,16 @@ export default function Home() {
           setError('Microphone access denied. Please allow microphone access in your browser settings.');
         } else if (event.error === 'network') {
           // Network error - speech recognition service unavailable
-          console.warn('[Voice] Network error - speech recognition service unavailable. This is usually temporary.');
-          setError('Voice input temporarily unavailable due to network issues. Please try again or type your message.');
-          setIsRecording(false);
+          // This is a common, expected error when the speech API is temporarily unavailable
+          // Don't log as error, just warn and show user-friendly message
+          console.warn('[Voice] Network error - speech recognition service temporarily unavailable. This is usually temporary.');
+          setError('Voice input temporarily unavailable due to network issues. Please try again in a moment or type your message.');
         } else if (event.error === 'aborted') {
-          // User stopped it, don't show error
+          // User stopped it, don't show error or log
           setIsRecording(false);
         } else {
-          console.error('[Voice] Unknown speech recognition error:', event.error);
+          // Only log unexpected errors
+          console.warn('[Voice] Speech recognition error:', event.error);
           setError('Speech recognition failed. Please try typing your message.');
         }
       };
