@@ -87,12 +87,12 @@ export function getMarcusPreferences(userId?: string): MarcusPreferences {
       },
       {
         name: "SkyRas Agency",
-        description: "Creative OS and workflow system for creators",
+        description: "The complete brand and creative OS - the platform, workflow system, and agency we're building",
         priority: "high"
       },
       {
-        name: "SkySky Show",
-        description: "Content brand and creative output platform",
+        name: "SkySky",
+        description: "The animated show - a content project (scripts, episodes, characters, stories). NOT code or technical infrastructure. This is creative content work.",
         priority: "high"
       },
       {
