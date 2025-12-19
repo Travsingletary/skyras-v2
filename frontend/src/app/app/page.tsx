@@ -611,6 +611,10 @@ export default function Home() {
             fileIds.push(...(uploadData as any).data.files.map((f: any) => f.id));
           }
         } catch (uploadErr) {
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:615',message:'Upload catch error',data:{errorMessage:(uploadErr as Error)?.message,errorName:(uploadErr as Error)?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          
           console.error("[Upload Error]:", uploadErr);
           setError(`File upload failed: ${(uploadErr as Error).message}`);
           setIsLoading(false);

@@ -142,13 +142,25 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     for (const file of files) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:144',message:'Processing file',data:{fileName:file.name,fileSize:file.size,fileType:file.type,userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+      
       try {
         // Convert File to Buffer
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:151',message:'Before saveFile call',data:{bufferSize:buffer.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+
         // Save file to Supabase Storage
         const savedFile = await saveFile(buffer, file.name, userId);
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:155',message:'saveFile success',data:{hasSavedFile:!!savedFile,fileId:savedFile?.fileId,path:savedFile?.path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
 
         // Get file extension
         const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
