@@ -5,21 +5,10 @@
  * specialized agents (Cassidy, Letitia, Giorgio, Jamal)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-
-let anthropicClient: Anthropic | null = null;
-
-function getAnthropicClient(): Anthropic {
-  if (anthropicClient) return anthropicClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    // Important: do NOT instantiate the SDK without a key. Some SDK versions
-    // throw at construction time, which can crash a serverless invocation.
-    throw new Error('ANTHROPIC_API_KEY is not set');
-  }
-  anthropicClient = new Anthropic({ apiKey });
-  return anthropicClient;
-}
+import { createComplianceAgent } from '@/agents/compliance';
+import { createGiorgioAgent } from '@/agents/giorgio';
+import { createJamalAgent } from '@/agents/jamal';
+import { createLetitiaAgent } from '@/agents/letitia';
 
 export type AgentName = 'cassidy' | 'letitia' | 'giorgio' | 'jamal';
 
@@ -44,176 +33,76 @@ interface ProcessingResult {
 }
 
 /**
- * Agent system prompts and capabilities
+ * Agent factory - creates the appropriate agent instance
  */
-const AGENT_CONFIGS = {
-  cassidy: {
-    name: 'Cassidy',
-    role: 'Licensing & Compliance Specialist',
-    systemPrompt: `You are Cassidy, a licensing and compliance specialist for creative content.
-
-Your responsibilities:
-- Analyze audio/video content for copyright and licensing requirements
-- Identify samples, interpolations, or derivative works
-- Recommend licensing actions and clearances needed
-- Flag potential copyright issues
-- Suggest licensing strategies for distribution
-
-Provide your analysis in JSON format with:
-{
-  "clearanceStatus": "clear" | "needs_review" | "issues_found",
-  "identifiedSamples": [...],
-  "licensingRecommendations": [...],
-  "estimatedCost": number,
-  "riskLevel": "low" | "medium" | "high",
-  "notes": "..."
-}`,
-  },
-  letitia: {
-    name: 'Letitia',
-    role: 'Cataloging & Organization Specialist',
-    systemPrompt: `You are Letitia, a cataloging and organization specialist for creative assets.
-
-Your responsibilities:
-- Catalog and organize files (audio, video, images, documents)
-- Extract metadata (title, artist, genre, BPM, key, etc.)
-- Suggest tags and categories
-- Recommend folder structures and naming conventions
-- Create searchable asset databases
-
-Provide your analysis in JSON format with:
-{
-  "suggestedTitle": "...",
-  "metadata": { ... },
-  "tags": [...],
-  "categories": [...],
-  "organizationSuggestions": [...],
-  "searchKeywords": [...]
-}`,
-  },
-  giorgio: {
-    name: 'Giorgio',
-    role: 'Creative & Script Generation Specialist',
-    systemPrompt: `You are Giorgio, a creative content and script generation specialist.
-
-Your responsibilities:
-- Generate video scripts and storyboards
-- Create content concepts and treatments
-- Suggest visual and narrative elements
-- Develop social media content strategies
-- Write promotional copy
-
-Provide your output in JSON format with:
-{
-  "scriptOutline": [...],
-  "visualConcepts": [...],
-  "targetAudience": "...",
-  "tone": "...",
-  "estimatedRuntime": "...",
-  "productionNotes": [...]
-}`,
-  },
-  jamal: {
-    name: 'Jamal',
-    role: 'Distribution & Marketing Specialist',
-    systemPrompt: `You are Jamal, a distribution and marketing specialist for creative content.
-
-Your responsibilities:
-- Create distribution strategies across platforms
-- Recommend release schedules and timing
-- Suggest marketing campaigns and promotional tactics
-- Analyze platform-specific requirements
-- Develop audience engagement strategies
-
-Provide your strategy in JSON format with:
-{
-  "platforms": [...],
-  "releaseSchedule": { ... },
-  "marketingTactics": [...],
-  "budgetEstimate": number,
-  "expectedReach": "...",
-  "kpis": [...]
-}`,
-  },
-};
+function getAgent(agentName: AgentName) {
+  switch (agentName) {
+    case 'cassidy':
+      return createComplianceAgent();
+    case 'letitia':
+      return createLetitiaAgent();
+    case 'giorgio':
+      return createGiorgioAgent();
+    case 'jamal':
+      return createJamalAgent();
+    default:
+      throw new Error(`Unknown agent: ${agentName}`);
+  }
+}
 
 /**
  * Process a task using the appropriate AI agent
  */
 export async function processTask(context: TaskContext): Promise<ProcessingResult> {
-  const config = AGENT_CONFIGS[context.agentName];
-
-  if (!config) {
-    return {
-      success: false,
-      results: {},
-      error: `Unknown agent: ${context.agentName}`,
-    };
-  }
-
   try {
-    const anthropic = getAnthropicClient();
+    const agent = getAgent(context.agentName);
 
-    // Build the user prompt with task context
-    let userPrompt = `Task: ${context.title}\n\n${context.description}\n\n`;
+    // Build the prompt from task context
+    let prompt = `${context.title}\n\n${context.description || ''}`;
 
+    // Add file metadata if available
     if (context.fileMetadata) {
-      userPrompt += `File Information:
+      prompt += `\n\nFile Information:
 - Name: ${context.fileMetadata.fileName}
 - Type: ${context.fileMetadata.fileType}
 - Size: ${(context.fileMetadata.fileSize / 1024 / 1024).toFixed(2)} MB
-- URL: ${context.fileMetadata.fileUrl}
-
-`;
+- URL: ${context.fileMetadata.fileUrl}`;
     }
 
-    userPrompt += `Please analyze this and provide your professional assessment in the JSON format specified in your role.`;
+    // Determine action and payload from task metadata
+    const taskMetadata = context as any;
+    const action = taskMetadata.action || taskMetadata.metadata?.action;
+    const payload = taskMetadata.payload || taskMetadata.metadata?.payload || {
+      project: taskMetadata.metadata?.project || 'SkySky',
+      ...(context.fileMetadata && {
+        fileId: taskMetadata.metadata?.fileId,
+        fileName: context.fileMetadata.fileName,
+        fileUrl: context.fileMetadata.fileUrl,
+      }),
+    };
 
-    // Call Claude API
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
-      max_tokens: 4096,
-      system: config.systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: userPrompt,
-        },
-      ],
+    // Execute the agent
+    const result = await agent.run({
+      prompt,
+      metadata: {
+        action,
+        payload,
+        taskId: context.taskId,
+        workflowId: context.workflowId,
+        fileMetadata: context.fileMetadata,
+      },
     });
 
-    // Extract the response
-    const content = response.content[0];
-    if (content.type !== 'text') {
-      throw new Error('Unexpected response type from Claude');
-    }
-
-    // Try to parse as JSON
-    let results: Record<string, any>;
-    try {
-      // Look for JSON in the response
-      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        results = JSON.parse(jsonMatch[0]);
-      } else {
-        // If no JSON found, wrap the text response
-        results = {
-          agentResponse: content.text,
-          processedAt: new Date().toISOString(),
-        };
-      }
-    } catch (parseError) {
-      // If parsing fails, store the raw response
-      results = {
-        rawResponse: content.text,
-        processedAt: new Date().toISOString(),
-      };
-    }
-
-    // Add metadata
-    results._agent = context.agentName;
-    results._processedBy = config.name;
-    results._completedAt = new Date().toISOString();
+    // Format results
+    const results: Record<string, any> = {
+      _agent: context.agentName,
+      _taskId: context.taskId,
+      _workflowId: context.workflowId,
+      _completedAt: new Date().toISOString(),
+      output: result.output,
+      ...(result.notes && { notes: result.notes }),
+      ...(result.delegations && { delegations: result.delegations }),
+    };
 
     return {
       success: true,
@@ -236,12 +125,18 @@ export async function simulateTaskProcessing(context: TaskContext): Promise<Proc
   // Simulate processing delay
   await new Promise(resolve => setTimeout(resolve, 2000));
 
-  const config = AGENT_CONFIGS[context.agentName];
+  // Agent name mapping for simulation
+  const agentNames: Record<AgentName, string> = {
+    cassidy: 'Cassidy',
+    letitia: 'Letitia',
+    giorgio: 'Giorgio',
+    jamal: 'Jamal',
+  };
 
   // Generate mock results based on agent type
   const mockResults: Record<string, any> = {
     _agent: context.agentName,
-    _processedBy: config?.name || 'Unknown',
+    _processedBy: agentNames[context.agentName] || 'Unknown',
     _completedAt: new Date().toISOString(),
     _simulated: true,
   };
