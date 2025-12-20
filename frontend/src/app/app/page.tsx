@@ -58,9 +58,6 @@ export default function Home() {
   const audioQueueRef = useRef<Array<{ text: string; role: Message['role'] }>>([]);
   const isPlayingAudioRef = useRef<boolean>(false);
   const isStartingAudioRef = useRef<boolean>(false); // Track if we're starting playback
-  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const fullTranscriptRef = useRef<string>('');
-  const hasSentRef = useRef<boolean>(false); // Track if we've already sent the message
 
   // Access code is optional - if not set, allow access
   const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE?.trim() || "";
@@ -141,150 +138,111 @@ export default function Home() {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Voice input handlers using Web Speech API
-  const startRecording = () => {
+  // Voice input handlers using MediaRecorder + OpenAI Whisper
+  const startRecording = async () => {
     try {
-      // Stop any existing recognition first
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {
-          // Ignore errors when stopping
-        }
-        recognitionRef.current = null;
-      }
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      // Check if browser supports speech recognition
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      
-      if (!SpeechRecognition) {
-        setError('Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.');
-        return;
-      }
+      // Create MediaRecorder
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm',
+      });
 
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true; // Keep listening until stopped
-      recognition.interimResults = true; // Show results as you speak
-      recognition.lang = 'en-US';
-      recognition.maxAlternatives = 1; // Only get the best result
+      const audioChunks: Blob[] = [];
 
-      const SILENCE_DELAY = 2000; // Send after 2 seconds of silence
-
-      recognition.onstart = () => {
-        setIsRecording(true);
-        setError(null);
-        fullTranscriptRef.current = '';
-      };
-
-      recognition.onresult = (event: any) => {
-        // Accumulate all results
-        let interimTranscript = '';
-        let finalTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript + ' ';
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-
-        // Update full transcript with final results
-        if (finalTranscript) {
-          fullTranscriptRef.current += finalTranscript;
-          console.log('[Voice] Final transcript:', fullTranscriptRef.current.trim());
-        }
-
-        // Show combined transcript in input field (final + interim)
-        const displayText = (fullTranscriptRef.current + interimTranscript).trim();
-        if (displayText) {
-          setMessage(displayText);
-        }
-
-        // Clear existing timeout
-        if (silenceTimeoutRef.current) {
-          clearTimeout(silenceTimeoutRef.current);
-          silenceTimeoutRef.current = null;
-        }
-
-        // If we have final results, set a timeout to send after silence
-        if (finalTranscript.trim() && !hasSentRef.current) {
-          silenceTimeoutRef.current = setTimeout(() => {
-            const textToSend = fullTranscriptRef.current.trim();
-            if (textToSend && !hasSentRef.current) {
-              hasSentRef.current = true; // Mark as sent
-              console.log('[Voice] Auto-sending after silence:', textToSend);
-              stopRecording(); // Stop recording first
-              setTimeout(() => {
-                handleSend(textToSend);
-              }, 200);
-            }
-            silenceTimeoutRef.current = null;
-          }, SILENCE_DELAY);
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunks.push(event.data);
         }
       };
 
-      recognition.onerror = (event: any) => {
-        console.error('[Voice] Speech recognition error:', event.error);
-        
-        // Clear timeout on error
-        if (silenceTimeoutRef.current) {
-          clearTimeout(silenceTimeoutRef.current);
-          silenceTimeoutRef.current = null;
-        }
-        
-        setIsRecording(false);
-        
-        if (event.error === 'no-speech') {
-          // If we have a transcript, send it; otherwise show error
-          if (fullTranscriptRef.current.trim() && !hasSentRef.current) {
-            hasSentRef.current = true; // Mark as sent
-            console.log('[Voice] No more speech, sending transcript:', fullTranscriptRef.current.trim());
-            stopRecording();
-            setTimeout(() => {
-              handleSend(fullTranscriptRef.current.trim());
-            }, 200);
-          } else if (!fullTranscriptRef.current.trim()) {
-            setError('No speech detected. Please try again.');
-          }
-        } else if (event.error === 'not-allowed') {
-          setError('Microphone access denied. Please allow microphone access in your browser settings.');
-        } else if (event.error === 'aborted') {
-          // User stopped it, don't show error
+      mediaRecorder.onstop = async () => {
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+
+        // Combine audio chunks
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+        if (audioBlob.size === 0) {
+          setError('No audio recorded. Please try again.');
           setIsRecording(false);
-        } else {
-          setError('Speech recognition failed. Please try typing your message.');
+          return;
+        }
+
+        console.log(`[Voice] Recorded ${audioBlob.size} bytes, sending to transcription...`);
+        setMessage('🎤 Transcribing...');
+
+        try {
+          // Send to speech-to-text API
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'recording.webm');
+
+          const response = await fetch('/api/speech-to-text', {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Transcription failed');
+          }
+
+          const data = await response.json();
+
+          if (!data.success || !data.transcript) {
+            throw new Error('No transcript returned');
+          }
+
+          const transcript = data.transcript.trim();
+          console.log('[Voice] Transcription:', transcript);
+
+          if (transcript) {
+            setMessage(transcript);
+            // Auto-send after transcription
+            setTimeout(() => {
+              handleSend(transcript);
+            }, 500);
+          } else {
+            setError('No speech detected. Please try again.');
+            setMessage('');
+          }
+
+        } catch (error) {
+          console.error('[Voice] Transcription error:', error);
+          setError('Failed to transcribe audio. Please try typing your message.');
+          setMessage('');
+        } finally {
+          setIsRecording(false);
         }
       };
 
-      recognition.onend = () => {
-        // Clear timeout when recognition ends
-        if (silenceTimeoutRef.current) {
-          clearTimeout(silenceTimeoutRef.current);
-          silenceTimeoutRef.current = null;
-        }
-        
+      mediaRecorder.onerror = (event: any) => {
+        console.error('[Voice] MediaRecorder error:', event.error);
+        setError('Recording failed. Please try again.');
         setIsRecording(false);
-        const transcriptToSend = fullTranscriptRef.current.trim();
-        recognitionRef.current = null;
-        
-        // Only send if we haven't already sent (prevents duplicate sends)
-        // This handles the case where user manually stops recording
-        if (transcriptToSend && !hasSentRef.current) {
-          hasSentRef.current = true; // Mark as sent
-          console.log('[Voice] Recording ended, sending transcript:', transcriptToSend);
-          setTimeout(() => {
-            handleSend(transcriptToSend);
-          }, 200);
-        }
+        stream.getTracks().forEach(track => track.stop());
       };
 
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (error) {
-      console.error('[Voice] Error starting recognition:', error);
-      setError('Failed to start voice input. Please try typing your message.');
+      // Store reference and start recording
+      recognitionRef.current = mediaRecorder as any;
+      mediaRecorder.start();
+      setIsRecording(true);
+      setError(null);
+      setMessage('🎤 Recording...');
+      console.log('[Voice] Recording started');
+
+    } catch (error: any) {
+      console.error('[Voice] Error starting recording:', error);
+
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        setError('Microphone access denied. Please allow microphone access in your browser settings.');
+      } else if (error.name === 'NotFoundError') {
+        setError('No microphone found. Please connect a microphone and try again.');
+      } else {
+        setError('Failed to start recording. Please try typing your message.');
+      }
+
       setIsRecording(false);
       recognitionRef.current = null;
     }
@@ -292,20 +250,14 @@ export default function Home() {
 
   const stopRecording = () => {
     if (recognitionRef.current) {
-      // Clear any pending timeout
-      if (silenceTimeoutRef.current) {
-        clearTimeout(silenceTimeoutRef.current);
-        silenceTimeoutRef.current = null;
-      }
-      
       try {
-        // Stop the recognition
+        // Stop the MediaRecorder
         recognitionRef.current.stop();
+        console.log('[Voice] Stopping recording...');
       } catch (e) {
-        // Ignore errors when stopping
+        console.error('[Voice] Error stopping recording:', e);
+        setIsRecording(false);
       }
-      // Don't set recognitionRef.current to null here - let onend handle it
-      // This way onend can check if we have a transcript to send
     }
   };
 
