@@ -211,7 +211,6 @@ export default function WorkflowsPage() {
                 User ID: {userId}
               </p>
             )}
-            </Link>
           </div>
         ) : (
           <div className="space-y-4">

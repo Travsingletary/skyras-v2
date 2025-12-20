@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { workflowTasksDb, workflowsDb } from '@/lib/database';
 import { pollForTasks, type AgentName } from '@/lib/taskPoller';
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/agents/status - Get status for all agents or a specific agent
  * 

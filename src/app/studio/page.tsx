@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import FilePreview from "@/components/FilePreview";
 import WorkflowSuggestions from "@/components/WorkflowSuggestions";
+import { getSupabaseBrowserClient } from "@/lib/supabaseBrowserClient";
 
 export const dynamic = 'force-dynamic';
 
@@ -159,38 +160,89 @@ export default function Home() {
       if (pendingFiles.length > 0) {
         console.log(`[Upload] Starting upload of ${pendingFiles.length} file(s)...`);
         try {
-          const formData = new FormData();
-          pendingFiles.forEach((file) => {
-            formData.append("files", file);
-          });
-          formData.append("userId", userId);
+          // Direct-to-storage upload (avoids Vercel FUNCTION_PAYLOAD_TOO_LARGE)
+          const supabase = getSupabaseBrowserClient();
 
-          const uploadRes = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
+          const initFiles = pendingFiles.map((file, idx) => ({
+            clientId: `${Date.now()}_${idx}_${file.name}`,
+            name: file.name,
+            size: file.size,
+            type: file.type || null,
+          }));
+
+          const initRes = await fetch("/api/upload/signed-url", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, files: initFiles }),
           });
 
-          if (!uploadRes.ok) {
-            const uploadError = await uploadRes.text();
-            throw new Error(`Upload failed: ${uploadError}`);
+          if (!initRes.ok) {
+            const t = await initRes.text();
+            throw new Error(`Upload init failed: ${t}`);
           }
 
-          const uploadData = await uploadRes.json();
-          console.log("[Upload] Success:", uploadData);
+          const initJson = await initRes.json();
+          if (!initJson?.success || !initJson?.data?.uploads) {
+            throw new Error(`Upload init failed: ${JSON.stringify(initJson)}`);
+          }
 
-          // Extract file IDs for chat
+          const bucket = initJson.data.bucket as string;
+          const uploads = initJson.data.uploads as Array<{
+            clientId: string;
+            fileId: string;
+            path: string;
+            token: string;
+          }>;
+
+          for (const u of uploads) {
+            const idx = initFiles.findIndex((f) => f.clientId === u.clientId);
+            const file = pendingFiles[idx];
+            if (!file) throw new Error("Upload mapping failed (clientId mismatch)");
+
+            const { error } = await (supabase.storage as any)
+              .from(bucket)
+              .uploadToSignedUrl(u.path, u.token, file, {
+                contentType: file.type || "application/octet-stream",
+              });
+
+            if (error) {
+              throw new Error(`Storage upload failed: ${error.message || String(error)}`);
+            }
+          }
+
+          const completeRes = await fetch("/api/upload/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,
+              files: uploads.map((u) => {
+                const idx = initFiles.findIndex((f) => f.clientId === u.clientId);
+                const file = pendingFiles[idx]!;
+                return {
+                  fileId: u.fileId,
+                  path: u.path,
+                  name: file.name,
+                  size: file.size,
+                  type: file.type || null,
+                };
+              }),
+            }),
+          });
+
+          if (!completeRes.ok) {
+            const t = await completeRes.text();
+            throw new Error(`Upload finalize failed: ${t}`);
+          }
+
+          const uploadData = await completeRes.json();
+          console.log("[Upload] Finalized:", uploadData);
+
           if (uploadData.success && uploadData.data?.fileIds) {
             fileIds.push(...uploadData.data.fileIds);
-          } else if (uploadData.fileIds) {
-            fileIds.push(...uploadData.fileIds);
           }
-
-          // Store uploaded files data for preview
           if (uploadData.success && uploadData.data?.files) {
             setUploadedFiles((prev) => [...prev, ...uploadData.data.files]);
           }
-
-          // Store workflow suggestions
           if (uploadData.success && uploadData.data?.workflowSuggestions) {
             setWorkflowSuggestions(uploadData.data.workflowSuggestions);
           }

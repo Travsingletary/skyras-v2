@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { getSupabaseBrowserClient } from "@/lib/supabaseBrowserClient";
 
 interface Message {
   id: string;
@@ -50,11 +51,7 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(() => {
-    // Check localStorage for voice preference
-    const stored = localStorage.getItem('voiceEnabled');
-    return stored !== null ? stored === 'true' : true; // Default to enabled
-  });
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -84,6 +81,16 @@ export default function Home() {
       setIsAuthenticated(true);
     }
   }, [requiredAccessCode]);
+
+  // Load voice preference from localStorage (client-only)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("voiceEnabled");
+      if (stored !== null) setVoiceEnabled(stored === "true");
+    } catch {
+      // Ignore: localStorage may be unavailable in some environments
+    }
+  }, []);
 
   // Initialize userId and conversationId from localStorage
   useEffect(() => {
@@ -543,32 +550,87 @@ export default function Home() {
       if (filesToUpload.length > 0) {
         console.log(`[Upload] Starting upload of ${filesToUpload.length} file(s)...`);
         try {
-          const formData = new FormData();
-          filesToUpload.forEach((file) => {
-            formData.append("files", file);
-          });
-          formData.append("userId", userId);
-          if (conversationId) {
-            formData.append("conversationId", conversationId);
-          }
+          // Direct-to-storage upload (avoids Vercel FUNCTION_PAYLOAD_TOO_LARGE)
+          const supabase = getSupabaseBrowserClient();
 
-          const uploadRes = await fetch(`/api/upload`, {
+          const initFiles = filesToUpload.map((file, idx) => ({
+            clientId: `${Date.now()}_${idx}_${file.name}`,
+            name: file.name,
+            size: file.size,
+            type: file.type || null,
+          }));
+
+          const initRes = await fetch("/api/upload/signed-url", {
             method: "POST",
-            body: formData,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, files: initFiles }),
           });
 
-          if (!uploadRes.ok) {
-            const uploadError = await uploadRes.text();
-            throw new Error(`Upload failed: ${uploadError}`);
+          if (!initRes.ok) {
+            const t = await initRes.text();
+            throw new Error(`Upload init failed: ${t}`);
           }
 
-          const uploadData = (await uploadRes.json()) as UploadResponse;
-          console.log("[Upload] Success:", uploadData);
+          const initJson = await initRes.json();
+          if (!initJson?.success || !initJson?.data?.uploads) {
+            throw new Error(`Upload init failed: ${JSON.stringify(initJson)}`);
+          }
 
-          if (uploadData.files && uploadData.files.length > 0) {
-            fileIds.push(...uploadData.files.map((f) => f.id));
-          } else if (uploadData.success && (uploadData as any).data?.files) {
-            fileIds.push(...(uploadData as any).data.files.map((f: any) => f.id));
+          const bucket = initJson.data.bucket as string;
+          const uploads = initJson.data.uploads as Array<{
+            clientId: string;
+            fileId: string;
+            path: string;
+            token: string;
+          }>;
+
+          for (const u of uploads) {
+            const idx = initFiles.findIndex((f) => f.clientId === u.clientId);
+            const file = filesToUpload[idx];
+            if (!file) throw new Error("Upload mapping failed (clientId mismatch)");
+
+            const { error } = await (supabase.storage as any)
+              .from(bucket)
+              .uploadToSignedUrl(u.path, u.token, file, {
+                contentType: file.type || "application/octet-stream",
+              });
+
+            if (error) {
+              throw new Error(`Storage upload failed: ${error.message || String(error)}`);
+            }
+          }
+
+          const completeRes = await fetch("/api/upload/complete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,
+              files: uploads.map((u) => {
+                const idx = initFiles.findIndex((f) => f.clientId === u.clientId);
+                const file = filesToUpload[idx]!;
+                return {
+                  fileId: u.fileId,
+                  path: u.path,
+                  name: file.name,
+                  size: file.size,
+                  type: file.type || null,
+                };
+              }),
+            }),
+          });
+
+          if (!completeRes.ok) {
+            const t = await completeRes.text();
+            throw new Error(`Upload finalize failed: ${t}`);
+          }
+
+          const uploadData = await completeRes.json();
+          console.log("[Upload] Finalized:", uploadData);
+
+          if (uploadData.success && uploadData.data?.fileIds) {
+            fileIds.push(...uploadData.data.fileIds);
+          } else if (uploadData.fileIds) {
+            fileIds.push(...uploadData.fileIds);
           }
         } catch (uploadErr) {
           console.error("[Upload Error]:", uploadErr);
