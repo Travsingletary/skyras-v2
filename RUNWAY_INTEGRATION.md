@@ -1,149 +1,258 @@
-# Runway Integration Guide
+# Runway ML Integration for Giorgio
+
+Giorgio's video generation capabilities powered by Runway ML Gen-3 Alpha.
 
 ## Overview
-RunwayML video generation has been integrated into the agent system. Giorgio can now generate videos using Runway's Veo 3 models (veo3, veo3.1, veo3.1_fast).
+
+Giorgio can now generate videos using Runway ML's API:
+- **Text-to-Video**: Generate videos from text descriptions
+- **Image-to-Video**: Animate static images with motion
+- **Models**: Gen-3 Alpha Turbo (default), Gen-3 Alpha, and other Runway models
+- **Duration**: 2-10 seconds per video
+- **Aspect Ratios**: 16:9, 9:16, 1:1, 4:3, 3:4
 
 ## Setup
 
 ### 1. Get Runway API Key
-1. Sign up at https://dev.runwayml.com/
-2. Navigate to API settings
-3. Generate an API key
-4. Add it to your environment variables
 
-### 2. Environment Variables
-Add to your `.env.local` or environment:
+1. Sign up at [runwayml.com](https://runwayml.com)
+2. Navigate to [Account Settings → API Keys](https://app.runwayml.com/account)
+3. Create a new API key
+4. Copy the key
+
+### 2. Configure Environment Variables
+
+Add to your `.env` or `.env.local`:
 
 ```bash
-RUNWAY_API_KEY=your_runway_api_key_here
-RUNWAY_API_BASE_URL=https://api.dev.runwayml.com  # Default (corrected from api.runwayml.com)
-RUNWAY_API_VERSION=2024-11-06  # API version in YYYY-MM-DD format (default: 2024-11-06)
+RUNWAY_API_KEY=your-runway-api-key-here
+RUNWAY_API_BASE_URL=https://api.dev.runwayml.com
+RUNWAY_API_VERSION=2024-11-06
 ```
 
-**Verified API Structure** (as of 2024-12-19):
-- Base URL: `https://api.dev.runwayml.com` (NOT `api.runwayml.com`)
-- Text-to-Video Endpoint: `POST /v1/text_to_video`
-- Task Status Endpoint: `GET /v1/tasks/{id}`
-- Required Header: `X-Runway-Version: 2024-11-06` (date format)
-- Models: `veo3`, `veo3.1`, `veo3.1_fast`
-- Aspect Ratios: `1280:720`, `720:1280`, `1080:1920`, `1920:1080`
-- Duration: 4, 6, or 8 seconds (for veo3.1 models)
+### 3. Add to Vercel (Production)
 
-## Usage
+In Vercel dashboard → Settings → Environment Variables:
+- `RUNWAY_API_KEY`: Your Runway API key
+- `RUNWAY_API_BASE_URL`: https://api.dev.runwayml.com
+- `RUNWAY_API_VERSION`: 2024-11-06
 
-### Via Marcus (Automatic)
-Marcus automatically detects video requests and delegates to Giorgio:
+## Usage with Giorgio
 
-**Examples:**
-- "Make a video for my project"
-- "Generate a cinematic video"
-- "Create a video using Runway"
-- "Film a short clip about..."
+### Text-to-Video
 
-### Via Giorgio Directly
-Giorgio can generate videos with the `generateRunwayVideo` action:
+Ask Giorgio to generate a video:
 
 ```typescript
+// Example prompt to Giorgio
+"Create a 5-second video of a sunset over mountains with cinematic camera movement"
+```
+
+Giorgio's `generateRunwayVideo` action will:
+1. Create a text-to-video generation task
+2. Poll Runway API until video is ready (up to 5 minutes)
+3. Download video and store in Supabase Storage
+4. Return video URL
+
+### Image-to-Video
+
+Provide an image URL to Giorgio:
+
+```typescript
+await giorgio.run({
+  metadata: {
+    action: "generateRunwayVideo",
+    payload: {
+      project: "Summer Campaign",
+      context: "Ocean waves crashing on beach",
+      imageUrl: "https://storage.supabase.co/.../beach.jpg",
+      duration: 5,
+      aspectRatio: "16:9",
+      model: "gen3a_turbo",
+    },
+  },
+});
+```
+
+## API Reference
+
+### POST /api/tools/generateVideo
+
+Generate a video using Runway ML.
+
+**Request Body:**
+```typescript
 {
-  action: "generateRunwayVideo",
-  payload: {
-    project: "MyProject",
-    context: "A futuristic cityscape",
-    mood: "dramatic",
-    style: "cinematic",
-    duration: 5,
-    aspectRatio: "16:9",
-    model: "gen3a_turbo"
+  prompt: string;              // Video description (required)
+  imageUrl?: string;           // Optional: Image to animate
+  duration?: number;           // 2-10 seconds (default: 5)
+  aspectRatio?: string;        // "16:9", "9:16", "1:1", "4:3", "3:4" (default: "16:9")
+  model?: string;              // "gen3a_turbo", "gen3a" (default: "gen3a_turbo")
+  projectId?: string;          // Optional: Project for organization
+  agentName?: string;          // Optional: Agent name (default: "giorgio")
+  waitForCompletion?: boolean; // Wait for video or return task ID (default: true)
+}
+```
+
+**Response (Success):**
+```typescript
+{
+  success: true,
+  video: {
+    id: string;           // Runway task ID
+    videoUrl: string;     // Public URL to video (Supabase or Runway)
+    thumbnailUrl: string; // Optional thumbnail
+    duration: number;     // Video duration in seconds
+    model: string;        // Model used
+    prompt: string;       // Original prompt
   }
 }
 ```
 
-### Via API Endpoint
-Direct API call to `/api/tools/generateVideo`:
-
-```bash
-curl -X POST http://localhost:3000/api/tools/generateVideo \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "A cinematic shot of a futuristic city",
-    "duration": 5,
-    "aspectRatio": "16:9",
-    "model": "gen3a_turbo",
-    "projectId": "project-123",
-    "waitForCompletion": true
-  }'
+**Response (Error):**
+```typescript
+{
+  success: false,
+  error: string;
+  failureCode?: string; // Runway error code if available
+}
 ```
 
-## Features
+## Models
 
-### Supported Models
-- `gen3a_turbo` - Fast generation (default)
-- `gen3a` - Standard quality
-- `gen4` - Highest quality (if available)
+### Gen-3 Alpha Turbo (Recommended)
+- **Model ID**: `gen3a_turbo`
+- **Speed**: Fastest generation (~30-60 seconds)
+- **Quality**: High quality, optimized for speed
+- **Cost**: Most cost-effective
 
-### Video Options
-- **Duration**: 1-10 seconds (default: 5)
-- **Aspect Ratios**: `16:9`, `9:16`, `1:1`, `4:5`
-- **Image-to-Video**: Provide `imageUrl` for image-to-video generation
-- **Seed**: Optional seed for reproducible results
+### Gen-3 Alpha
+- **Model ID**: `gen3a`
+- **Speed**: Slower (~2-5 minutes)
+- **Quality**: Highest quality, best for final production
+- **Cost**: Higher cost per video
 
-### Polling
-The system automatically polls for video completion when `waitForCompletion: true`:
-- Polls every 2 seconds
-- Maximum 60 attempts (2 minutes)
-- Returns video URL when ready
+## Aspect Ratios
 
-## File Storage
-Generated videos are automatically saved to:
-- **Database**: `files` table with metadata
-- **Storage**: Video URL stored in `public_url` field
-- **Metadata**: Includes Runway video ID, prompt, model, duration
+The API accepts friendly aspect ratio names:
+- `16:9` → 1280:720 (landscape, YouTube)
+- `9:16` → 720:1280 (portrait, TikTok/Instagram Stories)
+- `1:1` → 1024:1024 (square, Instagram feed)
+- `4:3` → 1024:768 (classic landscape)
+- `3:4` → 768:1024 (classic portrait)
 
-## Integration Points
+## Video Storage
 
-### 1. Auto-Execution
-When Marcus delegates video work, it:
-1. Creates workflow and task
-2. Triggers Giorgio to generate video
-3. Saves video to database
-4. Returns video URL in response
-
-### 2. Agent Actions
-Giorgio's `generateRunwayVideo` action:
-- Calls `/api/tools/generateVideo`
-- Waits for completion
-- Returns video URL and metadata
-
-### 3. API Route
-`/api/tools/generateVideo`:
-- Validates Runway API key
-- Generates video via Runway API
-- Optionally polls for completion
-- Saves to database
-- Returns video details
+Generated videos are automatically:
+1. Downloaded from Runway's temporary storage
+2. Uploaded to Supabase Storage bucket `user-uploads`
+3. Made publicly accessible
+4. Organized by project: `{projectId}/{timestamp}-{model}.mp4`
 
 ## Error Handling
-- Missing API key: Returns 503 with helpful message
-- API errors: Logged and returned to user
-- Timeout: Returns error after max polling attempts
-- File save failures: Logged but don't fail request
+
+Common errors and solutions:
+
+### "Runway API key not configured"
+- Add `RUNWAY_API_KEY` to environment variables
+- Redeploy application after adding key
+
+### "Video generation timed out"
+- Video took longer than 5 minutes (maxDuration)
+- Try using `gen3a_turbo` instead of `gen3a` for faster generation
+- Set `waitForCompletion: false` to get task ID immediately
+
+### "Runway API error: 401"
+- Invalid API key
+- Verify key is correct in environment variables
+
+### "Runway API error: 429"
+- Rate limit exceeded
+- Wait a few minutes before trying again
+- Consider upgrading Runway plan
+
+### "Failed to store in Supabase"
+- Supabase credentials not configured
+- Check `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+- Video will still be available at Runway URL (temporary)
+
+## Pricing
+
+Runway ML charges per second of generated video:
+- Gen-3 Alpha Turbo: ~$0.05/second
+- Gen-3 Alpha: ~$0.10/second
+
+Example costs:
+- 5-second video (Turbo): ~$0.25
+- 5-second video (Alpha): ~$0.50
+- 10-second video (Turbo): ~$0.50
+
+Check [Runway pricing](https://runwayml.com/pricing) for current rates.
+
+## Troubleshooting
+
+### Video generation is slow
+- Use `gen3a_turbo` model (faster)
+- Shorter videos generate faster (2-5 seconds)
+- Complex prompts may take longer
+
+### Video quality is poor
+- Use `gen3a` model for higher quality
+- Be more specific and detailed in prompts
+- Provide reference images when possible
+
+### Videos stored but not accessible
+- Check Supabase Storage bucket `user-uploads` is public
+- Verify CORS settings allow video playback
+- Test video URL directly in browser
+
+## Resources
+
+- [Runway API Documentation](https://docs.dev.runwayml.com/)
+- [Runway API Reference](https://docs.dev.runwayml.com/api/)
+- [Gen-3 Alpha Overview](https://runwayml.com/research/introducing-gen-3-alpha)
+- [Runway Pricing](https://runwayml.com/pricing)
+
+## Example Giorgio Actions
+
+### Generate Social Media Video
+```typescript
+await giorgio.run({
+  metadata: {
+    action: "generateRunwayVideo",
+    payload: {
+      project: "Product Launch",
+      context: "Sleek smartphone rotating in neon-lit environment",
+      mood: "futuristic",
+      style: "cyberpunk aesthetic",
+      duration: 5,
+      aspectRatio: "9:16",  // TikTok/Stories format
+      model: "gen3a_turbo",
+    },
+  },
+});
+```
+
+### Animate a Concept Art
+```typescript
+await giorgio.run({
+  metadata: {
+    action: "generateRunwayVideo",
+    payload: {
+      project: "Character Design",
+      context: "Character comes to life with subtle breathing and eye movement",
+      imageUrl: "https://storage.supabase.co/.../character.jpg",
+      duration: 3,
+      aspectRatio: "1:1",
+      model: "gen3a",  // Higher quality for final output
+    },
+  },
+});
+```
 
 ## Next Steps
-1. Add `RUNWAY_API_KEY` to your environment
-2. Test with: "Make a video for my project"
-3. Check `/workflows` to see generated videos
-4. Videos appear in project files
 
-## API Reference
-
-### Runway Library (`src/lib/runway.ts`)
-- `generateRunwayVideo(request)` - Start video generation
-- `getRunwayVideoStatus(videoId)` - Check generation status
-- `pollRunwayVideo(videoId)` - Poll until complete
-
-### API Route (`src/app/api/tools/generateVideo/route.ts`)
-- `POST /api/tools/generateVideo` - Generate video endpoint
-
-### Giorgio Action (`src/agents/giorgio/giorgioActions.ts`)
-- `generateRunwayVideo(context, input)` - Agent action for video generation
-
+- Integrate video preview in Giorgio's UI
+- Add thumbnail generation from first frame
+- Support video editing and extending
+- Batch video generation for campaigns
