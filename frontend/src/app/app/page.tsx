@@ -47,7 +47,8 @@ export default function Home() {
   const [accessError, setAccessError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(() => {
-    // Check localStorage for voice preference
+    // Check localStorage for voice preference (SSR-safe)
+    if (typeof window === 'undefined') return true;
     const stored = localStorage.getItem('voiceEnabled');
     return stored !== null ? stored === 'true' : true; // Default to enabled
   });
