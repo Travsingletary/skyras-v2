@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Extract response text from agent result
-    const responseText = result.output || result.text || 'No response from Marcus';
+    const responseText = result.output || 'No response from Marcus';
 
     // Generate conversation ID if not provided
     const finalConversationId = conversationId || `conv_${userId}_${Date.now()}`;
@@ -42,6 +42,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       conversationId: finalConversationId,
+      assistantMessageId: messageId,
+      response: responseText, // ← Frontend expects this!
       data: {
         message: {
           id: messageId,
