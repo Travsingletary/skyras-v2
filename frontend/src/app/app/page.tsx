@@ -563,12 +563,15 @@ export default function Home() {
 
       const data = (await res.json()) as ChatResponse;
       console.log("[Chat] Response:", data);
+      console.log("[Chat] Response type:", typeof data.response, "Value:", data.response);
 
       // 4) Update conversationId and append assistant message
       if (data.conversationId) {
         setConversationId(data.conversationId);
         // Persist conversationId to localStorage
-        localStorage.setItem("conversationId", data.conversationId);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem("conversationId", data.conversationId);
+        }
       }
 
       // Process delegations and notes to show agent responses
@@ -649,20 +652,21 @@ export default function Home() {
         }
       }
 
-      if (data.response) {
-        const assistantMessage: Message = {
-          id: data.assistantMessageId || `msg_${Date.now()}`,
-          role: "assistant",
-          content: data.response,
-          agentName: "Marcus",
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
+      // Always show Marcus's response, even if empty
+      const responseText = data.response || "[No response from Marcus]";
+      const assistantMessage: Message = {
+        id: data.assistantMessageId || `msg_${Date.now()}`,
+        role: "assistant",
+        content: responseText,
+        agentName: "Marcus",
+      };
+      console.log("[Chat] Adding Marcus message:", assistantMessage);
+      setMessages((prev) => [...prev, assistantMessage]);
 
-        // Play voice response (Marcus reads his response aloud) if enabled
-        if (voiceEnabled && data.response && typeof data.response === 'string') {
-          // Queue Marcus's response (will play after any agent messages)
-          playVoiceResponse(data.response as string, 'assistant');
-        }
+      // Play voice response (Marcus reads his response aloud) if enabled
+      if (voiceEnabled && data.response && typeof data.response === 'string') {
+        // Queue Marcus's response (will play after any agent messages)
+        playVoiceResponse(data.response as string, 'assistant');
       }
 
       // Update user message with actual file IDs
