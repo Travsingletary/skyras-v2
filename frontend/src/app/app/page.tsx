@@ -38,6 +38,11 @@ export default function Home() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string>("");
   const [messages, setMessages] = useState<Message[]>([]);
+
+  // Debug: Log messages whenever they change
+  useEffect(() => {
+    console.log('[DEBUG] Messages state updated:', messages.length, 'messages:', messages);
+  }, [messages]);
   const [message, setMessage] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -801,6 +806,11 @@ export default function Home() {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-4xl mx-auto space-y-4">
+          {/* Debug info */}
+          <div className="text-xs text-gray-400 mb-2">
+            Messages in state: {messages.length} | Loading: {isLoading ? 'yes' : 'no'}
+          </div>
+
           {messages.length === 0 && (
             <div className="text-center text-zinc-500 text-sm py-12">
               Start a conversation with Marcus...
