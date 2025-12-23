@@ -63,15 +63,8 @@ export async function collectStudioNotes(context: AgentExecutionContext): Promis
   };
 }
 
-export async function logPlanToSupabase(context: AgentExecutionContext, payload: Record<string, unknown>): Promise<MarcusActionResult> {
-  const response = await context.supabase.from("studio_plans").insert(payload);
-  if (response.error) {
-    context.logger.warn("Supabase insert failed", { error: response.error.message });
-    return { summary: "Failed to log plan", data: response.error.message };
-  }
-
-  return { summary: "Plan logged to Supabase (mock)", data: response.data };
-}
+// Removed: logPlanToSupabase - studio_plans table does not exist
+// If plan logging is needed, use workflows table instead
 
 export async function runLicensingAudit(context: AgentExecutionContext, payload: LicensingAuditPayload) {
   if (!payload.projectId || !Array.isArray(payload.files) || payload.files.length === 0) {

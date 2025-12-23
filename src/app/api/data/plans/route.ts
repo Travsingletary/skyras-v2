@@ -11,8 +11,9 @@ export async function GET(request: NextRequest) {
     const filters: Record<string, unknown> = {};
     if (project) filters.project_id = project;
 
-    const response = await supabase.from("studio_plans").select(filters);
-    return NextResponse.json({ success: true, data: response.data });
+    // studio_plans table does not exist - return empty result
+    // TODO: Migrate to workflows table if plan data is needed
+    return NextResponse.json({ success: true, data: [] });
   } catch (error) {
     return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
   }
