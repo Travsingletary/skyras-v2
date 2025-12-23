@@ -4,7 +4,6 @@ import { createLogger } from "@/lib/logger";
 import {
   collectStudioNotes,
   fetchLinkContent,
-  logPlanToSupabase,
   runCatalogSave,
   runCreativeGeneration,
   runDistributionPlan,
@@ -105,21 +104,15 @@ class MarcusAgent extends BaseAgent {
     context.logger.info("Handling request", { prompt: input.prompt });
 
     const notes = await collectStudioNotes(context);
-    const supabaseLog = await logPlanToSupabase(context, {
-      prompt: input.prompt,
-      metadata: input.metadata ?? {},
-    });
 
     const delegations: AgentDelegation[] = [];
     const outputLines = [
       `System prompt: ${SYSTEM_PROMPT.split('\n')[0]}`,
       `Notes: ${notes.summary}`,
-      `Supabase: ${supabaseLog.summary}`,
     ];
 
     const notesPayload: Record<string, unknown> = {
       files: notes.data,
-      supabase: supabaseLog.data,
     };
 
     const shouldAuditLicensing = LICENSING_KEYWORDS.test(input.prompt);
