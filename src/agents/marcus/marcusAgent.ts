@@ -340,19 +340,17 @@ class MarcusAgent extends BaseAgent {
           if (proofLine) {
             // Extract the proof prefix (everything before the actual content)
             const proofPrefix = proofLine.split("FLOW_OK:")[0] + "FLOW_OK: ";
+            console.log(`[PROOF] Found proof prefix in outputLines: ${proofPrefix.substring(0, 40)}...`);
+            console.log(`[PROOF] Wrapped output before fix: ${wrappedOutput.substring(0, 100)}...`);
             
-            // Force prefix to be at the start, even if AI included it elsewhere
-            if (!wrappedOutput.startsWith(proofPrefix)) {
-              // Remove prefix if it appears elsewhere in the response
-              wrappedOutput = wrappedOutput.replace(proofPrefix, '');
-              // Add it at the start
-              wrappedOutput = proofPrefix + wrappedOutput;
-              console.log(`[PROOF] FORCED prefix to start of wrapped response`);
-            } else {
-              console.log(`[PROOF] Prefix already at start of wrapped response`);
-            }
+            // ALWAYS force prefix to be at the start, regardless of what AI did
+            // Remove prefix if it appears anywhere in the response
+            wrappedOutput = wrappedOutput.replace(new RegExp(proofPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '');
+            // Trim any leading whitespace and add prefix at the start
+            wrappedOutput = proofPrefix + wrappedOutput.trim();
+            console.log(`[PROOF] FORCED prefix to start. Final output starts with: ${wrappedOutput.substring(0, 60)}...`);
           } else {
-            console.log(`[PROOF] WARNING: No proof prefix found in outputLines`);
+            console.log(`[PROOF] ERROR: No proof prefix found in outputLines! Available lines:`, outputLines.map(l => l.substring(0, 50)));
           }
           
           return {
