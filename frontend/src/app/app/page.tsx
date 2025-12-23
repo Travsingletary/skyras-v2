@@ -74,7 +74,9 @@ export default function Home() {
     const expectedCode = requiredAccessCode;
     
     // If no access code is required (empty or undefined), allow access immediately
-    if (!expectedCode || expectedCode === "" || expectedCode === "undefined") {
+    // Also clear any stored access code if it's no longer needed
+    if (!expectedCode || expectedCode === "" || expectedCode === "undefined" || expectedCode === "your-secret-passcode-here") {
+      localStorage.removeItem("marcus_access"); // Clear old stored code
       setIsAuthenticated(true);
       return;
     }
@@ -121,7 +123,9 @@ export default function Home() {
     const expectedCode = requiredAccessCode?.trim() || "";
     
     // If no access code is required (empty or undefined), allow access immediately
-    if (!expectedCode || expectedCode === "" || expectedCode === "undefined") {
+    // Also handle placeholder values
+    if (!expectedCode || expectedCode === "" || expectedCode === "undefined" || expectedCode === "your-secret-passcode-here") {
+      localStorage.removeItem("marcus_access"); // Clear old stored code
       setIsAuthenticated(true);
       return;
     }
