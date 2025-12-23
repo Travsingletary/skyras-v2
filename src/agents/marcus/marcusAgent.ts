@@ -109,10 +109,7 @@ class MarcusAgent extends BaseAgent {
     const notes = await collectStudioNotes(context);
 
     const delegations: AgentDelegation[] = [];
-    const outputLines = [
-      `System prompt: ${SYSTEM_PROMPT.split('\n')[0]}`,
-      `Notes: ${notes.summary}`,
-    ];
+    const outputLines: string[] = [];
 
     const notesPayload: Record<string, unknown> = {
       files: notes.data,
@@ -160,12 +157,17 @@ class MarcusAgent extends BaseAgent {
         const proofPrefix = `ROUTE_OK: Marcus→Giorgio | FLOW_OK: `;
         const outputWithProof = result.output.startsWith(proofPrefix) ? result.output : `${proofPrefix}${result.output}`;
         
-        // Server log proof
+        // Server log proof (console.log for Vercel visibility)
+        const logMessage = `ROUTE_OK agent=giorgio action=${action} project=${creativePayload.project}`;
+        console.log(logMessage);
         context.logger.info("ROUTE_OK", { 
           agent: "giorgio", 
           action: action,
           project: creativePayload.project 
         });
+        
+        // Debug: Log the proof prefix being added
+        console.log(`[PROOF] Adding prefix to output. Output length: ${result.output.length}, Prefix: ${proofPrefix.substring(0, 30)}...`);
         
         outputLines.push(outputWithProof);
         notesPayload.creative = result.notes ?? result;
@@ -335,6 +337,11 @@ class MarcusAgent extends BaseAgent {
             // Extract the proof prefix (everything before the actual content)
             const proofPrefix = proofLine.split("FLOW_OK:")[0] + "FLOW_OK: ";
             wrappedOutput = proofPrefix + wrappedOutput;
+            console.log(`[PROOF] Preserved prefix in wrapped response: ${proofPrefix.substring(0, 40)}...`);
+          } else if (proofLine && wrappedOutput.includes("ROUTE_OK:")) {
+            console.log(`[PROOF] Prefix already in wrapped response`);
+          } else {
+            console.log(`[PROOF] WARNING: No proof prefix found in outputLines or wrapped response`);
           }
           
           return {
@@ -349,8 +356,14 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
+    const finalOutput = outputLines.join('\n');
+    console.log(`[PROOF] Final output length: ${finalOutput.length}, Contains ROUTE_OK: ${finalOutput.includes('ROUTE_OK:')}`);
+    if (finalOutput.includes('ROUTE_OK:')) {
+      console.log(`[PROOF] Final output starts with: ${finalOutput.substring(0, 60)}...`);
+    }
+    
     return {
-      output: outputLines.join('\n'),
+      output: finalOutput,
       delegations,
       notes: notesPayload,
     };
