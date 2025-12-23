@@ -311,7 +311,11 @@ class MarcusAgent extends BaseAgent {
         }));
 
         const delegationSummary = outputLines.join('\n');
-        const wrapperPrompt = `I delegated the following tasks:\n\n${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented.`;
+        // Extract proof prefix if it exists in outputLines
+        const proofLine = outputLines.find(line => line.includes("ROUTE_OK:"));
+        const proofPrefix = proofLine ? proofLine.split("FLOW_OK:")[0] + "FLOW_OK: " : null;
+        
+        const wrapperPrompt = `I delegated the following tasks:\n\n${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented. IMPORTANT: If the delegation output starts with "ROUTE_OK: Marcus→Giorgio | FLOW_OK:", you MUST preserve this exact prefix at the start of your response.`;
 
         // Add wrapper prompt as latest user message
         conversationMessages.push({
@@ -328,20 +332,27 @@ class MarcusAgent extends BaseAgent {
 
         const textContent = message.content.find((block) => block.type === "text");
         if (textContent && textContent.type === "text") {
-          // Ensure proof prefix is preserved in wrapped response
+          // CRITICAL: Ensure proof prefix is ALWAYS preserved in wrapped response
           // Extract proof prefix from outputLines if it exists
           const proofLine = outputLines.find(line => line.includes("ROUTE_OK:"));
           let wrappedOutput = textContent.text;
           
-          if (proofLine && !wrappedOutput.includes("ROUTE_OK:")) {
+          if (proofLine) {
             // Extract the proof prefix (everything before the actual content)
             const proofPrefix = proofLine.split("FLOW_OK:")[0] + "FLOW_OK: ";
-            wrappedOutput = proofPrefix + wrappedOutput;
-            console.log(`[PROOF] Preserved prefix in wrapped response: ${proofPrefix.substring(0, 40)}...`);
-          } else if (proofLine && wrappedOutput.includes("ROUTE_OK:")) {
-            console.log(`[PROOF] Prefix already in wrapped response`);
+            
+            // Force prefix to be at the start, even if AI included it elsewhere
+            if (!wrappedOutput.startsWith(proofPrefix)) {
+              // Remove prefix if it appears elsewhere in the response
+              wrappedOutput = wrappedOutput.replace(proofPrefix, '');
+              // Add it at the start
+              wrappedOutput = proofPrefix + wrappedOutput;
+              console.log(`[PROOF] FORCED prefix to start of wrapped response`);
+            } else {
+              console.log(`[PROOF] Prefix already at start of wrapped response`);
+            }
           } else {
-            console.log(`[PROOF] WARNING: No proof prefix found in outputLines or wrapped response`);
+            console.log(`[PROOF] WARNING: No proof prefix found in outputLines`);
           }
           
           return {
