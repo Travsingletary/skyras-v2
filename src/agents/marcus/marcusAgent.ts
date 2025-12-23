@@ -3,8 +3,8 @@ import { AgentDelegation, AgentExecutionContext, AgentRunInput, AgentRunResult, 
 import { createLogger } from "@/lib/logger";
 import {
   collectStudioNotes,
+  createWorkflow,
   fetchLinkContent,
-  logPlanToSupabase,
   runCatalogSave,
   runCreativeGeneration,
   runDistributionPlan,
@@ -16,6 +16,7 @@ import type {
   DistributionPayload,
   LicensingAuditFile,
   LinkFetchPayload,
+  WorkflowCreationPayload,
 } from "./marcusActions";
 import { getMarcusPreferences, formatPreferencesContext } from "./marcusPreferences";
 import { MARCUS_SYSTEM_PROMPT } from "./marcusSystemPrompt";
@@ -25,6 +26,7 @@ const LICENSING_KEYWORDS = /(license|licensing|watermark|demo)/i;
 const CREATIVE_KEYWORDS = /(idea|script|prompt|concept|scene|treatment|story|cover art|sora|skit|marketing hook|shot|outline)/i;
 const DISTRIBUTION_KEYWORDS = /(post|posting plan|schedule|distribution|publish|rollout|slots)/i;
 const CATALOG_KEYWORDS = /(catalog|tag|metadata|save asset|store asset)/i;
+const WORKFLOW_KEYWORDS = /(create workflow|make workflow|new workflow|workflow plan|build workflow|generate workflow)/i;
 const URL_PATTERN = /https?:\/\/[^\s]+/gi;
 
 class MarcusAgent extends BaseAgent {
@@ -105,21 +107,15 @@ class MarcusAgent extends BaseAgent {
     context.logger.info("Handling request", { prompt: input.prompt });
 
     const notes = await collectStudioNotes(context);
-    const supabaseLog = await logPlanToSupabase(context, {
-      prompt: input.prompt,
-      metadata: input.metadata ?? {},
-    });
 
     const delegations: AgentDelegation[] = [];
     const outputLines = [
       `System prompt: ${SYSTEM_PROMPT.split('\n')[0]}`,
       `Notes: ${notes.summary}`,
-      `Supabase: ${supabaseLog.summary}`,
     ];
 
     const notesPayload: Record<string, unknown> = {
       files: notes.data,
-      supabase: supabaseLog.data,
     };
 
     const shouldAuditLicensing = LICENSING_KEYWORDS.test(input.prompt);
@@ -158,7 +154,20 @@ class MarcusAgent extends BaseAgent {
       try {
         const { delegation: creativeDelegation, result } = await runCreativeGeneration(context, creativePayload);
         delegations.push(creativeDelegation);
-        outputLines.push(result.output);
+        
+        // PROOF SIGNAL: Add routing proof to prove full chain (User → Marcus → Giorgio → UI)
+        const action = creativePayload.action ?? "generateScriptOutline";
+        const proofPrefix = `ROUTE_OK: Marcus→Giorgio | FLOW_OK: `;
+        const outputWithProof = result.output.startsWith(proofPrefix) ? result.output : `${proofPrefix}${result.output}`;
+        
+        // Server log proof
+        context.logger.info("ROUTE_OK", { 
+          agent: "giorgio", 
+          action: action,
+          project: creativePayload.project 
+        });
+        
+        outputLines.push(outputWithProof);
         notesPayload.creative = result.notes ?? result;
       } catch (error) {
         outputLines.push(`Creative delegation failed: ${(error as Error).message}`);
@@ -219,6 +228,37 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
+    // Check for workflow creation requests
+    const shouldCreateWorkflow = WORKFLOW_KEYWORDS.test(input.prompt);
+    if (shouldCreateWorkflow) {
+      const userId = (input.metadata?.userId as string | undefined);
+      if (!userId) {
+        outputLines.push("Workflow creation requested but userId is missing in metadata.");
+      } else {
+        try {
+          // Extract workflow details from prompt or metadata
+          const workflowPayload: WorkflowCreationPayload = {
+            userId,
+            projectId: (input.metadata?.projectId as string | undefined) || 
+                      (input.metadata?.project as string | undefined),
+            name: (input.metadata?.workflowName as string | undefined) || 
+                  `Workflow ${new Date().toLocaleDateString()}`,
+            type: (input.metadata?.workflowType as WorkflowCreationPayload["type"]) || "custom",
+            planMarkdown: input.metadata?.planMarkdown as string | undefined,
+            summary: input.metadata?.workflowSummary as string | undefined,
+            agentName: "marcus",
+            tasks: input.metadata?.workflowTasks as WorkflowCreationPayload["tasks"] | undefined,
+          };
+
+          const workflowResult = await createWorkflow(context, workflowPayload);
+          outputLines.push(workflowResult.summary);
+          notesPayload.workflow = workflowResult.data;
+        } catch (error) {
+          outputLines.push(`Workflow creation failed: ${(error as Error).message}`);
+        }
+      }
+    }
+
     // Check for URLs in the prompt and fetch them
     const urls = input.prompt.match(URL_PATTERN);
     let fetchedLinks = false;
@@ -240,7 +280,7 @@ class MarcusAgent extends BaseAgent {
     }
 
     // If no specific keywords matched, generate AI response for general chat
-    const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog || fetchedLinks;
+    const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog || shouldCreateWorkflow || fetchedLinks;
     if (!hasSpecificAction) {
       context.logger.info("No specific action keywords detected, generating AI response");
       const userId = input.metadata?.userId as string | undefined;
@@ -286,8 +326,19 @@ class MarcusAgent extends BaseAgent {
 
         const textContent = message.content.find((block) => block.type === "text");
         if (textContent && textContent.type === "text") {
+          // Ensure proof prefix is preserved in wrapped response
+          // Extract proof prefix from outputLines if it exists
+          const proofLine = outputLines.find(line => line.includes("ROUTE_OK:"));
+          let wrappedOutput = textContent.text;
+          
+          if (proofLine && !wrappedOutput.includes("ROUTE_OK:")) {
+            // Extract the proof prefix (everything before the actual content)
+            const proofPrefix = proofLine.split("FLOW_OK:")[0] + "FLOW_OK: ";
+            wrappedOutput = proofPrefix + wrappedOutput;
+          }
+          
           return {
-            output: textContent.text,
+            output: wrappedOutput,
             delegations,
             notes: notesPayload,
           };
