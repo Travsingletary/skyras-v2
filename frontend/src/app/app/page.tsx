@@ -56,6 +56,13 @@ export default function Home() {
   const [isTranscribing, setIsTranscribing] = useState(false);
 
   // Text-to-speech state
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+    // SSR-safe: Check if window is available
+    if (typeof window === 'undefined') return false;
+    // Check localStorage for voice preference
+    const stored = localStorage.getItem('voiceEnabled');
+    return stored !== null ? stored === 'true' : false; // Default to disabled
+  });
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
