@@ -72,7 +72,7 @@ if (files.length === 0) {
     { name: 'motionarray_PREVIEW_template.aep', path: 'templates/motionarray_PREVIEW_template.aep' },
   ];
   proofMarkers.push(
-    createProofMarker('cassidy_guardrail', 'ROUTE_OK', 'No files provided, using default sample filenames', {
+    createProofMarker('cassidy_guardrail', 'INFO', 'No files provided, using default sample filenames', {
       default_files_count: files.length,
     })
   );
@@ -122,14 +122,16 @@ All responses follow the unified agent contract:
 
 ## Example Response JSON
 
-### Empty Input (No Files Provided)
+### Empty Input (No Files Provided - Defaults Injected)
+
+**Note:** When `files[]` is empty, the system automatically injects 4 default sample filenames. The output message explicitly states this, and the proof trail includes an `INFO` status marker (not `ROUTE_OK`, which is reserved for Marcus routing decisions).
 
 ```json
 {
   "agent": "cassidy",
   "action": "scanFilesForLicensing",
   "success": true,
-  "output": "Compliance scan completed: All 4 file(s) are clean. No licensing issues detected.",
+  "output": "No files provided; used default sample filenames (4). Compliance scan completed: All 4 file(s) are clean. No licensing issues detected.",
   "artifacts": [],
   "proof": [
     {
@@ -140,7 +142,7 @@ All responses follow the unified agent contract:
     },
     {
       "step": "cassidy_guardrail",
-      "status": "ROUTE_OK",
+      "status": "INFO",
       "message": "No files provided, using default sample filenames",
       "timestamp": "2025-01-23T12:00:00.100Z",
       "details": {
@@ -185,7 +187,8 @@ All responses follow the unified agent contract:
     "assets_saved": 0,
     "scan_saved": true,
     "scan_id": "550e8400-e29b-41d4-a716-446655440000",
-    "scan_table": "compliance_scans"
+    "scan_table": "compliance_scans",
+    "used_defaults": true
   }
 }
 ```

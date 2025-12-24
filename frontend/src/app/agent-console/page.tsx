@@ -152,6 +152,8 @@ export default function AgentConsole() {
       case 'DB_OK':
       case 'DONE':
         return 'text-green-700 bg-green-50 border-green-200';
+      case 'INFO':
+        return 'text-blue-700 bg-blue-50 border-blue-200';
       case 'ERROR':
         return 'text-red-700 bg-red-50 border-red-200';
       default:
@@ -166,6 +168,8 @@ export default function AgentConsole() {
       case 'DB_OK':
       case 'DONE':
         return '✓';
+      case 'INFO':
+        return 'ℹ';
       case 'ERROR':
         return '✗';
       default:
@@ -317,9 +321,16 @@ export default function AgentConsole() {
                     {response.success !== false ? '✓' : '✗'}
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                      {response.success !== false ? 'Golden Path Completed' : 'Golden Path Failed'}
-                    </h2>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h2 className="text-2xl font-bold text-gray-900">
+                        {response.success !== false ? 'Golden Path Completed' : 'Golden Path Failed'}
+                      </h2>
+                      {response.metadata?.used_defaults && (
+                        <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-1 rounded border border-blue-300">
+                          Used Defaults
+                        </span>
+                      )}
+                    </div>
                     <p className="text-gray-600">
                       {response.agent ? `${response.agent} → ${response.action}` : 'No routing information'}
                     </p>

@@ -12,7 +12,7 @@ export interface AgentArtifact {
 
 export interface ProofMarker {
   step: string;
-  status: 'ROUTE_OK' | 'AGENT_OK' | 'DB_OK' | 'DONE' | 'ERROR';
+  status: 'ROUTE_OK' | 'AGENT_OK' | 'DB_OK' | 'DONE' | 'ERROR' | 'INFO';
   message: string;
   timestamp: string;
   details?: Record<string, unknown>;

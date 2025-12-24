@@ -271,7 +271,9 @@ async function runCompliancePath(
     }
 
     // Default sample files if none provided (guardrail)
+    let usedDefaults = false;
     if (files.length === 0) {
+      usedDefaults = true;
       files = [
         { name: 'Runway_DEMO_watermark_preview.mp4', path: 'videos/Runway_DEMO_watermark_preview.mp4' },
         { name: 'artlist_song_license.pdf', path: 'music/artlist_song_license.pdf' },
@@ -279,7 +281,7 @@ async function runCompliancePath(
         { name: 'motionarray_PREVIEW_template.aep', path: 'templates/motionarray_PREVIEW_template.aep' },
       ];
       proofMarkers.push(
-        createProofMarker('cassidy_guardrail', 'ROUTE_OK', 'No files provided, using default sample filenames', {
+        createProofMarker('cassidy_guardrail', 'INFO', 'No files provided, using default sample filenames', {
           default_files_count: files.length,
         })
       );
@@ -396,10 +398,15 @@ async function runCompliancePath(
     proofMarkers.push(createProofMarker('compliance_complete', 'DONE', 'Compliance path completed successfully'));
 
     // Build output message
-    const outputMessage =
-      flaggedCount > 0
-        ? `Compliance scan completed: ${flaggedCount} file(s) flagged, ${cleanCount} file(s) clean. ${scanResult.summary}`
-        : `Compliance scan completed: All ${files.length} file(s) are clean. No licensing issues detected.`;
+    let outputMessage = '';
+    if (usedDefaults) {
+      outputMessage = `No files provided; used default sample filenames (${files.length}). `;
+    }
+    if (flaggedCount > 0) {
+      outputMessage += `Compliance scan completed: ${flaggedCount} file(s) flagged, ${cleanCount} file(s) clean. ${scanResult.summary}`;
+    } else {
+      outputMessage += `Compliance scan completed: All ${files.length} file(s) are clean. No licensing issues detected.`;
+    }
 
     return createAgentResponse('cassidy', 'scanFilesForLicensing', outputMessage, {
       artifacts: suspiciousFiles.map((f) => ({
@@ -419,6 +426,7 @@ async function runCompliancePath(
         scan_saved: true,
         scan_id: scanId,
         scan_table: 'compliance_scans',
+        used_defaults: usedDefaults,
       },
     });
   } catch (error) {
