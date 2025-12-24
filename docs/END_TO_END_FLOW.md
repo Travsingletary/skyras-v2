@@ -398,11 +398,23 @@ Once verified working (after 2 successful tests):
 
 ---
 
-## Next Steps
+## Status: FAILED - Pending Verification
 
-1. ✅ Proof signal added to Giorgio's response
-2. ⏳ Test the flow manually
+**Issue:** Router not owning final response construction. Proof prefix was being added but lost during AI wrapping or not consistently applied.
+
+**Fix Applied (2025-01-23):**
+- Marcus now owns final response construction at a single point
+- Proof prefix is added AFTER all agent executions and AI wrapping
+- Prefix is guaranteed to be at the start when routing to Giorgio
+- Both `src/agents/marcus/marcusAgent.ts` and `frontend/src/agents/marcus/marcusAgent.ts` updated
+
+**Verification Required:**
+1. ⏳ Test the flow manually in production
+2. ⏳ Verify UI response STARTS with `ROUTE_OK: Marcus→Giorgio | FLOW_OK: `
 3. ⏳ Verify it works twice in a row
-4. ⏳ Mark as REFERENCE FLOW if successful
-5. ⏳ Document exact reproduction steps (this document)
+4. ⏳ Check server logs for `ROUTE_OK agent=giorgio action=...`
+5. ⏳ Mark as REFERENCE FLOW if successful
+6. ⏳ Document exact reproduction steps (this document)
+
+**Until verified, this flow is NOT WORKING.**
 

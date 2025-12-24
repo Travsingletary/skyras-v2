@@ -294,6 +294,10 @@ class MarcusAgent extends BaseAgent {
       };
     }
 
+    // CRITICAL: Marcus owns final response construction
+    // All agent outputs flow through here - we construct the final response with proof prefix
+    let finalResponseText: string;
+
     // If delegations occurred, wrap results with AI-enhanced explanation
     // This applies Prime Directives to delegation results
     if (delegations.length > 0 && this.anthropic) {
@@ -311,11 +315,8 @@ class MarcusAgent extends BaseAgent {
         }));
 
         const delegationSummary = outputLines.join('\n');
-        // Extract proof prefix if it exists in outputLines
-        const proofLine = outputLines.find(line => line.includes("ROUTE_OK:"));
-        const proofPrefix = proofLine ? proofLine.split("FLOW_OK:")[0] + "FLOW_OK: " : null;
         
-        const wrapperPrompt = `I delegated the following tasks:\n\n${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented. IMPORTANT: If the delegation output starts with "ROUTE_OK: Marcus→Giorgio | FLOW_OK:", you MUST preserve this exact prefix at the start of your response.`;
+        const wrapperPrompt = `I delegated the following tasks:\n\n${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented.`;
 
         // Add wrapper prompt as latest user message
         conversationMessages.push({
@@ -332,56 +333,51 @@ class MarcusAgent extends BaseAgent {
 
         const textContent = message.content.find((block) => block.type === "text");
         if (textContent && textContent.type === "text") {
-          // CRITICAL: Ensure proof prefix is ALWAYS preserved in wrapped response
-          let wrappedOutput = textContent.text;
-          
-          // ALWAYS construct proof prefix if we have a giorgio delegation
-          // This is the definitive source of truth - we KNOW we routed to Giorgio
-          const creativeDelegation = delegations.find(d => d.agent === "giorgio");
-          const proofPrefix = creativeDelegation 
-            ? `ROUTE_OK: Marcus→Giorgio | FLOW_OK: `
-            : null;
-          
-          if (proofPrefix) {
-            console.log(`[PROOF] Constructed proof prefix from delegation: ${proofPrefix.substring(0, 40)}...`);
-            console.log(`[PROOF] Wrapped output BEFORE fix (first 150 chars): ${wrappedOutput.substring(0, 150)}...`);
-            console.log(`[PROOF] outputLines contains ROUTE_OK: ${outputLines.some(l => l.includes("ROUTE_OK:"))}`);
-            
-            // ALWAYS force prefix to be at the start, regardless of what AI did
-            // Remove prefix if it appears anywhere in the response (case-insensitive, handles variations)
-            const escapedPrefix = proofPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            wrappedOutput = wrappedOutput.replace(new RegExp(escapedPrefix, 'gi'), '');
-            // Also remove any partial matches
-            wrappedOutput = wrappedOutput.replace(/ROUTE_OK:\s*Marcus→Giorgio\s*\|\s*FLOW_OK:\s*/gi, '');
-            // Trim any leading whitespace and add prefix at the start
-            wrappedOutput = proofPrefix + wrappedOutput.trim();
-            
-            console.log(`[PROOF] FORCED prefix to start. Final output (first 100 chars): ${wrappedOutput.substring(0, 100)}...`);
-            console.log(`[PROOF] Verification: Starts with prefix? ${wrappedOutput.startsWith(proofPrefix)}`);
-          } else {
-            console.log(`[PROOF] WARNING: No giorgio delegation found! Delegations:`, delegations.map(d => `${d.agent}:${d.action}`));
-          }
-          
-          return {
-            output: wrappedOutput,
-            delegations,
-            notes: notesPayload,
-          };
+          finalResponseText = textContent.text;
+        } else {
+          // Fallback to outputLines if AI wrapping failed
+          finalResponseText = outputLines.join('\n');
         }
       } catch (error) {
         context.logger.error("Failed to wrap delegation results", { error });
         // Fall through to default output
+        finalResponseText = outputLines.join('\n');
       }
+    } else {
+      // No AI wrapping - use outputLines directly
+      finalResponseText = outputLines.join('\n');
     }
 
-    const finalOutput = outputLines.join('\n');
-    console.log(`[PROOF] Final output length: ${finalOutput.length}, Contains ROUTE_OK: ${finalOutput.includes('ROUTE_OK:')}`);
-    if (finalOutput.includes('ROUTE_OK:')) {
-      console.log(`[PROOF] Final output starts with: ${finalOutput.substring(0, 60)}...`);
+    // CRITICAL: Ensure proof prefix is ALWAYS present when routing to Giorgio
+    // This is the SINGLE point where final response is constructed
+    const creativeDelegation = delegations.find(d => d.agent === "giorgio");
+    if (creativeDelegation) {
+      const proofPrefix = `ROUTE_OK: Marcus→Giorgio | FLOW_OK: `;
+      
+      // Server log proof (console.log for Vercel visibility)
+      const action = creativeDelegation.action || "unknown";
+      const logMessage = `ROUTE_OK agent=giorgio action=${action} project=${creativeDelegation.project || "unknown"}`;
+      console.log(logMessage);
+      context.logger.info("ROUTE_OK", { 
+        agent: "giorgio", 
+        action: action,
+        project: creativeDelegation.project 
+      });
+      
+      // Remove any existing prefix (in case it was added earlier or by AI)
+      finalResponseText = finalResponseText.replace(/ROUTE_OK:\s*Marcus→Giorgio\s*\|\s*FLOW_OK:\s*/gi, '').trim();
+      
+      // ALWAYS add prefix at the start - this is the definitive proof
+      finalResponseText = proofPrefix + finalResponseText;
+      
+      console.log(`[PROOF] Final response constructed with prefix. Length: ${finalResponseText.length}, Starts with: ${finalResponseText.substring(0, 60)}...`);
+    } else {
+      console.log(`[PROOF] No giorgio delegation - no proof prefix needed. Delegations:`, delegations.map(d => `${d.agent}:${d.action}`));
     }
     
+    // Return final response - Marcus owns this
     return {
-      output: finalOutput,
+      output: finalResponseText,
       delegations,
       notes: notesPayload,
     };

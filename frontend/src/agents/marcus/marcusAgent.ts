@@ -151,6 +151,7 @@ class MarcusAgent extends BaseAgent {
       try {
         const { delegation: creativeDelegation, result } = await runCreativeGeneration(context, creativePayload);
         delegations.push(creativeDelegation);
+        // Note: Proof prefix will be added at final response construction
         outputLines.push(result.output);
         notesPayload.creative = result.notes ?? result;
       } catch (error) {
@@ -245,6 +246,10 @@ class MarcusAgent extends BaseAgent {
       };
     }
 
+    // CRITICAL: Marcus owns final response construction
+    // All agent outputs flow through here - we construct the final response with proof prefix
+    let finalResponseText: string;
+
     // If delegations occurred, wrap results with AI-enhanced explanation
     // This applies Prime Directives to delegation results
     if (delegations.length > 0 && this.anthropic) {
@@ -279,20 +284,51 @@ class MarcusAgent extends BaseAgent {
 
         const textContent = message.content.find((block) => block.type === "text");
         if (textContent && textContent.type === "text") {
-          return {
-            output: textContent.text,
-            delegations,
-            notes: notesPayload,
-          };
+          finalResponseText = textContent.text;
+        } else {
+          // Fallback to outputLines if AI wrapping failed
+          finalResponseText = outputLines.join('\n');
         }
       } catch (error) {
         context.logger.error("Failed to wrap delegation results", { error });
         // Fall through to default output
+        finalResponseText = outputLines.join('\n');
       }
+    } else {
+      // No AI wrapping - use outputLines directly
+      finalResponseText = outputLines.join('\n');
     }
 
+    // CRITICAL: Ensure proof prefix is ALWAYS present when routing to Giorgio
+    // This is the SINGLE point where final response is constructed
+    const creativeDelegation = delegations.find(d => d.agent === "giorgio");
+    if (creativeDelegation) {
+      const proofPrefix = `ROUTE_OK: Marcus→Giorgio | FLOW_OK: `;
+      
+      // Server log proof (console.log for Vercel visibility)
+      const action = creativeDelegation.action || "unknown";
+      const logMessage = `ROUTE_OK agent=giorgio action=${action} project=${creativeDelegation.project || "unknown"}`;
+      console.log(logMessage);
+      context.logger.info("ROUTE_OK", { 
+        agent: "giorgio", 
+        action: action,
+        project: creativeDelegation.project 
+      });
+      
+      // Remove any existing prefix (in case it was added earlier or by AI)
+      finalResponseText = finalResponseText.replace(/ROUTE_OK:\s*Marcus→Giorgio\s*\|\s*FLOW_OK:\s*/gi, '').trim();
+      
+      // ALWAYS add prefix at the start - this is the definitive proof
+      finalResponseText = proofPrefix + finalResponseText;
+      
+      console.log(`[PROOF] Final response constructed with prefix. Length: ${finalResponseText.length}, Starts with: ${finalResponseText.substring(0, 60)}...`);
+    } else {
+      console.log(`[PROOF] No giorgio delegation - no proof prefix needed. Delegations:`, delegations.map(d => `${d.agent}:${d.action}`));
+    }
+    
+    // Return final response - Marcus owns this
     return {
-      output: outputLines.join('\n'),
+      output: finalResponseText,
       delegations,
       notes: notesPayload,
     };
