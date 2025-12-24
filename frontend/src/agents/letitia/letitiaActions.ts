@@ -31,17 +31,23 @@ export async function saveAssetMetadata(context: AgentExecutionContext, input: S
     throw new Error("project and name are required to save asset metadata");
   }
   const record = {
-    project_id: input.project,
+    project: input.project, // Use 'project' not 'project_id' to match migration
     name: input.name,
     type: input.type ?? "note",
     tags: input.tags ?? [],
     metadata: input.metadata ?? {},
+    content: (input.metadata?.content as string) || null, // For text artifacts
+    licensing_status: (input.metadata?.licensing_status as string) || 'unknown',
+    agent_source: 'letitia',
   };
-  await context.supabase.from("assets").upsert(record);
+  const { data, error } = await context.supabase.from("assets").insert(record).select();
+  if (error) {
+    throw new Error(`Failed to save asset: ${error.message}`);
+  }
   return {
     output: `Asset saved for ${input.project}: ${input.name}`,
     notes: {
-      asset: record,
+      asset: data?.[0] || record,
       metadata: baseMetadata(input.project),
     },
   };
