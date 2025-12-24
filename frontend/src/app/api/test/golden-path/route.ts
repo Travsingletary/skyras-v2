@@ -20,12 +20,18 @@ export const runtime = 'nodejs';
  * System-owned neutral demo inputs for compliance testing.
  * Not real assets. These are generic sample filenames used when no input is provided.
  * Never saved as real assets and excluded from asset ownership logic.
+ * 
+ * Designed to show mixed results: 2 flagged + 2 clean
+ * - video_demo_watermark.mp4 (flag: DEMO + WATERMARK)
+ * - music_preview_track.wav (flag: PREVIEW)
+ * - image_sample_render.png (clean: no keywords)
+ * - final_export.mov (clean: no keywords)
  */
 const DEFAULT_SAMPLE_FILES: Array<{ name: string; path: string }> = [
   { name: 'video_demo_watermark.mp4', path: 'videos/video_demo_watermark.mp4' },
   { name: 'music_preview_track.wav', path: 'music/music_preview_track.wav' },
   { name: 'image_sample_render.png', path: 'images/image_sample_render.png' },
-  { name: 'project_template_preview.aep', path: 'templates/project_template_preview.aep' },
+  { name: 'final_export.mov', path: 'videos/final_export.mov' },
 ];
 
 type Scenario = 'creative' | 'compliance' | 'distribution';

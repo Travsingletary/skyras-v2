@@ -44,11 +44,12 @@ export default function AgentConsole() {
   });
 
   // System-owned neutral demo inputs for compliance testing
+  // Designed to show mixed results: 2 flagged + 2 clean
   const DEFAULT_SAMPLE_FILES = [
-    'video_demo_watermark.mp4',
-    'music_preview_track.wav',
-    'image_sample_render.png',
-    'project_template_preview.aep',
+    'video_demo_watermark.mp4',  // flag: DEMO + WATERMARK
+    'music_preview_track.wav',   // flag: PREVIEW
+    'image_sample_render.png',   // clean: no keywords
+    'final_export.mov',          // clean: no keywords
   ];
 
   // Set default input based on scenario
@@ -257,7 +258,7 @@ export default function AgentConsole() {
                 scenario === 'creative'
                   ? '{"context": "A cinematic sequence", "mood": "dynamic"}'
                   : scenario === 'compliance'
-                  ? '["video_demo_watermark.mp4", "music_preview_track.wav", "image_sample_render.png", "project_template_preview.aep"]'
+                  ? '["video_demo_watermark.mp4", "music_preview_track.wav", "image_sample_render.png", "final_export.mov"]'
                   : '{"campaign": "Test Campaign", "platforms": ["instagram", "tiktok"]}'
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-gray-50"
