@@ -36,13 +36,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check file size limit (100MB - matches fileStorage.supabase.ts)
-    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+    // Check file size limit
+    // Note: Supabase Storage free tier typically limits to 50MB per file
+    // Paid tiers can be configured up to 5GB, but default is often 50MB
+    // We'll allow up to 50MB to match common Supabase limits
+    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB (matches Supabase Storage default limit)
     if (fileSize > MAX_FILE_SIZE) {
       return NextResponse.json(
         {
           success: false,
-          error: `File too large. Maximum size: ${MAX_FILE_SIZE / (1024 * 1024)}MB`,
+          error: `File too large. Maximum size: ${MAX_FILE_SIZE / (1024 * 1024)}MB. This limit is set by Supabase Storage. For larger files, please compress the file or upgrade your Supabase plan.`,
         },
         { status: 400 }
       );

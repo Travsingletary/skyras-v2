@@ -90,7 +90,21 @@ export async function uploadFileDirect(
 
   if (!uploadResponse.ok) {
     const errorText = await uploadResponse.text();
-    throw new Error(`Upload failed: ${uploadResponse.status} - ${errorText}`);
+    let errorMessage = `Upload failed: ${uploadResponse.status} - ${errorText}`;
+    
+    // Handle Supabase Storage size limits
+    if (uploadResponse.status === 400 || uploadResponse.status === 413) {
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.statusCode === '413' || errorJson.error === 'Payload too large') {
+          errorMessage = `File is too large for Supabase Storage. Maximum size is typically 50MB on free tier. Please compress the file or upgrade your Supabase plan for larger files.`;
+        }
+      } catch {
+        // If parsing fails, use original error message
+      }
+    }
+    
+    throw new Error(errorMessage);
   }
 
   // Call progress callback
