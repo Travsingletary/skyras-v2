@@ -794,20 +794,23 @@ export default function Home() {
             </div>
           )}
 
-          {messages.map((msg) => {
+          {/* SINGLE MOUTHPIECE: Filter to show only user messages and Marcus assistant messages */}
+          {messages
+            .filter((msg) => {
+              // Show all user messages
+              if (msg.role === 'user') return true;
+              // Show only assistant messages (Marcus is the only assistant)
+              // Hide any messages with agent roles (giorgio, jamal, letitia, cassidy)
+              if (msg.role === 'assistant') return true;
+              // Hide all other agent roles
+              return false;
+            })
+            .map((msg) => {
             // Determine agent styling
             const getAgentStyle = (role: Message['role']) => {
               switch (role) {
                 case 'user':
                   return 'bg-blue-600 text-white';
-                case 'giorgio':
-                  return 'bg-purple-100 border border-purple-300 text-purple-900';
-                case 'jamal':
-                  return 'bg-green-100 border border-green-300 text-green-900';
-                case 'letitia':
-                  return 'bg-pink-100 border border-pink-300 text-pink-900';
-                case 'cassidy':
-                  return 'bg-yellow-100 border border-yellow-300 text-yellow-900';
                 case 'assistant':
                 default:
                   return 'bg-white border border-zinc-200 text-zinc-900';
@@ -816,9 +819,9 @@ export default function Home() {
 
             const getAgentName = (msg: Message) => {
               if (msg.role === 'user') return null;
-              if (msg.agentName) return msg.agentName;
+              // All assistant messages are from Marcus
               if (msg.role === 'assistant') return 'Marcus';
-              return msg.role.charAt(0).toUpperCase() + msg.role.slice(1);
+              return null; // Should never reach here due to filter
             };
 
             const agentName = getAgentName(msg);
