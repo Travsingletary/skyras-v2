@@ -34,6 +34,7 @@ interface GoldenPathResponse {
 export default function AgentConsole() {
   const [scenario, setScenario] = useState<Scenario>('creative');
   const [input, setInput] = useState('');
+  const [includeImage, setIncludeImage] = useState(false);
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<GoldenPathResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,15 +85,27 @@ export default function AgentConsole() {
         project: 'SkySky',
       };
 
+      // For creative scenario, add includeImage flag
+      if (scenario === 'creative') {
+        if (!requestBody.input) {
+          requestBody.input = {};
+        }
+        (requestBody.input as Record<string, unknown>).includeImage = includeImage;
+      }
+
       // Parse input as JSON if provided
       if (input.trim()) {
         try {
           const parsed = JSON.parse(input);
           requestBody = { ...requestBody, ...parsed };
+          // Ensure includeImage is set from toggle
+          if (scenario === 'creative' && requestBody.input) {
+            (requestBody.input as Record<string, unknown>).includeImage = includeImage;
+          }
         } catch {
           // If not JSON, treat as plain text context
           if (scenario === 'creative') {
-            requestBody.input = { context: input };
+            requestBody.input = { context: input, includeImage };
           } else if (scenario === 'compliance') {
             // Support both comma-separated strings and JSON array
             if (input.trim().startsWith('[')) {
@@ -246,6 +259,25 @@ export default function AgentConsole() {
               />
             </div>
           </div>
+
+          {scenario === 'creative' && (
+            <div className="mb-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeImage}
+                  onChange={(e) => setIncludeImage(e.target.checked)}
+                  className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm font-semibold text-gray-700">
+                  Include image generation
+                </span>
+                <span className="text-xs text-gray-500">
+                  (Requires GIORGIO_IMAGE_ENABLED=true and REPLICATE_API_TOKEN)
+                </span>
+              </label>
+            </div>
+          )}
 
           <div className="mb-4">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -450,41 +482,80 @@ export default function AgentConsole() {
                 </button>
                 {expandedSections.artifacts && (
                   <div className="grid md:grid-cols-2 gap-4">
-                    {response.artifacts.map((artifact, idx) => (
-                      <div
-                        key={idx}
-                        className="border-2 border-gray-200 rounded-lg p-4 bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-md transition-all"
-                      >
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="font-bold text-sm uppercase text-blue-700 bg-blue-100 px-3 py-1 rounded">
-                            {artifact.type}
-                          </span>
-                          <button
-                            onClick={() => copyToClipboard(typeof artifact.content === 'string' ? artifact.content : JSON.stringify(artifact.content))}
-                            className="text-xs text-blue-600 hover:text-blue-700"
-                          >
-                            📋 Copy
-                          </button>
+                    {response.artifacts.map((artifact, idx) => {
+                      const isImage = artifact.type === 'image';
+                      const isPromptPackage = artifact.type === 'prompt_package';
+                      const isGenerated = isImage && artifact.url;
+                      const isFallback = isPromptPackage || (isImage && !artifact.url);
+
+                      return (
+                        <div
+                          key={idx}
+                          className="border-2 border-gray-200 rounded-lg p-4 bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-md transition-all"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-sm uppercase text-blue-700 bg-blue-100 px-3 py-1 rounded">
+                                {artifact.type}
+                              </span>
+                              {isGenerated && (
+                                <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded border border-green-300">
+                                  GENERATED
+                                </span>
+                              )}
+                              {isFallback && (
+                                <span className="text-xs font-semibold bg-yellow-100 text-yellow-700 px-2 py-1 rounded border border-yellow-300">
+                                  FALLBACK
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => copyToClipboard(typeof artifact.content === 'string' ? artifact.content : JSON.stringify(artifact.content))}
+                              className="text-xs text-blue-600 hover:text-blue-700"
+                            >
+                              📋 Copy
+                            </button>
+                          </div>
+                          {isImage && artifact.url && (
+                            <div className="bg-white rounded p-3 border border-gray-200 mb-2">
+                              <img
+                                src={artifact.url}
+                                alt="Generated image"
+                                className="w-full h-auto rounded max-h-64 object-contain"
+                              />
+                            </div>
+                          )}
+                          {isPromptPackage && (
+                            <div className="bg-white rounded p-3 border border-gray-200 mb-2">
+                              <pre className="text-sm text-gray-800 whitespace-pre-wrap break-words max-h-40 overflow-auto">
+                                {typeof artifact.content === 'string'
+                                  ? artifact.content
+                                  : JSON.stringify(artifact.content, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                          {!isImage && !isPromptPackage && (
+                            <div className="bg-white rounded p-3 border border-gray-200 mb-2">
+                              <pre className="text-sm text-gray-800 whitespace-pre-wrap break-words max-h-40 overflow-auto">
+                                {typeof artifact.content === 'string'
+                                  ? artifact.content
+                                  : JSON.stringify(artifact.content, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                          {artifact.metadata && Object.keys(artifact.metadata).length > 0 && (
+                            <details className="mt-2">
+                              <summary className="text-xs font-medium cursor-pointer text-gray-600 hover:text-gray-900">
+                                View Metadata
+                              </summary>
+                              <pre className="text-xs mt-2 bg-white p-2 rounded border overflow-auto">
+                                {JSON.stringify(artifact.metadata, null, 2)}
+                              </pre>
+                            </details>
+                          )}
                         </div>
-                        <div className="bg-white rounded p-3 border border-gray-200 mb-2">
-                          <pre className="text-sm text-gray-800 whitespace-pre-wrap break-words max-h-40 overflow-auto">
-                            {typeof artifact.content === 'string'
-                              ? artifact.content
-                              : JSON.stringify(artifact.content, null, 2)}
-                          </pre>
-                        </div>
-                        {artifact.metadata && Object.keys(artifact.metadata).length > 0 && (
-                          <details className="mt-2">
-                            <summary className="text-xs font-medium cursor-pointer text-gray-600 hover:text-gray-900">
-                              View Metadata
-                            </summary>
-                            <pre className="text-xs mt-2 bg-white p-2 rounded border overflow-auto">
-                              {JSON.stringify(artifact.metadata, null, 2)}
-                            </pre>
-                          </details>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

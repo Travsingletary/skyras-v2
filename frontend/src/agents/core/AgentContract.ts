@@ -4,7 +4,7 @@
  */
 
 export interface AgentArtifact {
-  type: 'text' | 'image' | 'file' | 'metadata' | 'prompt';
+  type: 'text' | 'image' | 'file' | 'metadata' | 'prompt' | 'prompt_package';
   content: string;
   url?: string;
   metadata?: Record<string, unknown>;

@@ -129,3 +129,9 @@ export async function generateCoverArtPrompt(_: unknown, input: CreativeInput): 
   };
   return createResponse(input.project, input.style, `Cover art prompt summarized for ${input.project}.`, creativity);
 }
+
+export interface GenerateImageInput extends CreativeInput {
+  aspectRatio?: 'square' | 'landscape' | 'portrait';
+  stylePreset?: string;
+  seed?: number;
+}

@@ -4,6 +4,7 @@ import { createGiorgioAgent } from '@/agents/giorgio';
 import { createJamalAgent } from '@/agents/jamal';
 import { scanFilesForLicensing } from '@/agents/compliance/complianceActions';
 import { saveAssetMetadata } from '@/agents/letitia/letitiaActions';
+import { generateImage as generateGiorgioImage } from '@/agents/giorgio/giorgioImageAction';
 import { getSupabaseClient } from '@/backend/supabaseClient';
 import {
   createAgentResponse,
@@ -212,27 +213,101 @@ async function runCreativePath(
         creativity,
         generated_by: 'giorgio',
         scenario: 'creative',
+        content: prompt, // Store prompt text in content field
       },
     });
 
     proofMarkers.push(
-      createProofMarker('letitia_save', 'DB_OK', 'Prompt saved as asset', {
+      createProofMarker('letitia_save_prompt', 'DB_OK', 'Prompt saved as asset', {
         asset_name: assetResult.notes?.asset?.name,
       })
     );
 
+    // Step 3: Optionally generate image if includeImage is true
+    // Check both input.includeImage and input.input?.includeImage
+    const includeImage = 
+      input.includeImage === true || 
+      input.includeImage === 'true' ||
+      (input.input && typeof input.input === 'object' && (input.input as Record<string, unknown>).includeImage === true) ||
+      (input.input && typeof input.input === 'object' && (input.input as Record<string, unknown>).includeImage === 'true');
+    
+    const artifacts: Array<{ type: string; content: string; metadata?: Record<string, unknown> }> = [
+      {
+        type: 'prompt',
+        content: prompt,
+        metadata: creativity,
+      },
+    ];
+
+    let imageResult: AgentResult | null = null;
+    if (includeImage) {
+      proofMarkers.push(createProofMarker('giorgio_image_requested', 'INFO', 'Image generation requested'));
+
+      const imageContext = {
+        supabase,
+        memory: giorgio['memory'],
+        logger: giorgio['logger'],
+        delegateTo: () => ({ agent: '', task: '', status: 'pending' as const }),
+      };
+
+      imageResult = await generateGiorgioImage(imageContext, {
+        project,
+        context: input.context || 'A cinematic sequence',
+        mood: input.mood || 'dynamic',
+        style: input.style || 'neon-realism',
+        aspectRatio: (input.aspectRatio as 'square' | 'landscape' | 'portrait') || 'square',
+        stylePreset: input.stylePreset as string | undefined,
+        seed: input.seed as number | undefined,
+      });
+
+      // Add image artifacts to response
+      if (imageResult.artifacts) {
+        artifacts.push(...imageResult.artifacts);
+      }
+
+      // Save image asset if image was generated
+      if (imageResult.artifacts && imageResult.artifacts.length > 0) {
+        const imageArtifact = imageResult.artifacts.find((a) => a.type === 'image' || a.type === 'prompt_package');
+        if (imageArtifact) {
+          const imageAssetType = imageArtifact.type === 'image' ? 'image' : 'prompt_package';
+          const imageContent = imageArtifact.type === 'image' ? imageArtifact.url || imageArtifact.content : imageArtifact.content;
+
+          await saveAssetMetadata(letitiaContext, {
+            project,
+            name: `Image ${imageAssetType === 'image' ? 'Generated' : 'Prompt Package'} - ${new Date().toISOString()}`,
+            type: imageAssetType,
+            tags: imageAssetType === 'image' ? ['image', 'giorgio', 'creative'] : ['image_prompt', 'fallback', 'giorgio', 'creative'],
+            metadata: {
+              ...imageArtifact.metadata,
+              content: imageContent,
+              generated_by: 'giorgio',
+              scenario: 'creative',
+            },
+          });
+
+          proofMarkers.push(
+            createProofMarker('letitia_save_image', 'DB_OK', `${imageAssetType === 'image' ? 'Image' : 'Prompt package'} saved as asset`)
+          );
+        }
+      }
+
+      // Merge proof markers from image generation
+      if (imageResult.proof) {
+        proofMarkers.push(...imageResult.proof);
+      }
+    }
+
+    const outputMessage = includeImage && imageResult
+      ? `Creative path completed: ${giorgioResult.output}. ${imageResult.output}`
+      : `Creative path completed: ${giorgioResult.output}`;
+
     return createAgentResponse(
       'marcus',
       'creative_path',
-      `Creative path completed: ${giorgioResult.output}`,
+      outputMessage,
       {
-        artifacts: [
-          {
-            type: 'prompt',
-            content: prompt,
-            metadata: creativity,
-          },
-        ],
+        artifacts,
+        warnings: imageResult?.warnings,
         proof: proofMarkers,
         metadata: {
           giorgio_output: giorgioResult.output,
