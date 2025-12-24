@@ -16,6 +16,18 @@ import { FEATURE_FLAGS } from '@/lib/featureFlags';
 
 export const runtime = 'nodejs';
 
+/**
+ * System-owned neutral demo inputs for compliance testing.
+ * Not real assets. These are generic sample filenames used when no input is provided.
+ * Never saved as real assets and excluded from asset ownership logic.
+ */
+const DEFAULT_SAMPLE_FILES: Array<{ name: string; path: string }> = [
+  { name: 'video_demo_watermark.mp4', path: 'videos/video_demo_watermark.mp4' },
+  { name: 'music_preview_track.wav', path: 'music/music_preview_track.wav' },
+  { name: 'image_sample_render.png', path: 'images/image_sample_render.png' },
+  { name: 'project_template_preview.aep', path: 'templates/project_template_preview.aep' },
+];
+
 type Scenario = 'creative' | 'compliance' | 'distribution';
 
 interface GoldenPathRequest {
@@ -274,12 +286,7 @@ async function runCompliancePath(
     let usedDefaults = false;
     if (files.length === 0) {
       usedDefaults = true;
-      files = [
-        { name: 'Runway_DEMO_watermark_preview.mp4', path: 'videos/Runway_DEMO_watermark_preview.mp4' },
-        { name: 'artlist_song_license.pdf', path: 'music/artlist_song_license.pdf' },
-        { name: 'final_master_v3.mov', path: 'videos/final_master_v3.mov' },
-        { name: 'motionarray_PREVIEW_template.aep', path: 'templates/motionarray_PREVIEW_template.aep' },
-      ];
+      files = [...DEFAULT_SAMPLE_FILES];
       proofMarkers.push(
         createProofMarker('cassidy_guardrail', 'INFO', 'No files provided, using default sample filenames', {
           default_files_count: files.length,
@@ -338,6 +345,9 @@ async function runCompliancePath(
       metadata: {
         scenario: 'compliance',
         scan_timestamp: new Date().toISOString(),
+        is_sample: usedDefaults,
+        source: usedDefaults ? 'system_default' : 'user_input',
+        used_due_to_empty_input: usedDefaults,
       },
     };
 
@@ -360,11 +370,21 @@ async function runCompliancePath(
     );
 
     // Step 4: Optionally save flagged files as assets (only if asset_id is provided in input)
+    // IMPORTANT: Never save default sample files as real assets
     const savedAssets = [];
-    if (input.asset_id && suspiciousFiles.length > 0) {
+    if (input.asset_id && suspiciousFiles.length > 0 && !usedDefaults) {
       proofMarkers.push(createProofMarker('letitia_route', 'ROUTE_OK', 'Saving flagged files as assets via Letitia'));
 
       for (const file of suspiciousFiles) {
+        // Skip default sample files - never save as real assets
+        const isDefaultFile = DEFAULT_SAMPLE_FILES.some(
+          (df) => df.name === file.file_path || df.path === file.file_path
+        );
+        if (isDefaultFile) {
+          console.log('[Compliance Path] Skipping default sample file from asset save:', file.file_path);
+          continue;
+        }
+
         try {
           const assetResult = await saveAssetMetadata(cassidyContext, {
             project,

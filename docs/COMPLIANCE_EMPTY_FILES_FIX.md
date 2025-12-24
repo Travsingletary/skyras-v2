@@ -12,11 +12,11 @@ Compliance scenario was failing when `files[]` was empty, causing "dead" runs wi
 
 - Default sample filenames are **always pre-populated** when compliance scenario is selected
 - If user clears input, backend guardrail ensures defaults are used
-- Default files:
-  - `Runway_DEMO_watermark_preview.mp4`
-  - `artlist_song_license.pdf`
-  - `final_master_v3.mov`
-  - `motionarray_PREVIEW_template.aep`
+- Default files (system-owned neutral demo inputs):
+  - `video_demo_watermark.mp4`
+  - `music_preview_track.wav`
+  - `image_sample_render.png`
+  - `project_template_preview.aep`
 
 **Implementation:**
 ```typescript
@@ -29,10 +29,10 @@ if (scenario === 'compliance') {
   if (!inputFiles || !Array.isArray(inputFiles) || inputFiles.length === 0) {
     // Use default sample filenames
     (requestBody.input as { files: string[] }).files = [
-      'Runway_DEMO_watermark_preview.mp4',
-      'artlist_song_license.pdf',
-      'final_master_v3.mov',
-      'motionarray_PREVIEW_template.aep',
+      'video_demo_watermark.mp4',
+      'music_preview_track.wav',
+      'image_sample_render.png',
+      'project_template_preview.aep',
     ];
   }
 }
@@ -66,10 +66,10 @@ if (!Array.isArray(input.files) || input.files.length === 0) {
 // Default sample files if none provided (guardrail)
 if (files.length === 0) {
   files = [
-    { name: 'Runway_DEMO_watermark_preview.mp4', path: 'videos/Runway_DEMO_watermark_preview.mp4' },
-    { name: 'artlist_song_license.pdf', path: 'music/artlist_song_license.pdf' },
-    { name: 'final_master_v3.mov', path: 'videos/final_master_v3.mov' },
-    { name: 'motionarray_PREVIEW_template.aep', path: 'templates/motionarray_PREVIEW_template.aep' },
+    { name: 'video_demo_watermark.mp4', path: 'videos/video_demo_watermark.mp4' },
+    { name: 'music_preview_track.wav', path: 'music/music_preview_track.wav' },
+    { name: 'image_sample_render.png', path: 'images/image_sample_render.png' },
+    { name: 'project_template_preview.aep', path: 'templates/project_template_preview.aep' },
   ];
   proofMarkers.push(
     createProofMarker('cassidy_guardrail', 'INFO', 'No files provided, using default sample filenames', {

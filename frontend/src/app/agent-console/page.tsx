@@ -43,16 +43,19 @@ export default function AgentConsole() {
     raw: false,
   });
 
+  // System-owned neutral demo inputs for compliance testing
+  const DEFAULT_SAMPLE_FILES = [
+    'video_demo_watermark.mp4',
+    'music_preview_track.wav',
+    'image_sample_render.png',
+    'project_template_preview.aep',
+  ];
+
   // Set default input based on scenario
   const getDefaultInput = (scenario: Scenario) => {
     switch (scenario) {
       case 'compliance':
-        return JSON.stringify([
-          'Runway_DEMO_watermark_preview.mp4',
-          'artlist_song_license.pdf',
-          'final_master_v3.mov',
-          'motionarray_PREVIEW_template.aep',
-        ]);
+        return JSON.stringify(DEFAULT_SAMPLE_FILES);
       case 'creative':
         return JSON.stringify({ context: 'A cinematic sequence', mood: 'dynamic' });
       case 'distribution':
@@ -114,13 +117,8 @@ export default function AgentConsole() {
         }
         const inputFiles = (requestBody.input as { files?: unknown[] })?.files;
         if (!inputFiles || !Array.isArray(inputFiles) || inputFiles.length === 0) {
-          // Use default sample filenames
-          (requestBody.input as { files: string[] }).files = [
-            'Runway_DEMO_watermark_preview.mp4',
-            'artlist_song_license.pdf',
-            'final_master_v3.mov',
-            'motionarray_PREVIEW_template.aep',
-          ];
+          // Use default sample filenames (system-owned neutral demo inputs)
+          (requestBody.input as { files: string[] }).files = [...DEFAULT_SAMPLE_FILES];
         }
       }
 
@@ -259,7 +257,7 @@ export default function AgentConsole() {
                 scenario === 'creative'
                   ? '{"context": "A cinematic sequence", "mood": "dynamic"}'
                   : scenario === 'compliance'
-                  ? '["Runway_DEMO_watermark_preview.mp4", "artlist_song_license.pdf", "final_master_v3.mov", "motionarray_PREVIEW_template.aep"]'
+                  ? '["video_demo_watermark.mp4", "music_preview_track.wav", "image_sample_render.png", "project_template_preview.aep"]'
                   : '{"campaign": "Test Campaign", "platforms": ["instagram", "tiktok"]}'
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-gray-50"
