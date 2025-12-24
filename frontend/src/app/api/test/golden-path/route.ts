@@ -261,7 +261,7 @@ async function runCompliancePath(
 
     // Parse input files - support both array of objects and array of strings
     let files: Array<{ name: string; path?: string }> = [];
-    if (input.files && Array.isArray(input.files)) {
+    if (input.files && Array.isArray(input.files) && input.files.length > 0) {
       files = input.files.map((f) => {
         if (typeof f === 'string') {
           return { name: f, path: f };
@@ -270,7 +270,7 @@ async function runCompliancePath(
       });
     }
 
-    // Default sample files if none provided
+    // Default sample files if none provided (guardrail)
     if (files.length === 0) {
       files = [
         { name: 'Runway_DEMO_watermark_preview.mp4', path: 'videos/Runway_DEMO_watermark_preview.mp4' },
@@ -278,6 +278,11 @@ async function runCompliancePath(
         { name: 'final_master_v3.mov', path: 'videos/final_master_v3.mov' },
         { name: 'motionarray_PREVIEW_template.aep', path: 'templates/motionarray_PREVIEW_template.aep' },
       ];
+      proofMarkers.push(
+        createProofMarker('cassidy_guardrail', 'ROUTE_OK', 'No files provided, using default sample filenames', {
+          default_files_count: files.length,
+        })
+      );
     }
 
     // Step 2: Cassidy scans files
@@ -320,7 +325,7 @@ async function runCompliancePath(
       summary: scanResult.summary,
     };
 
-    const { error: scanSaveError } = await supabase.from('compliance_scans').insert({
+    const scanInsertData = {
       project,
       input_files_json: files,
       output_json: scanOutput,
@@ -332,14 +337,21 @@ async function runCompliancePath(
         scenario: 'compliance',
         scan_timestamp: new Date().toISOString(),
       },
-    });
+    };
+
+    const { data: scanRecord, error: scanSaveError } = await supabase.from('compliance_scans').insert(scanInsertData);
 
     if (scanSaveError) {
       throw new Error(`Failed to save compliance scan: ${scanSaveError.message}`);
     }
 
+    // Extract scan ID from returned data (wrapper returns array)
+    const scanId = scanRecord && scanRecord.length > 0 ? scanRecord[0].id : 'unknown';
+
     proofMarkers.push(
       createProofMarker('compliance_scan_save', 'DB_OK', 'Compliance scan saved to compliance_scans table', {
+        scan_id: scanId,
+        table: 'compliance_scans',
         flagged_count: flaggedCount,
         clean_count: cleanCount,
       })
@@ -405,6 +417,8 @@ async function runCompliancePath(
         total_files: files.length,
         assets_saved: savedAssets.length,
         scan_saved: true,
+        scan_id: scanId,
+        scan_table: 'compliance_scans',
       },
     });
   } catch (error) {

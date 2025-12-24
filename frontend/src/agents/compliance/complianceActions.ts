@@ -54,8 +54,16 @@ function containsKeyword(name: string) {
 }
 
 export async function scanFilesForLicensing(context: AgentExecutionContext, input: ScanFilesInput) {
-  if (!input.projectId || !Array.isArray(input.files)) {
-    throw new Error("projectId and files array are required for licensing scan");
+  if (!input.projectId) {
+    throw new Error("projectId is required for licensing scan");
+  }
+
+  // Handle empty files array gracefully - return success with empty results
+  if (!Array.isArray(input.files) || input.files.length === 0) {
+    return {
+      summary: "No files provided to scan.",
+      data: [],
+    };
   }
 
   const suspicious: SuspiciousFile[] = [];

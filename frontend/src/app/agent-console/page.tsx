@@ -107,6 +107,23 @@ export default function AgentConsole() {
         }
       }
 
+      // For compliance, ensure files array is always present (use defaults if empty)
+      if (scenario === 'compliance') {
+        if (!requestBody.input) {
+          requestBody.input = {};
+        }
+        const inputFiles = (requestBody.input as { files?: unknown[] })?.files;
+        if (!inputFiles || !Array.isArray(inputFiles) || inputFiles.length === 0) {
+          // Use default sample filenames
+          (requestBody.input as { files: string[] }).files = [
+            'Runway_DEMO_watermark_preview.mp4',
+            'artlist_song_license.pdf',
+            'final_master_v3.mov',
+            'motionarray_PREVIEW_template.aep',
+          ];
+        }
+      }
+
       const res = await fetch('/api/test/golden-path', {
         method: 'POST',
         headers: {
@@ -508,13 +525,18 @@ export default function AgentConsole() {
                 </p>
               )}
               {response.metadata?.scan_saved && (
-                <p className="text-green-800 flex items-center gap-2">
+                <p className="text-green-800 flex items-center gap-2 flex-wrap">
                   <span className="text-green-600">✓</span>
                   Compliance scan saved to{' '}
                   <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">compliance_scans</code>
+                  {response.metadata.scan_id && response.metadata.scan_id !== 'unknown' && (
+                    <span className="text-green-700 font-mono text-xs">
+                      (ID: {String(response.metadata.scan_id).substring(0, 8)}...)
+                    </span>
+                  )}
                   {response.metadata.flagged_count !== undefined && (
                     <span className="text-green-700">
-                      ({response.metadata.flagged_count} flagged, {response.metadata.clean_count || 0} clean)
+                      — {response.metadata.flagged_count} flagged, {response.metadata.clean_count || 0} clean
                     </span>
                   )}
                 </p>
