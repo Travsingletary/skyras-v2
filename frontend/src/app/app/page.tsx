@@ -50,18 +50,18 @@ export default function Home() {
   const [accessCode, setAccessCode] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
+
+  // Speech-to-text state
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(() => {
-    // Check localStorage for voice preference (SSR-safe)
-    if (typeof window === 'undefined') return true;
-    const stored = localStorage.getItem('voiceEnabled');
-    return stored !== null ? stored === 'true' : true; // Default to enabled
-  });
+  const [isTranscribing, setIsTranscribing] = useState(false);
+
+  // Text-to-speech state
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
-  const audioQueueRef = useRef<Array<{ text: string; role: Message['role'] }>>([]);
+  const audioQueueRef = useRef<Array<{ text: string; role: Message['role']; messageId?: string }>>([]);
   const isPlayingAudioRef = useRef<boolean>(false);
   const isStartingAudioRef = useRef<boolean>(false); // Track if we're starting playback
 
@@ -181,7 +181,7 @@ export default function Home() {
         }
 
         console.log(`[Voice] Recorded ${audioBlob.size} bytes, sending to transcription...`);
-        setMessage('🎤 Transcribing...');
+        setIsTranscribing(true);
 
         try {
           // Send to speech-to-text API
@@ -208,27 +208,27 @@ export default function Home() {
           console.log('[Voice] Transcription:', transcript);
 
           if (transcript) {
+            // Insert transcript into the text input, but do NOT auto-send
             setMessage(transcript);
-            // Auto-send after transcription
-            setTimeout(() => {
-              handleSend(transcript);
-            }, 500);
+            setError(null);
           } else {
             setError('No speech detected. Please try again.');
-            setMessage('');
           }
 
         } catch (error) {
           console.error('[Voice] Transcription error:', error);
+          console.error('[Telemetry][STT] Transcription failed', error);
           setError('Failed to transcribe audio. Please try typing your message.');
-          setMessage('');
         } finally {
           setIsRecording(false);
+          setIsTranscribing(false);
+          recognitionRef.current = null;
         }
       };
 
       mediaRecorder.onerror = (event: any) => {
         console.error('[Voice] MediaRecorder error:', event.error);
+        console.error('[Telemetry][STT] MediaRecorder error', event.error);
         setError('Recording failed. Please try again.');
         setIsRecording(false);
         stream.getTracks().forEach(track => track.stop());
@@ -244,6 +244,7 @@ export default function Home() {
 
     } catch (error: any) {
       console.error('[Voice] Error starting recording:', error);
+      console.error('[Telemetry][STT] Failed to start recording', error);
 
       if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         setError('Microphone access denied. Please allow microphone access in your browser settings.');
@@ -335,8 +336,28 @@ export default function Home() {
     return voiceMap[role] || voiceMap['assistant']; // Default to Marcus voice
   };
 
-  // Play voice response using ElevenLabs TTS with queue management
-  const playVoiceResponse = async (text: string, agentRole: Message['role'] = 'assistant') => {
+  const stopCurrentAudio = () => {
+    try {
+      if (currentAudioRef.current) {
+        currentAudioRef.current.pause();
+        currentAudioRef.current.currentTime = 0;
+      }
+    } catch (e) {
+      console.error('[Voice] Error stopping current audio:', e);
+    } finally {
+      currentAudioRef.current = null;
+      isPlayingAudioRef.current = false;
+      isStartingAudioRef.current = false;
+      setPlayingMessageId(null);
+    }
+  };
+
+  // Play voice response using server-side TTS with queue management
+  const playVoiceResponse = async (
+    text: string,
+    agentRole: Message['role'] = 'assistant',
+    messageId?: string
+  ) => {
     // Clean the text first
     const cleanedText = cleanTextForTTS(text);
     
@@ -348,12 +369,18 @@ export default function Home() {
     // If audio is currently playing or starting, queue this new one instead of interrupting
     if ((isPlayingAudioRef.current && currentAudioRef.current) || isStartingAudioRef.current) {
       console.log('[Voice] Audio already playing or starting, queuing this message');
-      audioQueueRef.current.push({ text: cleanedText, role: agentRole });
+      audioQueueRef.current.push({ text: cleanedText, role: agentRole, messageId });
       return;
     }
 
+    // Stop any existing audio before starting new playback
+    stopCurrentAudio();
+
     // Mark that we're starting playback
     isStartingAudioRef.current = true;
+    if (messageId) {
+      setPlayingMessageId(messageId);
+    }
 
     try {
       const agentName = agentRole === 'assistant' ? 'Marcus' : agentRole.charAt(0).toUpperCase() + agentRole.slice(1);
@@ -411,13 +438,14 @@ export default function Home() {
         currentAudioRef.current = null;
         isPlayingAudioRef.current = false;
         isStartingAudioRef.current = false;
+        setPlayingMessageId(null);
         
         // Try to play next in queue even on error
         if (audioQueueRef.current.length > 0) {
           const next = audioQueueRef.current.shift();
           if (next) {
             setTimeout(() => {
-              playVoiceResponse(next.text, next.role);
+              playVoiceResponse(next.text, next.role, next.messageId);
             }, 300);
           }
         }
@@ -449,21 +477,40 @@ export default function Home() {
         currentAudioRef.current = null;
         isPlayingAudioRef.current = false;
         isStartingAudioRef.current = false;
+        setPlayingMessageId(null);
         
         // Try to play next in queue even on play error
         if (audioQueueRef.current.length > 0) {
           const next = audioQueueRef.current.shift();
           if (next) {
             setTimeout(() => {
-              playVoiceResponse(next.text, next.role);
+              playVoiceResponse(next.text, next.role, next.messageId);
             }, 300);
           }
         }
       });
     } catch (error) {
       console.error('[Voice] TTS error:', error);
+      console.error('[Telemetry][TTS] Text-to-speech failed', error);
       currentAudioRef.current = null;
       isPlayingAudioRef.current = false;
+      setPlayingMessageId(null);
+    }
+  };
+
+  const handleReadMessage = async (msg: Message) => {
+    // Toggle play/stop on the same message
+    if (playingMessageId === msg.id) {
+      stopCurrentAudio();
+      return;
+    }
+
+    try {
+      await playVoiceResponse(msg.content, msg.role, msg.id);
+    } catch (error) {
+      console.error('[Voice] Error reading message:', error);
+      console.error('[Telemetry][TTS] Failed to read message', error);
+      setPlayingMessageId(null);
     }
   };
 
@@ -583,83 +630,9 @@ export default function Home() {
         }
       }
 
-      // Process delegations and notes to show agent responses
-      if (data.data) {
-        const agentMessages: Message[] = [];
-        
-        // Check delegations
-        if (data.data.delegations && Array.isArray(data.data.delegations)) {
-          for (const delegation of data.data.delegations) {
-            const agentName = (delegation.agent || delegation.to)?.toLowerCase();
-            
-            if (agentName && ['giorgio', 'jamal', 'letitia', 'cassidy'].includes(agentName)) {
-              // Try to get output from notes
-              const notes = data.data.notes || {};
-              let agentOutput = '';
-              
-              // Check notes for agent-specific output
-              const agentNote = notes[agentName];
-              if (agentNote && typeof agentNote === 'object' && 'output' in agentNote) {
-                agentOutput = String((agentNote as any).output || '');
-              } else if (agentNote && typeof agentNote === 'object' && 'text' in agentNote) {
-                agentOutput = String((agentNote as any).text || '');
-              } else if (typeof agentNote === 'string') {
-                agentOutput = agentNote;
-              } else if (notes.creative && agentName === 'giorgio') {
-                agentOutput = typeof notes.creative === 'string' ? notes.creative : JSON.stringify(notes.creative);
-              } else if (notes.distribution && agentName === 'jamal') {
-                agentOutput = typeof notes.distribution === 'string' ? notes.distribution : JSON.stringify(notes.distribution);
-              } else if (notes.catalog && agentName === 'letitia') {
-                agentOutput = typeof notes.catalog === 'string' ? notes.catalog : JSON.stringify(notes.catalog);
-              } else if (notes.licensing && agentName === 'cassidy') {
-                agentOutput = typeof notes.licensing === 'string' ? notes.licensing : JSON.stringify(notes.licensing);
-              }
-              
-              // Map agent names to display names
-              const displayNames: Record<string, string> = {
-                'giorgio': 'Giorgio',
-                'jamal': 'Jamal',
-                'letitia': 'Letitia',
-                'cassidy': 'Cassidy',
-              };
-              
-              if (agentOutput) {
-                agentMessages.push({
-                  id: `agent_${agentName}_${Date.now()}_${Math.random()}`,
-                  role: agentName as Message['role'],
-                  content: agentOutput,
-                  agentName: displayNames[agentName] || agentName,
-                });
-              } else {
-                // Show delegation even without output
-                agentMessages.push({
-                  id: `agent_${agentName}_${Date.now()}_${Math.random()}`,
-                  role: agentName as Message['role'],
-                  content: `Working on: ${delegation.task}`,
-                  agentName: displayNames[agentName] || agentName,
-                });
-              }
-            }
-          }
-        }
-        
-        // Add agent messages to conversation and play their voices
-        if (agentMessages.length > 0) {
-          setMessages((prev) => [...prev, ...agentMessages]);
-          
-          // Play voices for each agent message if voice is enabled
-          if (voiceEnabled) {
-            // Play first message immediately, queue the rest
-            if (agentMessages.length > 0) {
-              playVoiceResponse(agentMessages[0].content, agentMessages[0].role);
-              // Queue remaining messages
-              for (let i = 1; i < agentMessages.length; i++) {
-                audioQueueRef.current.push({ text: agentMessages[i].content, role: agentMessages[i].role });
-              }
-            }
-          }
-        }
-      }
+      // SINGLE MOUTHPIECE: Only Marcus returns responses to UI
+      // Agent outputs are formatted as reports within Marcus's response
+      // No separate agent messages are created
 
       // Always show Marcus's response, even if empty
       const responseText = data.response || "[No response from Marcus]";
@@ -674,7 +647,6 @@ export default function Home() {
 
       // Play voice response (Marcus reads his response aloud) if enabled
       if (voiceEnabled && data.response && typeof data.response === 'string') {
-        // Queue Marcus's response (will play after any agent messages)
         playVoiceResponse(data.response as string, 'assistant');
       }
 
@@ -765,10 +737,7 @@ export default function Home() {
           <div>
             <h1 className="text-xl font-semibold">Marcus · SkyRas PM</h1>
             <p className="text-xs text-zinc-600 mt-1">
-              Talk to Marcus. He'll route your request to the right agents.
-              {voiceEnabled && (
-                <span className="text-xs text-blue-600 ml-2">🔊 Voice enabled</span>
-              )}
+              Ask questions, share context, or record a quick voice note – Marcus will handle the rest.
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -785,8 +754,10 @@ export default function Home() {
               Dashboard
             </Link>
             <div className="text-xs text-zinc-500 space-y-1 text-right">
-              <div>API: <span className="font-mono">same-origin</span></div>
-              <div>User: <span className="font-mono">{userId || "loading..."}</span></div>
+              <div>Signed in as <span className="font-mono">{userId || "loading..."}</span></div>
+              <div className="text-[10px] uppercase tracking-wide text-zinc-400">
+                API: same-origin
+              </div>
             </div>
           </div>
         </div>
@@ -810,10 +781,12 @@ export default function Home() {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-4xl mx-auto space-y-4">
-          {/* Debug info */}
-          <div className="text-xs text-gray-400 mb-2">
-            Messages in state: {messages.length} | Loading: {isLoading ? 'yes' : 'no'}
-          </div>
+          {/* Debug info (dev-only) */}
+          {process.env.NODE_ENV !== 'production' && (
+            <div className="text-xs text-gray-400 mb-2">
+              Debug · messages: {messages.length} · loading: {isLoading ? 'yes' : 'no'}
+            </div>
+          )}
 
           {messages.length === 0 && (
             <div className="text-center text-zinc-500 text-sm py-12">
@@ -851,54 +824,76 @@ export default function Home() {
             const agentName = getAgentName(msg);
             
             return (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-            >
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-3 ${getAgentStyle(msg.role)}`}
+                key={msg.id}
+                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                {agentName && (
-                  <div className="text-xs font-semibold mb-1 opacity-75">
-                    {agentName}
-                  </div>
-                )}
-                <div className="text-sm whitespace-pre-wrap">
-                  {msg.content.split('\n').map((line, idx) => {
-                    // Simple markdown rendering
-                    if (line.startsWith('## ')) {
-                      return <h2 key={idx} className="font-semibold text-base mt-4 mb-2">{line.replace('## ', '')}</h2>;
-                    } else if (line.startsWith('### ')) {
-                      return <h3 key={idx} className="font-semibold text-sm mt-3 mb-1">{line.replace('### ', '')}</h3>;
-                    } else if (line.startsWith('**') && line.endsWith('**')) {
-                      return <strong key={idx} className="font-semibold">{line.replace(/\*\*/g, '')}</strong>;
-                    } else if (line.startsWith('  • ') || line.startsWith('- ')) {
-                      return <div key={idx} className="ml-4">{line}</div>;
-                    } else if (line.trim() === '') {
-                      return <br key={idx} />;
-                    }
-                    return <p key={idx}>{line}</p>;
-                  })}
-                </div>
-                {msg.files && msg.files.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-opacity-20">
-                    <div className="text-xs opacity-80">
-                      {msg.files.map((file, idx) => (
-                        <div key={idx} className="flex items-center gap-1 mt-1">
-                          <span>📎</span>
-                          <span>{file.filename}</span>
-                          {file.size && (
-                            <span className="opacity-60">
-                              ({(file.size / 1024).toFixed(1)} KB)
-                            </span>
-                          )}
-                        </div>
-                      ))}
+                <div
+                  className={`max-w-[80%] rounded-lg px-4 py-3 ${getAgentStyle(msg.role)}`}
+                >
+                  {agentName && (
+                    <div className="text-xs font-semibold mb-1 opacity-75">
+                      {agentName}
                     </div>
+                  )}
+                  <div className="text-sm whitespace-pre-wrap">
+                    {msg.content.split('\n').map((line, idx) => {
+                      // Simple markdown rendering
+                      if (line.startsWith('## ')) {
+                        return <h2 key={idx} className="font-semibold text-base mt-4 mb-2">{line.replace('## ', '')}</h2>;
+                      } else if (line.startsWith('### ')) {
+                        return <h3 key={idx} className="font-semibold text-sm mt-3 mb-1">{line.replace('### ', '')}</h3>;
+                      } else if (line.startsWith('**') && line.endsWith('**')) {
+                        return <strong key={idx} className="font-semibold">{line.replace(/\*\*/g, '')}</strong>;
+                      } else if (line.startsWith('  • ') || line.startsWith('- ')) {
+                        return <div key={idx} className="ml-4">{line}</div>;
+                      } else if (line.trim() === '') {
+                        return <br key={idx} />;
+                      }
+                      return <p key={idx}>{line}</p>;
+                    })}
                   </div>
-                )}
+                  {msg.files && msg.files.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-opacity-20">
+                      <div className="text-xs opacity-80">
+                        {msg.files.map((file, idx) => (
+                          <div key={idx} className="flex items-center gap-1 mt-1">
+                            <span>📎</span>
+                            <span>{file.filename}</span>
+                            {file.size && (
+                              <span className="opacity-60">
+                                ({(file.size / 1024).toFixed(1)} KB)
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Read response button only for Marcus (assistant) messages */}
+                  {msg.role === 'assistant' && msg.content && (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => handleReadMessage(msg)}
+                        className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${
+                          playingMessageId === msg.id
+                            ? 'border-blue-600 text-blue-600 bg-blue-50'
+                            : 'border-zinc-300 text-zinc-500 hover:border-zinc-400 hover:text-zinc-700'
+                        }`}
+                        aria-pressed={playingMessageId === msg.id}
+                      >
+                        <span aria-hidden="true">
+                          {playingMessageId === msg.id ? '⏹' : '🔊'}
+                        </span>
+                        <span>
+                          {playingMessageId === msg.id ? 'Stop reading' : 'Read this reply'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
             );
           })}
           <div ref={messagesEndRef} />
@@ -978,35 +973,27 @@ export default function Home() {
               )}
             </button>
 
-            {/* Mic Button */}
+            {/* Speech-to-Text Button */}
             <button
               onClick={handleMicClick}
-              disabled={isLoading}
+              disabled={isLoading || isRecording || isTranscribing}
               className={`flex items-center justify-center w-11 h-11 rounded-lg border ${
-                isRecording
+                isRecording || isTranscribing
                   ? 'bg-red-500 text-white border-red-600 animate-pulse'
                   : 'border-zinc-300 bg-white hover:bg-zinc-50'
               } disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={isRecording ? 'Recording... Click to stop' : 'Click to record voice message'}
+              title={
+                isRecording
+                  ? 'Recording... Click to stop'
+                  : isTranscribing
+                  ? 'Transcribing audio...'
+                  : 'Click to record and transcribe your message'
+              }
             >
-              🎙
-            </button>
-
-            {/* Voice Toggle Button */}
-            <button
-              onClick={() => {
-                const newValue = !voiceEnabled;
-                setVoiceEnabled(newValue);
-                localStorage.setItem('voiceEnabled', String(newValue));
-              }}
-              className={`flex items-center justify-center w-11 h-11 rounded-lg border ${
-                voiceEnabled
-                  ? 'bg-green-100 border-green-300 text-green-700'
-                  : 'border-zinc-300 bg-white text-zinc-400'
-              } hover:bg-zinc-50`}
-              title={voiceEnabled ? 'Voice responses enabled (click to disable)' : 'Voice responses disabled (click to enable)'}
-            >
-              {voiceEnabled ? '🔊' : '🔇'}
+              <span aria-hidden="true">{isTranscribing ? '⌛' : '🎙'}</span>
+              <span className="sr-only">
+                {isRecording ? 'Stop recording' : 'Record a voice note for transcription'}
+              </span>
             </button>
           </div>
         </div>

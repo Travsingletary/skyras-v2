@@ -151,8 +151,36 @@ class MarcusAgent extends BaseAgent {
       try {
         const { delegation: creativeDelegation, result } = await runCreativeGeneration(context, creativePayload);
         delegations.push(creativeDelegation);
-        // Note: Proof prefix will be added at final response construction
-        outputLines.push(result.output);
+        
+        // Format agent output as readable report (not raw JSON)
+        const action = creativePayload.action ?? "generateScriptOutline";
+        const actionDisplay = action.replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+        
+        // Format Giorgio's output as a clean report
+        let agentReport = `I routed this to: Giorgio (${actionDisplay})\n\n`;
+        
+        // Extract readable content from result
+        if (result.notes?.creativity) {
+          const creativity = result.notes.creativity;
+          if (creativity.type === 'script_outline' && creativity.acts) {
+            agentReport += `**Script Outline:**\n`;
+            if (creativity.logline) {
+              agentReport += `Logline: ${creativity.logline}\n\n`;
+            }
+            agentReport += `**Acts:**\n`;
+            creativity.acts.forEach((act: any, idx: number) => {
+              agentReport += `Act ${act.act || idx + 1}: ${act.beat || 'TBD'}\n`;
+            });
+          } else {
+            // Fallback: use output text
+            agentReport += result.output || 'Giorgio completed the task.';
+          }
+        } else {
+          // Use output text directly
+          agentReport += result.output || 'Giorgio completed the task.';
+        }
+        
+        outputLines.push(agentReport);
         notesPayload.creative = result.notes ?? result;
       } catch (error) {
         outputLines.push(`Creative delegation failed: ${(error as Error).message}`);
@@ -267,7 +295,18 @@ class MarcusAgent extends BaseAgent {
         }));
 
         const delegationSummary = outputLines.join('\n');
-        const wrapperPrompt = `I delegated the following tasks:\n\n${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented.`;
+        
+        // Build routing header from delegations
+        const routingHeaders: string[] = [];
+        for (const delegation of delegations) {
+          const actionDisplay = (delegation.action || 'task').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+          routingHeaders.push(`${delegation.agent} (${actionDisplay})`);
+        }
+        const routingHeader = routingHeaders.length > 0 
+          ? `I routed this to: ${routingHeaders.join(', ')}\n\n`
+          : '';
+        
+        const wrapperPrompt = `${routingHeader}${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented. Format agent outputs as readable sections, not raw JSON.`;
 
         // Add wrapper prompt as latest user message
         conversationMessages.push({
