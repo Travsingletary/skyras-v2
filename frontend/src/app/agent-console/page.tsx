@@ -43,6 +43,31 @@ export default function AgentConsole() {
     raw: false,
   });
 
+  // Set default input based on scenario
+  const getDefaultInput = (scenario: Scenario) => {
+    switch (scenario) {
+      case 'compliance':
+        return JSON.stringify([
+          'Runway_DEMO_watermark_preview.mp4',
+          'artlist_song_license.pdf',
+          'final_master_v3.mov',
+          'motionarray_PREVIEW_template.aep',
+        ]);
+      case 'creative':
+        return JSON.stringify({ context: 'A cinematic sequence', mood: 'dynamic' });
+      case 'distribution':
+        return JSON.stringify({ campaign: 'Test Campaign', platforms: ['instagram', 'tiktok'] });
+      default:
+        return '';
+    }
+  };
+
+  // Update input when scenario changes
+  const handleScenarioChange = (newScenario: Scenario) => {
+    setScenario(newScenario);
+    setInput(getDefaultInput(newScenario));
+  };
+
   const handleRun = async () => {
     setLoading(true);
     setError(null);
@@ -65,7 +90,17 @@ export default function AgentConsole() {
           if (scenario === 'creative') {
             requestBody.input = { context: input };
           } else if (scenario === 'compliance') {
-            requestBody.input = { files: input.split(',').map((f) => ({ name: f.trim() })) };
+            // Support both comma-separated strings and JSON array
+            if (input.trim().startsWith('[')) {
+              try {
+                const parsed = JSON.parse(input);
+                requestBody.input = { files: parsed };
+              } catch {
+                requestBody.input = { files: input.split(',').map((f) => ({ name: f.trim() })) };
+              }
+            } else {
+              requestBody.input = { files: input.split(',').map((f) => ({ name: f.trim() })) };
+            }
           } else {
             requestBody.input = { campaign: input };
           }
@@ -161,7 +196,7 @@ export default function AgentConsole() {
               </label>
               <select
                 value={scenario}
-                onChange={(e) => setScenario(e.target.value as Scenario)}
+                onChange={(e) => handleScenarioChange(e.target.value as Scenario)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
                 <option value="creative">Creative (Marcus → Giorgio → Letitia)</option>
@@ -203,7 +238,7 @@ export default function AgentConsole() {
                 scenario === 'creative'
                   ? '{"context": "A cinematic sequence", "mood": "dynamic"}'
                   : scenario === 'compliance'
-                  ? '["demo_track.mp3", "licensed_song.mp3"]'
+                  ? '["Runway_DEMO_watermark_preview.mp4", "artlist_song_license.pdf", "final_master_v3.mov", "motionarray_PREVIEW_template.aep"]'
                   : '{"campaign": "Test Campaign", "platforms": ["instagram", "tiktok"]}'
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-gray-50"
@@ -465,13 +500,25 @@ export default function AgentConsole() {
                         <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">scheduled_posts</code>
                       </p>
                     )}
-                    {response.metadata?.assets_saved && (
-                      <p className="text-green-800 flex items-center gap-2">
-                        <span className="text-green-600">✓</span>
-                        {response.metadata.assets_saved} asset(s) saved to{' '}
-                        <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">assets</code>
-                      </p>
-                    )}
+              {response.metadata?.assets_saved && (
+                <p className="text-green-800 flex items-center gap-2">
+                  <span className="text-green-600">✓</span>
+                  {response.metadata.assets_saved} asset(s) saved to{' '}
+                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">assets</code>
+                </p>
+              )}
+              {response.metadata?.scan_saved && (
+                <p className="text-green-800 flex items-center gap-2">
+                  <span className="text-green-600">✓</span>
+                  Compliance scan saved to{' '}
+                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">compliance_scans</code>
+                  {response.metadata.flagged_count !== undefined && (
+                    <span className="text-green-700">
+                      ({response.metadata.flagged_count} flagged, {response.metadata.clean_count || 0} clean)
+                    </span>
+                  )}
+                </p>
+              )}
                   </div>
                 </div>
               </div>

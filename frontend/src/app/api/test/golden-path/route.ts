@@ -236,7 +236,7 @@ async function runCreativePath(
 }
 
 /**
- * Compliance Path: Cassidy → Letitia
+ * Compliance Path: Marcus → Cassidy → (optional) Letitia
  */
 async function runCompliancePath(
   userId: string,
@@ -245,8 +245,8 @@ async function runCompliancePath(
   proofMarkers: ProofMarker[]
 ): Promise<AgentResult> {
   try {
-    // Step 1: Cassidy scans files
-    proofMarkers.push(createProofMarker('cassidy_scan', 'ROUTE_OK', 'Cassidy scanning files for licensing'));
+    // Step 1: Marcus routes to Cassidy
+    proofMarkers.push(createProofMarker('cassidy_route', 'ROUTE_OK', 'Marcus routing to Cassidy for licensing scan'));
 
     const supabase = getSupabaseClient();
     const cassidyContext = {
@@ -259,11 +259,28 @@ async function runCompliancePath(
       delegateTo: () => ({ agent: '', task: '', status: 'pending' as const }),
     };
 
-    const files = (input.files as Array<{ name: string; path?: string }>) || [
-      { name: 'demo_track.mp3', path: 'music/demo_track.mp3' },
-      { name: 'licensed_song.mp3', path: 'music/licensed_song.mp3' },
-    ];
+    // Parse input files - support both array of objects and array of strings
+    let files: Array<{ name: string; path?: string }> = [];
+    if (input.files && Array.isArray(input.files)) {
+      files = input.files.map((f) => {
+        if (typeof f === 'string') {
+          return { name: f, path: f };
+        }
+        return { name: f.name || String(f), path: f.path || f.name || String(f) };
+      });
+    }
 
+    // Default sample files if none provided
+    if (files.length === 0) {
+      files = [
+        { name: 'Runway_DEMO_watermark_preview.mp4', path: 'videos/Runway_DEMO_watermark_preview.mp4' },
+        { name: 'artlist_song_license.pdf', path: 'music/artlist_song_license.pdf' },
+        { name: 'final_master_v3.mov', path: 'videos/final_master_v3.mov' },
+        { name: 'motionarray_PREVIEW_template.aep', path: 'templates/motionarray_PREVIEW_template.aep' },
+      ];
+    }
+
+    // Step 2: Cassidy scans files
     const scanResult = await scanFilesForLicensing(cassidyContext, {
       projectId: project,
       files: files.map((f) => ({
@@ -273,13 +290,6 @@ async function runCompliancePath(
       })),
     });
 
-    proofMarkers.push(
-      createProofMarker('cassidy_execution', 'AGENT_OK', 'Cassidy completed licensing scan', {
-        suspicious_count: (scanResult.data as unknown[]).length,
-      })
-    );
-
-    // Step 2: Save results to assets table with licensing status
     const suspiciousFiles = (scanResult.data || []) as Array<{
       file_path: string;
       reason: string;
@@ -287,57 +297,122 @@ async function runCompliancePath(
       source: string;
     }>;
 
-    const savedAssets = [];
-    for (const file of suspiciousFiles) {
-      try {
-        const assetResult = await saveAssetMetadata(cassidyContext, {
-          project,
-          name: file.file_path,
-          type: file.inferred_type || 'unknown',
-          tags: ['compliance', 'suspicious', file.source],
-          metadata: {
-            reason: file.reason,
-            source: file.source,
-            licensing_status: 'unlicensed',
-          },
-        });
-        if (assetResult.notes?.asset) {
-          savedAssets.push(assetResult.notes.asset);
-        }
-      } catch (assetError) {
-        console.error('[Compliance Path] Failed to save asset:', assetError);
-        // Continue with other files
-      }
-    }
+    const flaggedCount = suspiciousFiles.length;
+    const cleanCount = files.length - flaggedCount;
 
     proofMarkers.push(
-      createProofMarker('letitia_save', 'DB_OK', 'Compliance results saved to assets', {
-        assets_saved: savedAssets.length,
+      createProofMarker('cassidy_execution', 'AGENT_OK', 'Cassidy completed licensing scan', {
+        total_files: files.length,
+        flagged_count: flaggedCount,
+        clean_count: cleanCount,
       })
     );
 
-    return createAgentResponse(
-      'cassidy',
-      'compliance_path',
-      scanResult.summary || `Compliance scan completed: ${suspiciousFiles.length} suspicious files found`,
-      {
-        artifacts: suspiciousFiles.map((f) => ({
-          type: 'metadata' as const,
-          content: JSON.stringify(f),
-          metadata: f,
-        })),
-        warnings:
-          suspiciousFiles.length > 0
-            ? [`Found ${suspiciousFiles.length} potentially unlicensed assets`]
-            : undefined,
-        proof: proofMarkers,
-        metadata: {
-          scan_summary: scanResult.summary,
-          suspicious_count: suspiciousFiles.length,
-        },
-      }
+    // Step 3: Always save scan result to compliance_scans table
+    const scanOutput = {
+      flagged: suspiciousFiles,
+      clean: files.filter((f) => !suspiciousFiles.some((sf) => sf.file_path === (f.path || f.name))),
+      counts: {
+        total: files.length,
+        flagged: flaggedCount,
+        clean: cleanCount,
+      },
+      summary: scanResult.summary,
+    };
+
+    const { error: scanSaveError } = await supabase.from('compliance_scans').insert({
+      project,
+      input_files_json: files,
+      output_json: scanOutput,
+      flagged_count: flaggedCount,
+      clean_count: cleanCount,
+      user_id: userId,
+      agent_source: 'cassidy',
+      metadata: {
+        scenario: 'compliance',
+        scan_timestamp: new Date().toISOString(),
+      },
+    });
+
+    if (scanSaveError) {
+      throw new Error(`Failed to save compliance scan: ${scanSaveError.message}`);
+    }
+
+    proofMarkers.push(
+      createProofMarker('compliance_scan_save', 'DB_OK', 'Compliance scan saved to compliance_scans table', {
+        flagged_count: flaggedCount,
+        clean_count: cleanCount,
+      })
     );
+
+    // Step 4: Optionally save flagged files as assets (only if asset_id is provided in input)
+    const savedAssets = [];
+    if (input.asset_id && suspiciousFiles.length > 0) {
+      proofMarkers.push(createProofMarker('letitia_route', 'ROUTE_OK', 'Saving flagged files as assets via Letitia'));
+
+      for (const file of suspiciousFiles) {
+        try {
+          const assetResult = await saveAssetMetadata(cassidyContext, {
+            project,
+            name: file.file_path,
+            type: file.inferred_type || 'unknown',
+            tags: ['compliance', 'suspicious', file.source],
+            metadata: {
+              reason: file.reason,
+              source: file.source,
+              licensing_status: 'unlicensed',
+            },
+          });
+          if (assetResult.notes?.asset) {
+            savedAssets.push(assetResult.notes.asset);
+          }
+        } catch (assetError) {
+          console.error('[Compliance Path] Failed to save asset:', assetError);
+          // Continue with other files
+        }
+      }
+
+      if (savedAssets.length > 0) {
+        proofMarkers.push(
+          createProofMarker('letitia_save', 'DB_OK', 'Flagged files saved as assets', {
+            assets_saved: savedAssets.length,
+          })
+        );
+      }
+    }
+
+    proofMarkers.push(createProofMarker('compliance_complete', 'DONE', 'Compliance path completed successfully'));
+
+    // Build output message
+    const outputMessage =
+      flaggedCount > 0
+        ? `Compliance scan completed: ${flaggedCount} file(s) flagged, ${cleanCount} file(s) clean. ${scanResult.summary}`
+        : `Compliance scan completed: All ${files.length} file(s) are clean. No licensing issues detected.`;
+
+    return createAgentResponse('cassidy', 'scanFilesForLicensing', outputMessage, {
+      artifacts: suspiciousFiles.map((f) => ({
+        type: 'metadata' as const,
+        content: JSON.stringify(f),
+        metadata: f,
+      })),
+      warnings:
+        flaggedCount > 0 ? [`Found ${flaggedCount} potentially unlicensed asset(s) requiring attention`] : undefined,
+      proof: proofMarkers,
+      metadata: {
+        scan_summary: scanResult.summary,
+        flagged_count: flaggedCount,
+        clean_count: cleanCount,
+        total_files: files.length,
+        assets_saved: savedAssets.length,
+        scan_saved: true,
+      },
+    });
   } catch (error) {
+    proofMarkers.push(
+      createProofMarker('compliance_error', 'ERROR', `Error in compliance path: ${(error as Error).message}`, {
+        step: 'compliance_execution',
+      })
+    );
     return createAgentError(
       'COMPLIANCE_PATH_ERROR',
       (error as Error).message,
