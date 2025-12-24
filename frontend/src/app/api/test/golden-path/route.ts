@@ -415,8 +415,7 @@ async function runDistributionPath(
               scenario: 'distribution',
               generated_at: new Date().toISOString(),
             },
-          })
-          .select();
+          });
 
         if (!error && data && data.length > 0) {
           savedPosts.push(data[0]);
@@ -437,8 +436,7 @@ async function runDistributionPath(
             scenario: 'distribution',
             raw_output: jamalResult.output,
           },
-        })
-        .select();
+        });
       if (!error && data && data.length > 0) {
         savedPosts.push(data[0]);
       }

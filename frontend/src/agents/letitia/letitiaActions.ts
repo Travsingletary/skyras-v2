@@ -40,7 +40,7 @@ export async function saveAssetMetadata(context: AgentExecutionContext, input: S
     licensing_status: (input.metadata?.licensing_status as string) || 'unknown',
     agent_source: 'letitia',
   };
-  const { data, error } = await context.supabase.from("assets").insert(record).select();
+  const { data, error } = await context.supabase.from("assets").insert(record);
   if (error) {
     throw new Error(`Failed to save asset: ${error.message}`);
   }
