@@ -73,10 +73,23 @@ export async function POST(request: NextRequest) {
     // Get file extension
     const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
 
+    // Validate projectId is a valid UUID (if provided)
+    // project_id must be a UUID, not a conversation ID or other string
+    let validProjectId: string | undefined = undefined;
+    if (projectId) {
+      // Check if it's a valid UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(projectId)) {
+        validProjectId = projectId;
+      } else {
+        console.warn(`[Confirm] Invalid projectId format (not a UUID): ${projectId}. Ignoring.`);
+      }
+    }
+
     // Save file metadata to database
     const fileRecord = await filesDb.create({
       user_id: userId,
-      project_id: projectId || undefined,
+      project_id: validProjectId,
       original_name: fileName,
       storage_path: path,
       public_url: publicUrl,

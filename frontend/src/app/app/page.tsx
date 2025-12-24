@@ -563,11 +563,14 @@ export default function Home() {
         console.log(`[Upload] Starting direct upload of ${filesToUpload.length} file(s)...`);
         try {
           // Use direct upload to avoid Vercel function payload limits
+          // Note: projectId must be a valid UUID, not a conversation ID
+          // For now, we don't associate files with projects via conversationId
           const { successful, failed } = await uploadFilesDirect(
             filesToUpload,
             userId,
             {
-              projectId: conversationId || undefined,
+              // Don't pass conversationId as projectId - it's not a valid UUID
+              // projectId: undefined, // Files are not associated with projects for now
               onFileComplete: (index, result) => {
                 console.log(`[Upload] File ${index + 1}/${filesToUpload.length} complete:`, result?.name);
               },
