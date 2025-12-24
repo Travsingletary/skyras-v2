@@ -50,14 +50,27 @@ export async function POST(request: NextRequest) {
 
     // Initialize Supabase client with service role key
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    // Support both old and new env var names for the service key
+    const supabaseServiceKey =
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('[Sign] Supabase credentials not configured');
+    if (!supabaseUrl) {
+      console.error('[Sign] SUPABASE_URL not configured');
       return NextResponse.json(
         {
           success: false,
-          error: 'Storage not configured. Please contact administrator.',
+          error: 'Storage not configured: SUPABASE_URL is missing',
+        },
+        { status: 503 }
+      );
+    }
+
+    if (!supabaseServiceKey) {
+      console.error('[Sign] Supabase service key not configured (neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_SECRET_KEY is set)');
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Storage not configured: SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is required',
         },
         { status: 503 }
       );

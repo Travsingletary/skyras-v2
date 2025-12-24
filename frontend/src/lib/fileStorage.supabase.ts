@@ -82,48 +82,14 @@ export async function saveFile(
   userId: string,
   fileId?: string
 ): Promise<{ fileId: string; path: string; url: string; originalName: string }> {
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileStorage.supabase.ts:79',message:'saveFile entry',data:{originalName,userId,fileId,bufferSize:buffer.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
-  
   const supabase = getSupabaseStorageClient();
 
   if (!supabase) {
-    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const hasAnonKey = !!process.env.SUPABASE_ANON_KEY;
-    const hasUrl = !!process.env.SUPABASE_URL;
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileStorage.supabase.ts:88',message:'Client null',data:{hasUrl,hasServiceKey,hasAnonKey},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
-    
-    console.error('[Storage] Supabase client not initialized:', {
-      hasUrl,
-      hasServiceKey,
-      hasAnonKey,
-    });
-    
-    throw new Error(
-      `Supabase client not initialized. Check environment variables: ` +
-      `SUPABASE_URL=${hasUrl ? '✓' : '✗'}, ` +
-      `SUPABASE_SERVICE_ROLE_KEY=${hasServiceKey ? '✓' : '✗'}, ` +
-      `SUPABASE_ANON_KEY=${hasAnonKey ? '✓' : '✗'}`
-    );
+    throw new Error('Supabase client not initialized. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_SECRET_KEY environment variables.');
   }
 
   const id = fileId || generateFileId();
   const storagePath = getStoragePath(userId, id, originalName);
-
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileStorage.supabase.ts:107',message:'Before upload',data:{bucket:STORAGE_BUCKET,path:storagePath,size:buffer.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
-  // #endregion
-
-  console.log('[Storage] Attempting upload:', {
-    bucket: STORAGE_BUCKET,
-    path: storagePath,
-    size: buffer.length,
-    hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-  });
 
   // Upload to Supabase Storage
   const { data, error } = await supabase.storage
@@ -133,19 +99,8 @@ export async function saveFile(
       upsert: false, // Don't overwrite existing files
     });
 
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileStorage.supabase.ts:123',message:'Upload result',data:{hasError:!!error,errorMessage:error?.message,statusCode:(error as any)?.statusCode,hasData:!!data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
-
   if (error) {
-    console.error('[Storage] Upload error:', {
-      message: error.message,
-      statusCode: (error as any).statusCode,
-      error: error,
-      bucket: STORAGE_BUCKET,
-      path: storagePath,
-    });
-    throw new Error(`Failed to upload file to Supabase: ${error.message} (Status: ${(error as any).statusCode || 'unknown'})`);
+    throw new Error(`Failed to upload file to Supabase: ${error.message}`);
   }
 
   // Get public URL
@@ -287,30 +242,15 @@ export async function isStorageConfigured(): Promise<boolean> {
   const supabase = getSupabaseStorageClient();
 
   if (!supabase) {
-    console.error('[Storage Config] Supabase client is null');
     return false;
   }
 
   try {
     // Try to list buckets to verify connection
-    // Note: listBuckets might require service role key
     const { data, error } = await supabase.storage.listBuckets();
 
     if (error) {
-      console.error('[Storage Config] Bucket list failed:', {
-        message: error.message,
-        statusCode: (error as any).statusCode,
-        // Don't fail the check if it's just a permission issue - bucket might still exist
-      });
-      
-      // If we can't list buckets, assume bucket exists if we have the right keys
-      // This is a fallback for when anon key doesn't have list permission
-      const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
-      if (hasServiceKey) {
-        console.log('[Storage Config] Cannot list buckets, but service role key is set - assuming bucket exists');
-        return true;
-      }
-      
+      console.error('Supabase storage check failed:', error);
       return false;
     }
 
@@ -318,14 +258,13 @@ export async function isStorageConfigured(): Promise<boolean> {
     const bucketExists = data?.some(bucket => bucket.name === STORAGE_BUCKET);
 
     if (!bucketExists) {
-      console.warn(`[Storage Config] Storage bucket '${STORAGE_BUCKET}' does not exist. Please create it in Supabase dashboard.`);
+      console.warn(`Storage bucket '${STORAGE_BUCKET}' does not exist. Please create it in Supabase dashboard.`);
       return false;
     }
 
-    console.log('[Storage Config] Bucket exists and is accessible');
     return true;
   } catch (error) {
-    console.error('[Storage Config] Configuration error:', error);
+    console.error('Supabase storage configuration error:', error);
     return false;
   }
 }
