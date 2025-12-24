@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check file size limit (50MB default)
-    const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+    // Check file size limit (100MB - matches fileStorage.supabase.ts)
+    const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
     if (fileSize > MAX_FILE_SIZE) {
       return NextResponse.json(
         {
