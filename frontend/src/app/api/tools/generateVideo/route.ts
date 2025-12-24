@@ -144,7 +144,8 @@ export async function POST(request: NextRequest) {
 
     // Download and store video in Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    // Support both old and new env var names for the service key
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
 
     let storedVideoUrl = videoUrl;
     let thumbnailUrl = '';

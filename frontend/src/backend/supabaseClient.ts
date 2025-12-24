@@ -138,7 +138,10 @@ export function getSupabaseClient(): SupabaseClientLike {
   if (cachedClient) return cachedClient;
 
   const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+  // Support both old and new variable names (consistent with getSupabaseStorageClient)
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  const anonKey = process.env.SUPABASE_ANON_KEY;
+  const key = serviceKey || anonKey;
 
   if (url && key) {
     const client = createClient(url, key, { auth: { persistSession: false } });
