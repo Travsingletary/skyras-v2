@@ -1,0 +1,22 @@
+[
+  {
+    "fileName": "main-overview.mdc",
+    "description": "Complete system overview focusing on the multi-agent architecture, workflow orchestration, and key components of the content creation platform"
+  },
+  {
+    "fileName": "agent-orchestration-system.mdc",
+    "description": "Detailed documentation of the agent-based workflow system, including agent roles (Marcus, Giorgio, Cassidy, Jamal, Letitia), delegation patterns, and inter-agent communication flows"
+  },
+  {
+    "fileName": "workflow-engine.mdc",
+    "description": "Technical specification of the workflow engine, including task dependencies, state machine implementation, parallel execution management, and auto-execution algorithms"
+  },
+  {
+    "fileName": "content-processing-pipeline.mdc",
+    "description": "Documentation of the multi-modal content processing system, including file type detection, workflow suggestion algorithms, and processing rules for different content types"
+  },
+  {
+    "fileName": "creative-generation-algorithms.mdc",
+    "description": "Detailed documentation of creative content generation algorithms, including AI integration, template systems, and multi-modal content generation pipelines"
+  }
+]

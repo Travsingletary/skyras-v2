@@ -106,7 +106,7 @@ Your frontend is in the `frontend/` directory. Vercel will deploy from there.
 
 **Environment Variables** (Add these in Vercel dashboard):
 ```
-NEXT_PUBLIC_API_BASE_URL=https://your-backend-url.onrender.com
+   NEXT_PUBLIC_API_BASE_URL=https://your-railway-backend-url.up.railway.app
 NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025
 SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -175,7 +175,7 @@ If you need to change `NEXT_PUBLIC_API_BASE_URL` after deployment:
 #### ✅ Backend Connection
 - [ ] Open browser DevTools → Network tab
 - [ ] Send a message in chat
-- [ ] Verify request goes to: `https://your-backend-url.onrender.com/api/chat`
+- [ ] Verify request goes to: `https://your-railway-backend-url.up.railway.app/api/chat`
 - [ ] Response received successfully
 
 #### ✅ Supabase Integration
@@ -232,7 +232,7 @@ They'll need the access code: `PICOSQUAD2025`
 ### Frontend (Vercel)
 
 **Required:**
-- [ ] `NEXT_PUBLIC_API_BASE_URL=https://your-backend-url.onrender.com`
+- [ ] `NEXT_PUBLIC_API_BASE_URL=https://your-railway-backend-url.up.railway.app`
 - [ ] `NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025`
 - [ ] `SUPABASE_URL=https://...supabase.co`
 - [ ] `SUPABASE_ANON_KEY=eyJ...`
@@ -266,7 +266,7 @@ They'll need the access code: `PICOSQUAD2025`
 ### Frontend Issues
 
 **API calls failing:**
-- Verify `NEXT_PUBLIC_API_BASE_URL` is set correctly
+- Verify `NEXT_PUBLIC_API_BASE_URL` points to Railway backend
 - Check it points to your Render backend URL (not localhost)
 - Check browser console for CORS or network errors
 
@@ -349,7 +349,7 @@ curl https://your-app.vercel.app/
 2. **Environment variables** - Must be set in both Render and Vercel dashboards
 3. **Root directory** - Vercel must have `frontend` set as root directory
 4. **Access code** - Set to `PICOSQUAD2025` in Vercel env vars
-5. **Backend URL** - Update `NEXT_PUBLIC_API_BASE_URL` after Render deployment
+5. **Backend URL** - Update `NEXT_PUBLIC_API_BASE_URL` after Railway deployment
 
 ---
 

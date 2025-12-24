@@ -51,4 +51,9 @@ uploads/
 frontend/uploads/
 .vercel
 
+# Firebase service account (contains sensitive credentials)
+config/firebase-service-account.json
+*-firebase-adminsdk-*.json
+firebase-service-account*.json
+
 Supabase 

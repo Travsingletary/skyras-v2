@@ -1,33 +1,29 @@
 # Deploy SkyRas v2 - Step-by-Step Script
 
-## SECTION 1: BACKEND DEPLOYMENT (Render)
+## SECTION 1: BACKEND DEPLOYMENT (Railway)
 
-### Step 1: Go to Render
-1. Open https://render.com in your browser
-2. Click **"Get Started"** or **"Sign In"** (use GitHub to sign in)
+### Step 1: Go to Railway
+1. Open https://railway.app in your browser
+2. Click **"Start a New Project"** or **"Sign In"** (use GitHub to sign in)
 
-### Step 2: Create New Web Service
-1. Once logged in, click the **"New +"** button (top right)
-2. Click **"Web Service"** from the dropdown
+### Step 2: Create New Project
+1. Once logged in, click **"New Project"**
+2. Click **"Deploy from GitHub repo"**
 
 ### Step 3: Connect Repository
 1. You'll see "Connect a repository"
-2. Click **"Connect account"** if you haven't connected GitHub yet
-3. Authorize Render to access your GitHub
+2. Click **"Configure GitHub App"** if you haven't connected GitHub yet
+3. Authorize Railway to access your GitHub
 4. Select your repository: `skyras-v2` (or whatever your repo is named)
-5. Click **"Connect"**
+5. Click **"Deploy Now"**
 
 ### Step 4: Configure Service Settings
 
 **Basic Settings:**
-- **Name**: Type `skyras-backend` (or your choice)
-- **Region**: Choose closest to you (e.g., "Oregon (US West)")
-- **Branch**: Select `main` (or your default branch)
+- Railway auto-detects Node.js projects
 - **Root Directory**: Leave **empty** (deploy from repo root)
-- **Runtime**: Select `Node`
-- **Build Command**: Type `npm install`
-- **Start Command**: Type `npm start`
-- **Plan**: Select **"Free"** (or "Starter" for $7/month always-on)
+- **Branch**: Select `main` (or your default branch)
+- **Start Command**: Set to `npm start` in service settings (Railway auto-detects this)
 
 **Environment Variables:**
 Click **"Add Environment Variable"** and add these one by one:
@@ -133,7 +129,7 @@ Click **"Add"** and add these:
 
 ```
 Key: NEXT_PUBLIC_API_BASE_URL
-Value: https://your-backend-url.onrender.com
+Value: https://your-railway-backend-url.up.railway.app
 ```
 *(Replace with your actual Render backend URL from Section 1, Step 6)*
 
@@ -213,7 +209,7 @@ Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6
 - [ ] Open browser DevTools (F12)
 - [ ] Go to **"Network"** tab
 - [ ] Send a message in chat
-- [ ] Look for request to: `https://your-backend-url.onrender.com/api/chat`
+- [ ] Look for request to: `https://your-railway-backend-url.up.railway.app/api/chat`
 - [ ] Request should show status `200` (success)
 - [ ] Response should contain Marcus's message
 - [ ] ✅ **If you see this, backend connection works!**
@@ -304,8 +300,8 @@ Marcus asks you 5 quick questions about your work, then builds a personalized we
 
 **Backend not responding?**
 - Wait 30 seconds (free tier cold start)
-- Check Render logs: Render dashboard → Your service → Logs
-- Verify health endpoint: `https://your-backend-url.onrender.com/health`
+- Check Railway logs: Railway dashboard → Your service → Deployments → View logs
+- Verify health endpoint: `https://your-railway-backend-url.up.railway.app/health`
 
 **Frontend build failed?**
 - Check Vercel build logs: Vercel dashboard → Your project → Deployments → Click latest → View build logs
@@ -316,7 +312,7 @@ Marcus asks you 5 quick questions about your work, then builds a personalized we
 - Clear browser localStorage and try again
 
 **API calls failing?**
-- Check `NEXT_PUBLIC_API_BASE_URL` points to your Render backend URL
+- Check `NEXT_PUBLIC_API_BASE_URL` points to your Railway backend URL
 - Check browser console for CORS errors
 - Verify backend is running (test health endpoint)
 
@@ -324,7 +320,7 @@ Marcus asks you 5 quick questions about your work, then builds a personalized we
 
 ## ✅ DEPLOYMENT COMPLETE CHECKLIST
 
-- [ ] Backend deployed to Render
+- [ ] Backend deployed to Railway
 - [ ] Backend health check passes
 - [ ] Frontend deployed to Vercel
 - [ ] Frontend landing page loads

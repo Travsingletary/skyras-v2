@@ -15,7 +15,7 @@
 - [ ] All routes properly handle errors
 - [ ] Supabase client initializes correctly
 - [ ] CORS middleware enabled
-- [ ] PORT uses process.env.PORT (Render sets this)
+- [ ] PORT uses process.env.PORT (Railway sets this)
 
 ## ✅ Frontend Readiness
 
@@ -37,7 +37,7 @@
 
 ## ✅ Environment Variables
 
-### Backend (Render)
+### Backend (Railway)
 - [ ] PORT=4000
 - [ ] NODE_ENV=production
 - [ ] OPENAI_API_KEY
@@ -47,7 +47,7 @@
 - [ ] ELEVENLABS_API_KEY (if using voice)
 
 ### Frontend (Vercel)
-- [ ] NEXT_PUBLIC_API_BASE_URL (will set after Render deploy)
+- [ ] NEXT_PUBLIC_API_BASE_URL (will set after Railway deploy)
 - [ ] NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025
 - [ ] SUPABASE_URL
 - [ ] SUPABASE_ANON_KEY
@@ -65,7 +65,7 @@
 
 - [ ] All changes committed
 - [ ] Pushed to GitHub
-- [ ] Repository is connected to Render/Vercel
+- [ ] Repository is connected to Railway/Vercel
 
 ## ✅ Documentation
 

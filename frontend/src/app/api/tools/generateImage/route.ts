@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseClient, getSupabaseStorageClient } from "@/backend/supabaseClient";
-import { executeCreate, executeEdit } from "@/backend/imageProviders/sdxlAdapter";
+import { executeCreate, executeEdit } from "@/backend/imageProviders/router";
 
 // Normalize supported actions
 export type GenerateImageAction = "create" | "edit";

@@ -2,85 +2,26 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-
-interface WorkflowTask {
-  id: string;
-  workflow_id: string;
-  title: string;
-  description: string;
-  agent_name: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
-  priority: number;
-  dependencies: string[];
-  results: Record<string, any>;
-  started_at?: string;
-  completed_at?: string;
-  created_at: string;
-}
-
-interface Workflow {
-  id: string;
-  user_id: string;
-  name: string;
-  type: string;
-  status: 'active' | 'completed' | 'cancelled';
-  plan_markdown?: string;
-  metadata: Record<string, any>;
-  created_at: string;
-  updated_at: string;
-  tasks?: WorkflowTask[];
-}
+import { useWorkflowsRealtime } from '@/hooks/useWorkflowsRealtime';
+import type { Workflow, WorkflowTask } from '@/types/database';
 
 export default function WorkflowsPage() {
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // CRITICAL: Initialize to 'public' immediately so API calls use correct userId from first render
-  const [userId] = useState<string>('public');
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
-    // HARD RULE: Use 'public' as userId until user scoping is complete
-    const standardUserId = 'public';
-
-    // Force clear old userId if it's different from localStorage (only in browser)
-    if (typeof window !== 'undefined') {
-      const existingUserId = localStorage.getItem('userId');
-      if (existingUserId && existingUserId !== standardUserId) {
-        console.log('[Workflows] Clearing old userId:', existingUserId, '→', standardUserId);
-        localStorage.removeItem('userId');
-      }
-      localStorage.setItem('userId', standardUserId);
+    const storedUserId = localStorage.getItem('userId');
+    if (storedUserId) {
+      setUserId(storedUserId);
+    } else {
+      // Generate a userId if one doesn't exist
+      const newUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('userId', newUserId);
+      setUserId(newUserId);
     }
   }, []);
 
-  useEffect(() => {
-    if (!userId) return;
-
-    async function fetchWorkflows() {
-      try {
-        setLoading(true);
-        const res = await fetch(`/api/workflows?userId=${userId}`);
-        const data = await res.json();
-
-        if (data.success) {
-          setWorkflows(data.data.workflows || []);
-        } else {
-          setError(data.error || 'Failed to fetch workflows');
-        }
-      } catch (err) {
-        setError('Network error fetching workflows');
-        console.error('Error fetching workflows:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchWorkflows();
-
-    // Refresh every 5 seconds
-    const interval = setInterval(fetchWorkflows, 5000);
-    return () => clearInterval(interval);
-  }, [userId]);
+  // Use real-time hook instead of polling
+  const { workflows, loading, error } = useWorkflowsRealtime(userId);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -179,18 +120,36 @@ export default function WorkflowsPage() {
         </div>
 
         {/* Workflows List */}
-        {workflows.length === 0 ? (
+        {workflows.length === 0 && !loading ? (
           <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
             <div className="text-6xl mb-4">📋</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">No workflows yet</h3>
             <p className="text-gray-600 mb-6">
-              Upload files in the Studio to get AI-powered workflow suggestions
+              {userId ? (
+                <>No workflows found for your account. Ask Marcus to create a workflow, or upload files in the Studio.</>
+              ) : (
+                <>Please start a conversation with Marcus first to get a user ID.</>
+              )}
             </p>
-            <Link
-              href="/studio"
-              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Go to Studio
+            <div className="flex gap-3 justify-center">
+              <Link
+                href="/app"
+                className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Chat with Marcus
+              </Link>
+              <Link
+                href="/studio"
+                className="inline-block px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Go to Studio
+              </Link>
+            </div>
+            {userId && (
+              <p className="text-xs text-gray-500 mt-4">
+                User ID: {userId}
+              </p>
+            )}
             </Link>
           </div>
         ) : (

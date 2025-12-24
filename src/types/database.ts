@@ -16,6 +16,10 @@ export type AgentName = 'marcus' | 'giorgio' | 'cassidy' | 'jamal' | 'letitia';
 export type CalendarProvider = 'google' | 'outlook' | 'apple';
 export type SyncStatus = 'synced' | 'pending' | 'failed';
 
+export type PlanStatus = 'draft' | 'approved' | 'rejected';
+export type BlockSyncStatus = 'pending' | 'synced' | 'failed' | 'conflict';
+export type DeviceType = 'web' | 'ios' | 'android';
+
 // ============================================================================
 // PROJECT
 // ============================================================================
@@ -162,6 +166,94 @@ export interface CalendarEventInsert extends Omit<CalendarEvent, 'id' | 'created
 export interface CalendarEventUpdate extends Partial<Omit<CalendarEvent, 'id' | 'created_at' | 'user_id'>> {}
 
 // ============================================================================
+// DAILY PLAN
+// ============================================================================
+export interface DailyPlan {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  plan_date: string; // DATE type from Postgres
+  daily_brief?: string;
+  minimum_day_fallback?: string;
+  status: PlanStatus;
+  metadata: Record<string, any>;
+}
+
+export interface DailyPlanInsert extends Omit<DailyPlan, 'id' | 'created_at' | 'updated_at'> {
+  id?: string;
+}
+
+export interface DailyPlanUpdate extends Partial<Omit<DailyPlan, 'id' | 'created_at' | 'user_id' | 'plan_date'>> {}
+
+// ============================================================================
+// DAILY PLAN BLOCK
+// ============================================================================
+export interface DailyPlanBlock {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  plan_id: string;
+  start_time: string;
+  end_time: string;
+  title: string;
+  description?: string;
+  task_ids: string[]; // Array of UUIDs
+  google_event_id?: string;
+  sync_status: BlockSyncStatus;
+  has_conflict: boolean;
+  alternate_slots: Array<{ start_time: string; end_time: string }>;
+  metadata: Record<string, any>;
+}
+
+export interface DailyPlanBlockInsert extends Omit<DailyPlanBlock, 'id' | 'created_at' | 'updated_at'> {
+  id?: string;
+}
+
+export interface DailyPlanBlockUpdate extends Partial<Omit<DailyPlanBlock, 'id' | 'created_at' | 'plan_id'>> {}
+
+// ============================================================================
+// GOOGLE OAUTH TOKEN
+// ============================================================================
+export interface GoogleOAuthToken {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  access_token_encrypted: string;
+  refresh_token_encrypted: string;
+  token_expires_at: string;
+  scope: string;
+  metadata: Record<string, any>;
+}
+
+export interface GoogleOAuthTokenInsert extends Omit<GoogleOAuthToken, 'id' | 'created_at' | 'updated_at'> {
+  id?: string;
+}
+
+export interface GoogleOAuthTokenUpdate extends Partial<Omit<GoogleOAuthToken, 'id' | 'created_at' | 'user_id'>> {}
+
+// ============================================================================
+// PUSH NOTIFICATION TOKEN
+// ============================================================================
+export interface PushNotificationToken {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  user_id: string;
+  fcm_token: string;
+  device_type: DeviceType;
+  is_active: boolean;
+  metadata: Record<string, any>;
+}
+
+export interface PushNotificationTokenInsert extends Omit<PushNotificationToken, 'id' | 'created_at' | 'updated_at'> {
+  id?: string;
+}
+
+export interface PushNotificationTokenUpdate extends Partial<Omit<PushNotificationToken, 'id' | 'created_at' | 'user_id' | 'fcm_token'>> {}
+
+// ============================================================================
 // HELPER TYPES
 // ============================================================================
 
@@ -184,4 +276,9 @@ export interface FileWithProcessing extends File {
 // Task with calendar event
 export interface TaskWithCalendar extends WorkflowTask {
   calendar_event?: CalendarEvent;
+}
+
+// Daily plan with blocks populated
+export interface DailyPlanWithBlocks extends DailyPlan {
+  blocks: DailyPlanBlock[];
 }

@@ -23,17 +23,16 @@ The backend already loads `ELEVENLABS_API_KEY` from `process.env` and uses it in
 
 ## Deployment Configuration
 
-### Render (Backend)
+### Railway (Backend)
 
-1. Go to your Render dashboard: https://dashboard.render.com
+1. Go to your Railway dashboard: https://railway.app/dashboard
 2. Select your **SkyRas backend** service
-3. Navigate to **Environment** → **Environment Variables**
-4. Click **Add Environment Variable**
+3. Navigate to **Variables** tab
+4. Click **New Variable**
 5. Add:
    - **Key**: `ELEVENLABS_API_KEY`
    - **Value**: `<your real key>`
-6. Click **Save Changes**
-7. Render will automatically redeploy your service
+6. Railway will automatically redeploy your service
 
 ### Vercel (Frontend)
 
@@ -114,7 +113,7 @@ Once `ELEVENLABS_API_KEY` is configured:
 
 ### Voice not working in production
 - **Vercel**: Environment variables are only available at build time for `NEXT_PUBLIC_*` variables
-- Since `ELEVENLABS_API_KEY` is used by the backend, make sure it's set in **Render**, not Vercel
+- Since `ELEVENLABS_API_KEY` is used by the backend, make sure it's set in **Railway**, not Vercel
 - The frontend calls the backend API, so the key only needs to be in the backend environment
 
 ## API Key Location

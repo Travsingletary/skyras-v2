@@ -13,6 +13,7 @@ import {
   generateSoraPrompt,
   generateRunwayVideo,
   generateScriptOutline,
+  generateImage,
   type CreativeInput,
 } from "./giorgioActions";
 
@@ -31,6 +32,7 @@ const PROMPT = loadPrompt();
 type GiorgioAction =
   | "generateSoraPrompt"
   | "generateRunwayVideo"
+  | "generateImage"
   | "generateScriptOutline"
   | "generateSceneBeats"
   | "generateCharacterSheet"
@@ -63,6 +65,8 @@ export class GiorgioAgent extends BaseAgent {
         return generateSoraPrompt(context, payload);
       case "generateRunwayVideo":
         return generateRunwayVideo(context, payload);
+      case "generateImage":
+        return generateImage(context, payload);
       case "generateScriptOutline":
         return generateScriptOutline(context, payload);
       case "generateSceneBeats":

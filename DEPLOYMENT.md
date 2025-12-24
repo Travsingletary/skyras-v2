@@ -2,16 +2,17 @@
 
 ## Recommended Hosting Combo
 
-**Render (Backend) + Vercel (Frontend)**
+**Railway (Backend) + Vercel (Frontend)**
 
 ### Why This Combo?
 
-- **Render**: 
+- **Railway**: 
   - Excellent for Express/Node.js backends
-  - Free tier available (with limitations)
+  - Free tier includes $5/month credit
   - Simple deployment from GitHub
   - Automatic HTTPS
   - Environment variable management
+  - Services stay active (no sleep mode)
   - Good for APIs and background services
 
 - **Vercel**:
@@ -21,8 +22,6 @@
   - Edge network for fast global access
   - Zero-config for Next.js
   - Built-in environment variable management
-
-**Alternative**: Railway (Backend) + Vercel (Frontend) - Railway has a simpler free tier but Render is more established.
 
 ---
 
@@ -40,28 +39,26 @@ See `frontend/.env.local.example`
 
 ## Step-by-Step Deployment
 
-### Part 1: Deploy Express Backend to Render
+### Part 1: Deploy Express Backend to Railway
 
 1. **Prepare Repository**
    - Ensure `server.js` is in root
    - Create `package.json` with start script: `"start": "node server.js"`
    - Commit and push to GitHub
 
-2. **Create Render Service**
-   - Go to https://render.com
+2. **Create Railway Service**
+   - Go to https://railway.app
    - Sign up/login with GitHub
-   - Click "New +" → "Web Service"
+   - Click "New Project" → "Deploy from GitHub repo"
    - Connect your GitHub repository
    - Select the repository
 
 3. **Configure Service**
-   - **Name**: `skyras-backend` (or your choice)
-   - **Environment**: Node
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
-   - **Plan**: Free (or paid if needed)
+   - Railway auto-detects Node.js projects
+   - **Start Command**: Set to `npm start` in service settings
+   - Railway automatically runs `npm install` during build
 
-4. **Set Environment Variables** (in Render dashboard)
+4. **Set Environment Variables** (in Railway dashboard)
    ```
    PORT=4000
    OPENAI_API_KEY=your_openai_key
@@ -72,11 +69,11 @@ See `frontend/.env.local.example`
    ```
 
 5. **Deploy**
-   - Click "Create Web Service"
+   - Railway automatically deploys after connecting repo
    - Wait for build and deployment
-   - Note the service URL (e.g., `https://skyras-backend.onrender.com`)
+   - Note the service URL (e.g., `https://your-service-name.up.railway.app`)
 
-6. **Important**: Render free tier services spin down after 15min inactivity. Consider:
+6. **Important**: Railway free tier includes $5/month credit. Services stay active:
    - Upgrading to paid tier for always-on
    - Or use Railway (better free tier for always-on)
 
@@ -105,7 +102,7 @@ See `frontend/.env.local.example`
    
    **Required:**
    ```
-   NEXT_PUBLIC_API_BASE_URL=https://skyras-backend.onrender.com
+   NEXT_PUBLIC_API_BASE_URL=https://your-railway-backend-url.up.railway.app
    NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025
    SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
    SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6eGVkaXhwYnZpdnBzbnp0anNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODkyMTksImV4cCI6MjA3ODk2NTIxOX0.xDUS_lPMxQvI-J1ZaafWOhaAhqwRW-whr-PrYFQh1RQ
@@ -126,7 +123,7 @@ See `frontend/.env.local.example`
    - Note the deployment URL (e.g., `https://skyras.vercel.app`)
 
 6. **Update Backend URL**
-   - After deployment, update `NEXT_PUBLIC_API_BASE_URL` in Vercel to point to your Render backend URL
+   - After deployment, update `NEXT_PUBLIC_API_BASE_URL` in Vercel to point to your Railway backend URL
    - Redeploy if needed (Vercel auto-redeploys on env var changes)
 
 ---
@@ -135,7 +132,7 @@ See `frontend/.env.local.example`
 
 1. **Test Backend**
    ```bash
-   curl https://your-backend-url.onrender.com/health
+   curl https://your-railway-backend-url.up.railway.app/health
    # Should return: {"status":"ok","message":"SkyRas v2 Backend running"}
    ```
 
@@ -147,7 +144,7 @@ See `frontend/.env.local.example`
 3. **Test API Connection**
    - Open browser DevTools → Network tab
    - Send a test message
-   - Verify requests go to `https://your-backend-url.onrender.com/api/chat`
+   - Verify requests go to `https://your-railway-backend-url.up.railway.app/api/chat`
 
 ---
 
@@ -185,10 +182,10 @@ The frontend now includes a simple access code gate at `/` (Marcus Chat page).
 
 ## Cost Estimate (Free Tier)
 
-- **Render**: Free (with limitations) or $7/month for always-on
+- **Railway**: Free tier ($5/month credit) or paid plans available
 - **Vercel**: Free (generous limits)
 - **Supabase**: Free tier (500MB database, 1GB storage)
-- **Total**: $0-7/month depending on Render plan
+- **Total**: $0-5+/month depending on Railway usage
 
 ---
 
@@ -196,6 +193,6 @@ The frontend now includes a simple access code gate at `/` (Marcus Chat page).
 
 1. Test end-to-end: Send message, upload file, verify Supabase writes
 2. Share access code with friends
-3. Monitor Render/Vercel dashboards for errors
+3. Monitor Railway/Vercel dashboards for errors
 4. Set up basic monitoring/alerts if needed
 

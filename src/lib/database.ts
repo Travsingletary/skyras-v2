@@ -19,6 +19,18 @@ import type {
   CalendarEvent,
   CalendarEventInsert,
   CalendarEventUpdate,
+  DailyPlan,
+  DailyPlanInsert,
+  DailyPlanUpdate,
+  DailyPlanBlock,
+  DailyPlanBlockInsert,
+  DailyPlanBlockUpdate,
+  GoogleOAuthToken,
+  GoogleOAuthTokenInsert,
+  GoogleOAuthTokenUpdate,
+  PushNotificationToken,
+  PushNotificationTokenInsert,
+  PushNotificationTokenUpdate,
 } from '@/types/database';
 
 const supabase = getSupabaseClient();
@@ -311,5 +323,212 @@ export const calendarEventsDb = {
       { id }
     );
     if (error) throw new Error(`Failed to mark calendar event as failed: ${error.message || JSON.stringify(error)}`);
+  },
+};
+
+// ============================================================================
+// DAILY PLANS
+// ============================================================================
+
+export const dailyPlansDb = {
+  async create(plan: DailyPlanInsert): Promise<DailyPlan> {
+    const { data, error } = await supabase.from('daily_plans').insert(plan);
+    if (error) throw new Error(`Failed to create daily plan: ${error.message || JSON.stringify(error)}`);
+    return data[0] as DailyPlan;
+  },
+
+  async getById(id: string): Promise<DailyPlan | null> {
+    const { data, error } = await supabase.from('daily_plans').select({ id });
+    if (error) throw new Error(`Failed to get daily plan: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as DailyPlan) || null;
+  },
+
+  async getByUserAndDate(userId: string, planDate: string): Promise<DailyPlan | null> {
+    const { data, error } = await supabase.from('daily_plans').select({ user_id: userId, plan_date: planDate } as Record<string, unknown>);
+    if (error) throw new Error(`Failed to get daily plan by user and date: ${error.message || JSON.stringify(error)}`);
+    // Filter client-side since SupabaseClientLike may return all rows
+    const plans = (data as DailyPlan[]) || [];
+    return plans.find(p => p.user_id === userId && p.plan_date === planDate) || null;
+  },
+
+  async getByUserId(userId: string, limit?: number): Promise<DailyPlan[]> {
+    const { data, error } = await supabase.from('daily_plans').select({ user_id: userId } as Record<string, unknown>);
+    if (error) throw new Error(`Failed to get user daily plans: ${error.message || JSON.stringify(error)}`);
+    const plans = (data as DailyPlan[]) || [];
+    const filtered = plans.filter(p => p.user_id === userId);
+    // Sort by plan_date descending (most recent first)
+    filtered.sort((a, b) => new Date(b.plan_date).getTime() - new Date(a.plan_date).getTime());
+    return limit ? filtered.slice(0, limit) : filtered;
+  },
+
+  async update(id: string, updates: DailyPlanUpdate): Promise<DailyPlan> {
+    const { data, error } = await supabase.from('daily_plans').update(updates, { id });
+    if (error) throw new Error(`Failed to update daily plan: ${error.message || JSON.stringify(error)}`);
+    return data[0] as DailyPlan;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('daily_plans').delete({ id });
+    if (error) throw new Error(`Failed to delete daily plan: ${error.message || JSON.stringify(error)}`);
+  },
+
+  async approve(id: string): Promise<DailyPlan> {
+    return this.update(id, { status: 'approved' });
+  },
+
+  async reject(id: string): Promise<DailyPlan> {
+    return this.update(id, { status: 'rejected' });
+  },
+};
+
+// ============================================================================
+// DAILY PLAN BLOCKS
+// ============================================================================
+
+export const dailyPlanBlocksDb = {
+  async create(block: DailyPlanBlockInsert): Promise<DailyPlanBlock> {
+    const { data, error } = await supabase.from('daily_plan_blocks').insert(block);
+    if (error) throw new Error(`Failed to create daily plan block: ${error.message || JSON.stringify(error)}`);
+    return data[0] as DailyPlanBlock;
+  },
+
+  async createMany(blocks: DailyPlanBlockInsert[]): Promise<DailyPlanBlock[]> {
+    const { data, error } = await supabase.from('daily_plan_blocks').insert(blocks);
+    if (error) throw new Error(`Failed to create daily plan blocks: ${error.message || JSON.stringify(error)}`);
+    return data as DailyPlanBlock[];
+  },
+
+  async getById(id: string): Promise<DailyPlanBlock | null> {
+    const { data, error } = await supabase.from('daily_plan_blocks').select({ id });
+    if (error) throw new Error(`Failed to get daily plan block: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as DailyPlanBlock) || null;
+  },
+
+  async getByPlanId(planId: string): Promise<DailyPlanBlock[]> {
+    const { data, error } = await supabase.from('daily_plan_blocks').select({ plan_id: planId });
+    if (error) throw new Error(`Failed to get plan blocks: ${error.message || JSON.stringify(error)}`);
+    const blocks = (data as DailyPlanBlock[]) || [];
+    // Sort by start_time ascending
+    blocks.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    return blocks;
+  },
+
+  async update(id: string, updates: DailyPlanBlockUpdate): Promise<DailyPlanBlock> {
+    const { data, error } = await supabase.from('daily_plan_blocks').update(updates, { id });
+    if (error) throw new Error(`Failed to update daily plan block: ${error.message || JSON.stringify(error)}`);
+    return data[0] as DailyPlanBlock;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('daily_plan_blocks').delete({ id });
+    if (error) throw new Error(`Failed to delete daily plan block: ${error.message || JSON.stringify(error)}`);
+  },
+
+  async updateSyncStatus(id: string, syncStatus: 'pending' | 'synced' | 'failed' | 'conflict', googleEventId?: string): Promise<DailyPlanBlock> {
+    const updates: DailyPlanBlockUpdate = { sync_status: syncStatus };
+    if (googleEventId) {
+      updates.google_event_id = googleEventId;
+    }
+    return this.update(id, updates);
+  },
+
+  async deleteByPlanId(planId: string): Promise<void> {
+    const { error } = await supabase.from('daily_plan_blocks').delete({ plan_id: planId });
+    if (error) throw new Error(`Failed to delete blocks for plan: ${error.message || JSON.stringify(error)}`);
+  },
+};
+
+// ============================================================================
+// GOOGLE OAUTH TOKENS
+// ============================================================================
+
+export const googleOAuthTokensDb = {
+  async create(token: GoogleOAuthTokenInsert): Promise<GoogleOAuthToken> {
+    const { data, error } = await supabase.from('google_oauth_tokens').insert(token);
+    if (error) throw new Error(`Failed to create Google OAuth token: ${error.message || JSON.stringify(error)}`);
+    return data[0] as GoogleOAuthToken;
+  },
+
+  async getByUserId(userId: string): Promise<GoogleOAuthToken | null> {
+    const { data, error } = await supabase.from('google_oauth_tokens').select({ user_id: userId });
+    if (error) throw new Error(`Failed to get Google OAuth token: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as GoogleOAuthToken) || null;
+  },
+
+  async update(id: string, updates: GoogleOAuthTokenUpdate): Promise<GoogleOAuthToken> {
+    const { data, error } = await supabase.from('google_oauth_tokens').update(updates, { id });
+    if (error) throw new Error(`Failed to update Google OAuth token: ${error.message || JSON.stringify(error)}`);
+    return data[0] as GoogleOAuthToken;
+  },
+
+  async updateByUserId(userId: string, updates: GoogleOAuthTokenUpdate): Promise<GoogleOAuthToken> {
+    const { data, error } = await supabase.from('google_oauth_tokens').update(updates, { user_id: userId });
+    if (error) throw new Error(`Failed to update Google OAuth token by user: ${error.message || JSON.stringify(error)}`);
+    return data[0] as GoogleOAuthToken;
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('google_oauth_tokens').delete({ id });
+    if (error) throw new Error(`Failed to delete Google OAuth token: ${error.message || JSON.stringify(error)}`);
+  },
+
+  async deleteByUserId(userId: string): Promise<void> {
+    const { error } = await supabase.from('google_oauth_tokens').delete({ user_id: userId });
+    if (error) throw new Error(`Failed to delete Google OAuth token by user: ${error.message || JSON.stringify(error)}`);
+  },
+};
+
+// ============================================================================
+// PUSH NOTIFICATION TOKENS
+// ============================================================================
+
+export const pushNotificationTokensDb = {
+  async create(token: PushNotificationTokenInsert): Promise<PushNotificationToken> {
+    const { data, error } = await supabase.from('push_notification_tokens').insert(token);
+    if (error) throw new Error(`Failed to create push notification token: ${error.message || JSON.stringify(error)}`);
+    return data[0] as PushNotificationToken;
+  },
+
+  async getById(id: string): Promise<PushNotificationToken | null> {
+    const { data, error } = await supabase.from('push_notification_tokens').select({ id });
+    if (error) throw new Error(`Failed to get push notification token: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as PushNotificationToken) || null;
+  },
+
+  async getByUserId(userId: string, activeOnly: boolean = true): Promise<PushNotificationToken[]> {
+    const { data, error } = await supabase.from('push_notification_tokens').select({ user_id: userId } as Record<string, unknown>);
+    if (error) throw new Error(`Failed to get user push tokens: ${error.message || JSON.stringify(error)}`);
+    const tokens = (data as PushNotificationToken[]) || [];
+    let filtered = tokens.filter(t => t.user_id === userId);
+    if (activeOnly) {
+      filtered = filtered.filter(t => t.is_active);
+    }
+    return filtered;
+  },
+
+  async getByFcmToken(fcmToken: string): Promise<PushNotificationToken | null> {
+    const { data, error } = await supabase.from('push_notification_tokens').select({ fcm_token: fcmToken });
+    if (error) throw new Error(`Failed to get push token by FCM token: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as PushNotificationToken) || null;
+  },
+
+  async update(id: string, updates: PushNotificationTokenUpdate): Promise<PushNotificationToken> {
+    const { data, error } = await supabase.from('push_notification_tokens').update(updates, { id });
+    if (error) throw new Error(`Failed to update push notification token: ${error.message || JSON.stringify(error)}`);
+    return data[0] as PushNotificationToken;
+  },
+
+  async deactivate(id: string): Promise<PushNotificationToken> {
+    return this.update(id, { is_active: false });
+  },
+
+  async deactivateByFcmToken(fcmToken: string): Promise<void> {
+    const { error } = await supabase.from('push_notification_tokens').update({ is_active: false }, { fcm_token: fcmToken });
+    if (error) throw new Error(`Failed to deactivate push token: ${error.message || JSON.stringify(error)}`);
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('push_notification_tokens').delete({ id });
+    if (error) throw new Error(`Failed to delete push notification token: ${error.message || JSON.stringify(error)}`);
   },
 };

@@ -27,7 +27,7 @@
 
 ### 4. Documentation
 - ✅ Created `ELEVENLABS_SETUP.md` with deployment instructions
-- ✅ Includes instructions for Vercel and Render
+- ✅ Includes instructions for Vercel and Railway
 
 ## 🎯 What You Need to Do
 
@@ -37,8 +37,8 @@ Update your `.env` file:
 ELEVENLABS_API_KEY=<your real key>
 ```
 
-### Step 2: Add API Key to Render (Backend)
-1. Go to Render dashboard → Your backend service
+### Step 2: Add API Key to Railway (Backend)
+1. Go to Railway dashboard → Your backend service
 2. Environment → Environment Variables
 3. Add: `ELEVENLABS_API_KEY` = `<your real key>`
 4. Save (auto-redeploys)
@@ -119,7 +119,7 @@ curl -X POST http://localhost:4000/api/voice/tts \
 
 ## ⚠️ Important Notes
 
-1. **Backend Key Only**: The `ELEVENLABS_API_KEY` only needs to be in the backend (Render), not the frontend (Vercel). The frontend calls the backend API.
+1. **Backend Key Only**: The `ELEVENLABS_API_KEY` only needs to be in the backend (Railway), not the frontend (Vercel). The frontend calls the backend API.
 
 2. **HTTPS Required**: Microphone access requires HTTPS in production. Make sure your Vercel deployment uses HTTPS.
 
@@ -133,7 +133,7 @@ curl -X POST http://localhost:4000/api/voice/tts \
 
 1. Add your real API key to `.env` locally
 2. Test voice features locally
-3. Add API key to Render (backend)
+3. Add API key to Railway (backend)
 4. Add API key to Vercel (frontend) - though technically not needed since frontend calls backend
 5. Deploy and test in production
 

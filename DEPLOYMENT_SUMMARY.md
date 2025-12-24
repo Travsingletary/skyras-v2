@@ -20,14 +20,13 @@ git commit -m "Prepare for friends beta deployment"
 git push origin main
 ```
 
-### 2. Deploy Backend to Render
+### 2. Deploy Backend to Railway
 
-1. Go to https://render.com → New Web Service
+1. Go to https://railway.app → New Project
 2. Connect GitHub repo
 3. Configure:
-   - **Name**: `skyras-backend`
-   - **Build Command**: `npm install`
-   - **Start Command**: `npm start`
+   - Railway auto-detects Node.js
+   - **Start Command**: `npm start` (set in service settings)
    - **Environment Variables** (see below)
 4. Deploy → **Save backend URL**
 
@@ -50,7 +49,7 @@ git push origin main
 
 ## 📋 Environment Variables
 
-### Backend (Render)
+### Backend (Railway)
 
 ```bash
 PORT=4000
@@ -65,7 +64,7 @@ ELEVENLABS_API_KEY=your-elevenlabs-key (optional)
 ### Frontend (Vercel)
 
 ```bash
-NEXT_PUBLIC_API_BASE_URL=https://your-backend-url.onrender.com
+NEXT_PUBLIC_API_BASE_URL=https://your-railway-backend-url.up.railway.app
 NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025
 SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -110,7 +109,7 @@ Access Code: PICOSQUAD2025
 - [ ] Send message → Onboarding starts
 - [ ] Complete onboarding → Workflow created
 - [ ] Dashboard shows workflow: `https://your-app.vercel.app/dashboard`
-- [ ] Backend health check: `curl https://your-backend-url.onrender.com/health`
+- [ ] Backend health check: `curl https://your-railway-backend-url.up.railway.app/health`
 - [ ] Network tab shows API calls to Render backend
 - [ ] Supabase has new conversation/workflow data
 
@@ -118,9 +117,9 @@ Access Code: PICOSQUAD2025
 
 ## 📝 Important Notes
 
-1. **Render Free Tier**: Services sleep after 15min. First request is slow (~30s). Consider paid tier ($7/month) for always-on.
+1. **Railway Free Tier**: Includes $5/month credit. Services stay active (no sleep mode). Consider paid plan if you exceed free tier limits.
 
-2. **Environment Variables**: Must be set in both Render and Vercel dashboards. Frontend needs backend URL after Render deploys.
+2. **Environment Variables**: Must be set in both Railway and Vercel dashboards. Frontend needs backend URL after Railway deploys.
 
 3. **Root Directory**: Vercel must have `frontend` set as root directory.
 
@@ -135,7 +134,7 @@ Access Code: PICOSQUAD2025
 **Backend not responding?**
 - Check Render logs
 - Verify environment variables
-- Test health endpoint: `curl https://your-backend-url.onrender.com/health`
+- Test health endpoint: `curl https://your-railway-backend-url.up.railway.app/health`
 
 **Frontend build fails?**
 - Check Vercel build logs
@@ -143,7 +142,7 @@ Access Code: PICOSQUAD2025
 - Check TypeScript errors
 
 **API calls failing?**
-- Verify `NEXT_PUBLIC_API_BASE_URL` points to Render backend
+- Verify `NEXT_PUBLIC_API_BASE_URL` points to Railway backend
 - Check CORS (should be enabled in backend)
 - Check browser console for errors
 

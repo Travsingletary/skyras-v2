@@ -244,3 +244,70 @@ export async function generateCoverArtPrompt(_: unknown, input: CreativeInput): 
   };
   return createResponse(input.project, input.style, `Cover art prompt summarized for ${input.project}.`, creativity);
 }
+
+export async function generateImage(context: AgentExecutionContext, input: CreativeInput & { size?: "512x512" | "1024x1024" | "1536x1536" }): Promise<AgentRunResult> {
+  ensureProject(input);
+  
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+  const imageUrl = apiBaseUrl 
+    ? `${apiBaseUrl}/api/tools/generateImage`
+    : '/api/tools/generateImage';
+
+  try {
+    // Build the image prompt from the creative input
+    const imagePrompt = `${input.context || input.project}${input.mood ? `, ${input.mood} mood` : ''}${input.style ? `, ${input.style} style` : ''}${input.characters && Array.isArray(input.characters) && input.characters.length ? `, featuring ${input.characters.join(' and ')}` : ''}`;
+
+    const response = await fetch(imageUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'create',
+        prompt: imagePrompt,
+        style: input.style,
+        size: input.size || '1024x1024',
+        projectId: input.project,
+        agentName: 'giorgio',
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Image generation failed: HTTP ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    if (result.error) {
+      throw new Error(result.error || 'Image generation failed');
+    }
+
+    const creativity = {
+      type: "generated_image",
+      fileUrl: result.file_url,
+      prompt: imagePrompt,
+      size: result.width && result.height ? `${result.width}x${result.height}` : input.size || '1024x1024',
+      model: result.model_name,
+      provider: result.provider,
+      costEstimate: result.cost_estimate,
+      project: input.project,
+    };
+
+    return createResponse(
+      input.project,
+      input.style,
+      `Generated image for ${input.project} using ${result.provider || 'image generation'}. Image available at: ${result.file_url}`,
+      creativity
+    );
+  } catch (error) {
+    context.logger.error("Image generation failed", { error });
+    return {
+      output: `Failed to generate image: ${(error as Error).message}`,
+      notes: {
+        error: (error as Error).message,
+        metadata: baseMetadata(input.project, input.style),
+      },
+    };
+  }
+}

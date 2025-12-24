@@ -51,8 +51,7 @@ export default function Home() {
   const [accessError, setAccessError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(() => {
-    // Check localStorage for voice preference (only in browser, not SSR)
-    if (typeof window === 'undefined') return true; // Default for SSR
+    // Check localStorage for voice preference
     const stored = localStorage.getItem('voiceEnabled');
     return stored !== null ? stored === 'true' : true; // Default to enabled
   });
@@ -67,25 +66,15 @@ export default function Home() {
   const fullTranscriptRef = useRef<string>('');
   const hasSentRef = useRef<boolean>(false); // Track if we've already sent the message
 
-  // Access code is optional - if not set, allow access
-  const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE?.trim() || "";
+  const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE || "";
 
   // Check authentication on mount
   useEffect(() => {
-    // SSR-safe: Only access localStorage in browser
-    if (typeof window === 'undefined') {
-      // During SSR, check if access code is required
-      if (!requiredAccessCode || requiredAccessCode === "" || requiredAccessCode === "undefined") {
-        setIsAuthenticated(true);
-      }
-      return;
-    }
-
     const storedAuth = localStorage.getItem("marcus_access");
     const expectedCode = requiredAccessCode;
-
-    // If no access code is required (empty or undefined), allow access immediately
-    if (!expectedCode || expectedCode === "" || expectedCode === "undefined") {
+    
+    // If no access code is required, allow access
+    if (!expectedCode || expectedCode === "") {
       setIsAuthenticated(true);
       return;
     }
@@ -99,21 +88,13 @@ export default function Home() {
   // Initialize userId and conversationId from localStorage
   useEffect(() => {
     if (!isAuthenticated) return;
-    // SSR-safe: Only access localStorage in browser
-    if (typeof window === 'undefined') return;
-
-    // HARD RULE: Use 'public' as userId until user scoping is complete
-    const standardUserId = 'public';
-
-    // Force clear old userId if it's different
-    const existingUserId = localStorage.getItem("userId");
-    if (existingUserId !== standardUserId) {
-      console.log('[Chat] Clearing old userId:', existingUserId, '→', standardUserId);
-      localStorage.removeItem("userId");
+    
+    let storedUserId = localStorage.getItem("userId");
+    if (!storedUserId) {
+      storedUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem("userId", storedUserId);
     }
-
-    localStorage.setItem("userId", standardUserId);
-    setUserId(standardUserId);
+    setUserId(storedUserId);
 
     // Load conversationId from localStorage
     const storedConversationId = localStorage.getItem("conversationId");
@@ -131,10 +112,10 @@ export default function Home() {
     e.preventDefault();
     setAccessError(null);
 
-    const expectedCode = requiredAccessCode?.trim() || "";
+    const expectedCode = requiredAccessCode;
     
-    // If no access code is required (empty or undefined), allow access immediately
-    if (!expectedCode || expectedCode === "" || expectedCode === "undefined") {
+    // If no access code is required, allow access
+    if (!expectedCode || expectedCode === "") {
       setIsAuthenticated(true);
       return;
     }
@@ -150,11 +131,7 @@ export default function Home() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    console.log('[File Upload] Selected files:', files.length);
-    if (files.length > 0) {
-      setPendingFiles((prev) => [...prev, ...files]);
-      console.log('[File Upload] Added to pending files. Total:', files.length);
-    }
+    setPendingFiles((prev) => [...prev, ...files]);
   };
 
   const removeFile = (index: number) => {
@@ -163,10 +140,6 @@ export default function Home() {
 
   // Voice input handlers using Web Speech API
   const startRecording = () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:153',message:'startRecording entry',data:{hasExistingRecognition:!!recognitionRef.current},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H'})}).catch(()=>{});
-    // #endregion
-    
     try {
       // Stop any existing recognition first
       if (recognitionRef.current) {
@@ -181,16 +154,8 @@ export default function Home() {
       // Check if browser supports speech recognition
       const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
       
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:169',message:'SpeechRecognition check',data:{available:!!SpeechRecognition,hasWebkit:!!(window as any).webkitSpeechRecognition,hasStandard:!!(window as any).SpeechRecognition,isSecure:location.protocol==='https:'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
-      
-      console.log('[Voice] SpeechRecognition available:', !!SpeechRecognition);
-      
       if (!SpeechRecognition) {
-        const errorMsg = 'Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.';
-        console.error('[Voice]', errorMsg);
-        setError(errorMsg);
+        setError('Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.');
         return;
       }
 
@@ -258,9 +223,7 @@ export default function Home() {
       };
 
       recognition.onerror = (event: any) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:240',message:'Recognition error',data:{error:event.error,errorType:typeof event.error,hasTranscript:!!fullTranscriptRef.current.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-        // #endregion
+        console.error('[Voice] Speech recognition error:', event.error);
         
         // Clear timeout on error
         if (silenceTimeoutRef.current) {
@@ -284,22 +247,10 @@ export default function Home() {
           }
         } else if (event.error === 'not-allowed') {
           setError('Microphone access denied. Please allow microphone access in your browser settings.');
-        } else if (event.error === 'network') {
-          // Network error - speech recognition service unavailable
-          // This is a common, expected error when the speech API is temporarily unavailable
-          // Don't log as error, just warn and show user-friendly message
-          console.warn('[Voice] Network error - speech recognition service temporarily unavailable. This is usually temporary.');
-          // Don't show error to user for network issues - it's too common and disruptive
-          // Just silently fail and let them type instead
-          setIsRecording(false);
-          // Optionally show a subtle notification
-          // setError('Voice input temporarily unavailable. Please type your message.');
         } else if (event.error === 'aborted') {
-          // User stopped it, don't show error or log
+          // User stopped it, don't show error
           setIsRecording(false);
         } else {
-          // Only log unexpected errors
-          console.warn('[Voice] Speech recognition error:', event.error);
           setError('Speech recognition failed. Please try typing your message.');
         }
       };
@@ -356,12 +307,9 @@ export default function Home() {
   };
 
   const handleMicClick = () => {
-    console.log('[Voice] Mic button clicked, isRecording:', isRecording);
     if (isRecording) {
-      console.log('[Voice] Stopping recording...');
       stopRecording();
     } else {
-      console.log('[Voice] Starting recording...');
       startRecording();
     }
   };
@@ -623,10 +571,6 @@ export default function Home() {
             fileIds.push(...(uploadData as any).data.files.map((f: any) => f.id));
           }
         } catch (uploadErr) {
-          // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/page.tsx:615',message:'Upload catch error',data:{errorMessage:(uploadErr as Error)?.message,errorName:(uploadErr as Error)?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
-          
           console.error("[Upload Error]:", uploadErr);
           setError(`File upload failed: ${(uploadErr as Error).message}`);
           setIsLoading(false);
@@ -855,12 +799,6 @@ export default function Home() {
             </p>
           </div>
           <div className="flex items-center gap-4">
-            <Link
-              href="/workflows"
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Workflows
-            </Link>
             <Link
               href="/dashboard"
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"

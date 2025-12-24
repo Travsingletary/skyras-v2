@@ -16,15 +16,14 @@ All requested features have been implemented and deployment configuration is com
 - **Project**: `frontend`
 - **URL**: `https://skyras-v2-frontend-app-git-main-travis-singletarys-projects.vercel.app`
 - **Environment Variables Configured**:
-  - ✅ `NEXT_PUBLIC_API_BASE_URL` → `https://skyras-backend.onrender.com`
+  - ✅ `NEXT_PUBLIC_API_BASE_URL` → Railway backend URL
   - ✅ `SUPABASE_URL` → `https://zzxedixpbvivpsnztjsc.supabase.co`
   - ✅ `SUPABASE_ANON_KEY` → (configured)
 
-### 3. Render Backend Deployment
-- **Service**: `skyras-backend`
-- **URL**: `https://skyras-backend.onrender.com`
-- **Deployment Config**: `.render.yaml` in repo root
-- **Required Environment Variables** (add in Render dashboard):
+### 3. Railway Backend Deployment
+- **Service**: Backend deployed on Railway
+- **URL**: Railway-provided URL (check Railway dashboard)
+- **Required Environment Variables** (add in Railway dashboard):
   ```
   NODE_ENV=production
   PORT=4000
@@ -67,7 +66,7 @@ formData.append('files', file);
 formData.append('userId', userId);
 formData.append('conversationId', conversationId);
 
-fetch('https://skyras-backend.onrender.com/api/upload', {
+fetch('https://your-railway-backend-url.up.railway.app/api/upload', {
   method: 'POST',
   body: formData
 });
@@ -86,7 +85,7 @@ fetch('https://skyras-backend.onrender.com/api/upload', {
 **Usage**:
 ```javascript
 // Text-to-Speech
-fetch('https://skyras-backend.onrender.com/api/voice/tts', {
+fetch('https://your-railway-backend-url.up.railway.app/api/voice/tts', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -96,7 +95,7 @@ fetch('https://skyras-backend.onrender.com/api/voice/tts', {
 });
 
 // WebSocket for real-time voice
-const ws = new WebSocket('wss://skyras-backend.onrender.com');
+const ws = new WebSocket('wss://your-railway-backend-url.up.railway.app');
 ws.send(JSON.stringify({
   type: 'start_voice_session',
   voiceId: 'EXAVITQu4vr4xnSDxMaL'
@@ -130,9 +129,9 @@ ELEVENLABS_API_KEY=<your-key>
 
 ## 🚀 Deployment Instructions
 
-### Deploy Backend to Render
-1. Go to https://render.com/dashboard
-2. Find service: `skyras-backend`
+### Deploy Backend to Railway
+1. Go to https://railway.app/dashboard
+2. Create new project and service
 3. Add environment variables:
    - `NODE_ENV` → `production`
    - `PORT` → `4000`
@@ -159,7 +158,7 @@ After deployment, verify:
 
 ### Backend Health Check
 ```bash
-curl https://skyras-backend.onrender.com/health
+curl https://your-railway-backend-url.up.railway.app/health
 # Expected: {"status":"ok","message":"SkyRas v2 Backend running"}
 ```
 
@@ -174,13 +173,13 @@ curl https://skyras-backend.onrender.com/health
 ### Voice Features (requires ELEVENLABS_API_KEY)
 ```bash
 # Test TTS
-curl -X POST https://skyras-backend.onrender.com/api/voice/tts \
+curl -X POST https://your-railway-backend-url.up.railway.app/api/voice/tts \
   -H "Content-Type: application/json" \
   -d '{"text":"Hello from Marcus"}' \
   --output test.mp3
 
 # Test voices list
-curl https://skyras-backend.onrender.com/api/voice/voices
+curl https://your-railway-backend-url.up.railway.app/api/voice/voices
 ```
 
 ---
@@ -200,7 +199,7 @@ curl https://skyras-backend.onrender.com/api/voice/voices
 
 - **GitHub Repo**: https://github.com/Travsingletary/skyras-v2
 - **Vercel Dashboard**: https://vercel.com/travis-singletarys-projects/frontend
-- **Render Dashboard**: https://render.com/dashboard
+- **Railway Dashboard**: https://railway.app/dashboard
 
 ---
 

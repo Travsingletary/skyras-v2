@@ -55,7 +55,7 @@ git push -u origin main
 
 Once your code is on GitHub:
 1. Go back to `DEPLOY_NOW.md`
-2. Follow **Section 1: Backend Deployment (Render)**
+2. Follow **Section 1: Backend Deployment (Railway)**
 3. When Render asks you to connect a repository, select `skyras-v2`
 
 ---

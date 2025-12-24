@@ -44,7 +44,7 @@ Click **"Add"** and add these 4 environment variables:
 ### Variable 1:
 ```
 Key: NEXT_PUBLIC_API_BASE_URL
-Value: https://skyras-backend.onrender.com
+Value: https://your-railway-backend-url.up.railway.app
 ```
 
 ### Variable 2:
