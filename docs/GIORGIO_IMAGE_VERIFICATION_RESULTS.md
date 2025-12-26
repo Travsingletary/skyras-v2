@@ -112,3 +112,5 @@ For each test, verify:
 - Fallback prompt packages should always be returned when image generation is unavailable
 - Database records should be created for all artifacts
 
+
+

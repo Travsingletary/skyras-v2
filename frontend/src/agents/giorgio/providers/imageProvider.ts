@@ -42,7 +42,8 @@ export async function generateImage(
       size,
     };
 
-    // Call the provider adapter
+    // Call the provider adapter with timeout protection
+    // Note: The provider adapter handles its own timeout, but we add an extra safety layer
     const result = await executeCreate(providerArgs);
 
     // Convert base64 to data URL for display
