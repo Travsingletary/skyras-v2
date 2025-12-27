@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-type Scenario = 'creative' | 'compliance' | 'distribution';
+type Scenario = 'creative' | 'compliance' | 'distribution' | 'atlas';
 
 interface GoldenPathResponse {
   agent?: string;
@@ -31,17 +31,40 @@ interface GoldenPathResponse {
   };
 }
 
+interface AtlasResponse {
+  success: boolean;
+  output?: string;
+  notes?: {
+    active_priority?: string;
+    today_task?: string;
+    checklist_count?: number;
+    initial_priority_set?: boolean;
+    scope_creep_detected?: boolean;
+  };
+  state?: {
+    active_priority?: string;
+    today_task?: string;
+    why_it_matters?: string;
+    checklist?: Array<{ id: string; text: string; completed: boolean }>;
+    backlog?: string[];
+    last_completed_task?: string;
+  };
+  error?: string;
+}
+
 export default function AgentConsole() {
-  const [scenario, setScenario] = useState<Scenario>('creative');
+  const [scenario, setScenario] = useState<Scenario>('atlas');
   const [input, setInput] = useState('');
   const [includeImage, setIncludeImage] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [response, setResponse] = useState<GoldenPathResponse | null>(null);
+  const [response, setResponse] = useState<GoldenPathResponse | AtlasResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [atlasState, setAtlasState] = useState<AtlasResponse['state'] | null>(null);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     proof: true,
     artifacts: true,
     raw: false,
+    state: true,
   });
 
   // System-owned neutral demo inputs for compliance testing
@@ -56,6 +79,8 @@ export default function AgentConsole() {
   // Set default input based on scenario
   const getDefaultInput = (scenario: Scenario) => {
     switch (scenario) {
+      case 'atlas':
+        return 'What should we focus on next?';
       case 'compliance':
         return JSON.stringify(DEFAULT_SAMPLE_FILES);
       case 'creative':
@@ -67,10 +92,33 @@ export default function AgentConsole() {
     }
   };
 
+  // Load Atlas state on mount and when scenario changes to atlas
+  const loadAtlasState = async () => {
+    try {
+      const res = await fetch('/api/agents/atlas?userId=public');
+      const data = await res.json();
+      if (data.success && data.state) {
+        setAtlasState(data.state);
+      }
+    } catch (err) {
+      console.error('Failed to load Atlas state:', err);
+    }
+  };
+
+  // Load Atlas state on mount if scenario is atlas
+  useEffect(() => {
+    if (scenario === 'atlas') {
+      loadAtlasState();
+    }
+  }, [scenario]);
+
   // Update input when scenario changes
   const handleScenarioChange = (newScenario: Scenario) => {
     setScenario(newScenario);
     setInput(getDefaultInput(newScenario));
+    if (newScenario === 'atlas') {
+      loadAtlasState();
+    }
   };
 
   const handleRun = async () => {
@@ -79,6 +127,33 @@ export default function AgentConsole() {
     setResponse(null);
 
     try {
+      // Handle Atlas scenario separately
+      if (scenario === 'atlas') {
+        const res = await fetch('/api/agents/atlas', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: input.trim() || 'What should we focus on next?',
+            userId: 'public',
+          }),
+        });
+
+        const data = await res.json();
+        setResponse(data);
+        
+        if (data.success && data.state) {
+          setAtlasState(data.state);
+        }
+
+        if (!res.ok || data.success === false) {
+          setError(data.error || 'Request failed');
+        }
+        setLoading(false);
+        return;
+      }
+
       let requestBody: Record<string, unknown> = {
         scenario,
         userId: 'public',
@@ -199,6 +274,8 @@ export default function AgentConsole() {
 
   const getScenarioFlow = (scenario: Scenario) => {
     switch (scenario) {
+      case 'atlas':
+        return ['Atlas', '→', 'Priority Management'];
       case 'creative':
         return ['Marcus', '→', 'Giorgio', '→', 'Letitia'];
       case 'compliance':
@@ -216,7 +293,7 @@ export default function AgentConsole() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Agent Console</h1>
           <p className="text-gray-600 text-lg">
-            Test the 3 golden paths: Creative, Compliance, and Distribution
+            Atlas PM Agent + 3 golden paths: Creative, Compliance, and Distribution
           </p>
         </div>
 
@@ -232,6 +309,7 @@ export default function AgentConsole() {
                 onChange={(e) => handleScenarioChange(e.target.value as Scenario)}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
               >
+                <option value="atlas">Atlas - PM Agent (Priority Management)</option>
                 <option value="creative">Creative (Marcus → Giorgio → Letitia)</option>
                 <option value="compliance">Compliance (Marcus → Cassidy → Letitia)</option>
                 <option value="distribution">Distribution (Marcus → Jamal → DB)</option>
@@ -279,22 +357,45 @@ export default function AgentConsole() {
             </div>
           )}
 
+          {scenario === 'atlas' && atlasState && (
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-sm font-semibold text-blue-900 mb-2">Current State</div>
+              {atlasState.active_priority && (
+                <div className="text-sm text-blue-800 mb-1">
+                  <span className="font-medium">Priority:</span> {atlasState.active_priority}
+                </div>
+              )}
+              {atlasState.today_task && (
+                <div className="text-sm text-blue-800 mb-1">
+                  <span className="font-medium">Today:</span> {atlasState.today_task}
+                </div>
+              )}
+              {atlasState.checklist && atlasState.checklist.length > 0 && (
+                <div className="text-sm text-blue-800">
+                  <span className="font-medium">Checklist:</span> {atlasState.checklist.filter(c => !c.completed).length} remaining
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="mb-4">
             <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Input (Optional - JSON or plain text)
+              {scenario === 'atlas' ? 'Message to Atlas' : 'Input (Optional - JSON or plain text)'}
             </label>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={
-                scenario === 'creative'
+                scenario === 'atlas'
+                  ? 'What should we focus on next?'
+                  : scenario === 'creative'
                   ? '{"context": "A cinematic sequence", "mood": "dynamic"}'
                   : scenario === 'compliance'
                   ? '["video_demo_watermark.mp4", "music_preview_track.wav", "image_sample_render.png", "final_export.mov"]'
                   : '{"campaign": "Test Campaign", "platforms": ["instagram", "tiktok"]}'
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-gray-50"
-              rows={4}
+              rows={scenario === 'atlas' ? 3 : 4}
             />
           </div>
 
@@ -314,7 +415,7 @@ export default function AgentConsole() {
             ) : (
               <>
                 <span>▶</span>
-                Run Golden Path
+                {scenario === 'atlas' ? 'Ask Atlas' : 'Run Golden Path'}
               </>
             )}
           </button>
@@ -354,16 +455,28 @@ export default function AgentConsole() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <h2 className="text-2xl font-bold text-gray-900">
-                        {response.success !== false ? 'Golden Path Completed' : 'Golden Path Failed'}
+                        {scenario === 'atlas' 
+                          ? (response.success !== false ? 'Atlas Response' : 'Atlas Error')
+                          : (response.success !== false ? 'Golden Path Completed' : 'Golden Path Failed')
+                        }
                       </h2>
-                      {response.metadata?.used_defaults && (
+                      {scenario !== 'atlas' && response.metadata?.used_defaults && (
                         <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-2 py-1 rounded border border-blue-300">
                           Used Defaults
                         </span>
                       )}
+                      {scenario === 'atlas' && (response as AtlasResponse).notes?.scope_creep_detected && (
+                        <span className="text-xs font-semibold bg-yellow-100 text-yellow-700 px-2 py-1 rounded border border-yellow-300">
+                          Added to Backlog
+                        </span>
+                      )}
                     </div>
                     <p className="text-gray-600">
-                      {response.agent ? `${response.agent} → ${response.action}` : 'No routing information'}
+                      {scenario === 'atlas' 
+                        ? 'Atlas - Primary Decision-Maker'
+                        : response.agent 
+                        ? `${response.agent} → ${response.action}` 
+                        : 'No routing information'}
                     </p>
                   </div>
                 </div>
@@ -380,45 +493,120 @@ export default function AgentConsole() {
             </div>
 
             {/* Quick Stats */}
-            <div className="grid md:grid-cols-4 gap-4">
-              <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500">
-                <div className="text-sm text-gray-600 mb-1">Agent</div>
-                <div className="text-xl font-bold text-gray-900">{response.agent || 'N/A'}</div>
+            {scenario !== 'atlas' && (
+              <div className="grid md:grid-cols-4 gap-4">
+                <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500">
+                  <div className="text-sm text-gray-600 mb-1">Agent</div>
+                  <div className="text-xl font-bold text-gray-900">{(response as GoldenPathResponse).agent || 'N/A'}</div>
+                </div>
+                <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-500">
+                  <div className="text-sm text-gray-600 mb-1">Action</div>
+                  <div className="text-xl font-bold text-gray-900">{(response as GoldenPathResponse).action || 'N/A'}</div>
+                </div>
+                <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500">
+                  <div className="text-sm text-gray-600 mb-1">Proof Steps</div>
+                  <div className="text-xl font-bold text-gray-900">{(response as GoldenPathResponse).proof?.length || 0}</div>
+                </div>
+                <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-orange-500">
+                  <div className="text-sm text-gray-600 mb-1">Artifacts</div>
+                  <div className="text-xl font-bold text-gray-900">{(response as GoldenPathResponse).artifacts?.length || 0}</div>
+                </div>
               </div>
-              <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-500">
-                <div className="text-sm text-gray-600 mb-1">Action</div>
-                <div className="text-xl font-bold text-gray-900">{response.action || 'N/A'}</div>
+            )}
+
+            {scenario === 'atlas' && (response as AtlasResponse).state && (
+              <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                <button
+                  onClick={() => toggleSection('state')}
+                  className="w-full flex items-center justify-between mb-4"
+                >
+                  <h2 className="text-xl font-bold text-gray-900">Atlas State</h2>
+                  <span className="text-gray-500">{expandedSections.state ? '▼' : '▶'}</span>
+                </button>
+                {expandedSections.state && (
+                  <div className="space-y-4">
+                    {(response as AtlasResponse).state?.active_priority && (
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="text-sm font-semibold text-blue-900 mb-1">Active Priority</div>
+                        <div className="text-base text-blue-800">{(response as AtlasResponse).state?.active_priority}</div>
+                      </div>
+                    )}
+                    {(response as AtlasResponse).state?.today_task && (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="text-sm font-semibold text-green-900 mb-1">Today's Task</div>
+                        <div className="text-base text-green-800">{(response as AtlasResponse).state?.today_task}</div>
+                      </div>
+                    )}
+                    {(response as AtlasResponse).state?.why_it_matters && (
+                      <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                        <div className="text-sm font-semibold text-purple-900 mb-1">Why It Matters</div>
+                        <div className="text-base text-purple-800">{(response as AtlasResponse).state?.why_it_matters}</div>
+                      </div>
+                    )}
+                    {(response as AtlasResponse).state?.checklist && (response as AtlasResponse).state?.checklist.length > 0 && (
+                      <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div className="text-sm font-semibold text-gray-900 mb-2">Checklist</div>
+                        <div className="space-y-2">
+                          {(response as AtlasResponse).state?.checklist.map((item) => (
+                            <div key={item.id} className="flex items-center gap-2">
+                              <span className={item.completed ? 'text-green-600' : 'text-gray-400'}>
+                                {item.completed ? '[x]' : '[ ]'}
+                              </span>
+                              <span className={item.completed ? 'text-gray-500 line-through' : 'text-gray-800'}>
+                                {item.text}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(response as AtlasResponse).state?.backlog && (response as AtlasResponse).state?.backlog.length > 0 && (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="text-sm font-semibold text-yellow-900 mb-2">Backlog</div>
+                        <ul className="list-disc list-inside space-y-1 text-yellow-800">
+                          {(response as AtlasResponse).state?.backlog.map((item, idx) => (
+                            <li key={idx}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500">
-                <div className="text-sm text-gray-600 mb-1">Proof Steps</div>
-                <div className="text-xl font-bold text-gray-900">{response.proof?.length || 0}</div>
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-orange-500">
-                <div className="text-sm text-gray-600 mb-1">Artifacts</div>
-                <div className="text-xl font-bold text-gray-900">{response.artifacts?.length || 0}</div>
-              </div>
-            </div>
+            )}
 
             {/* Output */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Output</h2>
+                <h2 className="text-xl font-bold text-gray-900">
+                  {scenario === 'atlas' ? 'Atlas Response' : 'Output'}
+                </h2>
                 <button
-                  onClick={() => copyToClipboard(response.output || response.error?.message || '')}
+                  onClick={() => copyToClipboard(
+                    scenario === 'atlas' 
+                      ? (response as AtlasResponse).output || (response as AtlasResponse).error || ''
+                      : (response as GoldenPathResponse).output || (response as GoldenPathResponse).error?.message || ''
+                  )}
                   className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
                 >
                   <span>📋</span> Copy
                 </button>
               </div>
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-5 border border-gray-200">
+              <div className={`rounded-lg p-5 border border-gray-200 ${
+                scenario === 'atlas' 
+                  ? 'bg-gradient-to-br from-blue-50 to-indigo-50'
+                  : 'bg-gradient-to-br from-gray-50 to-gray-100'
+              }`}>
                 <pre className="font-mono text-sm text-gray-800 whitespace-pre-wrap break-words">
-                  {response.output || response.error?.message || 'No output'}
+                  {scenario === 'atlas'
+                    ? (response as AtlasResponse).output || (response as AtlasResponse).error || 'No output'
+                    : (response as GoldenPathResponse).output || (response as GoldenPathResponse).error?.message || 'No output'}
                 </pre>
               </div>
             </div>
 
             {/* Proof Markers */}
-            {response.proof && response.proof.length > 0 && (
+            {scenario !== 'atlas' && (response as GoldenPathResponse).proof && (response as GoldenPathResponse).proof.length > 0 && (
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
                 <button
                   onClick={() => toggleSection('proof')}
@@ -429,7 +617,7 @@ export default function AgentConsole() {
                 </button>
                 {expandedSections.proof && (
                   <div className="space-y-3">
-                    {response.proof.map((proof, idx) => (
+                    {(response as GoldenPathResponse).proof.map((proof, idx) => (
                       <div
                         key={idx}
                         className={`p-4 rounded-lg border-2 ${getProofStatusColor(proof.status)} transition-all hover:shadow-md`}
@@ -471,18 +659,18 @@ export default function AgentConsole() {
             )}
 
             {/* Artifacts */}
-            {response.artifacts && response.artifacts.length > 0 && (
+            {scenario !== 'atlas' && (response as GoldenPathResponse).artifacts && (response as GoldenPathResponse).artifacts.length > 0 && (
               <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
                 <button
                   onClick={() => toggleSection('artifacts')}
                   className="w-full flex items-center justify-between mb-4"
                 >
-                  <h2 className="text-xl font-bold text-gray-900">Artifacts ({response.artifacts.length})</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Artifacts ({(response as GoldenPathResponse).artifacts.length})</h2>
                   <span className="text-gray-500">{expandedSections.artifacts ? '▼' : '▶'}</span>
                 </button>
                 {expandedSections.artifacts && (
                   <div className="grid md:grid-cols-2 gap-4">
-                    {response.artifacts.map((artifact, idx) => {
+                    {(response as GoldenPathResponse).artifacts.map((artifact, idx) => {
                       const isImage = artifact.type === 'image';
                       const isPromptPackage = artifact.type === 'prompt_package';
                       const isGenerated = isImage && artifact.url;
@@ -562,14 +750,14 @@ export default function AgentConsole() {
             )}
 
             {/* Warnings */}
-            {response.warnings && response.warnings.length > 0 && (
+            {scenario !== 'atlas' && (response as GoldenPathResponse).warnings && (response as GoldenPathResponse).warnings.length > 0 && (
               <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-5 shadow-sm">
                 <div className="flex items-start gap-3">
                   <div className="text-yellow-600 text-2xl">⚠</div>
                   <div className="flex-1">
-                    <h3 className="text-yellow-900 font-bold mb-2">Warnings ({response.warnings.length})</h3>
+                    <h3 className="text-yellow-900 font-bold mb-2">Warnings ({(response as GoldenPathResponse).warnings.length})</h3>
                     <ul className="list-disc list-inside text-yellow-800 space-y-1">
-                      {response.warnings.map((warning, idx) => (
+                      {(response as GoldenPathResponse).warnings.map((warning, idx) => (
                         <li key={idx}>{warning}</li>
                       ))}
                     </ul>
@@ -579,53 +767,55 @@ export default function AgentConsole() {
             )}
 
             {/* DB Confirmation */}
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="text-green-600 text-2xl">✓</div>
-                <div className="flex-1">
-                  <h3 className="text-green-900 font-bold mb-3">Database Confirmation</h3>
-                  <div className="space-y-2">
-                    <p className="text-green-800 flex items-center gap-2">
-                      <span className="text-green-600">✓</span>
-                      Agent run saved to{' '}
-                      <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">agent_runs</code>{' '}
-                      table
-                    </p>
-                    {response.metadata?.drafts_saved && (
+            {scenario !== 'atlas' && (
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl p-5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="text-green-600 text-2xl">✓</div>
+                  <div className="flex-1">
+                    <h3 className="text-green-900 font-bold mb-3">Database Confirmation</h3>
+                    <div className="space-y-2">
                       <p className="text-green-800 flex items-center gap-2">
                         <span className="text-green-600">✓</span>
-                        {response.metadata.drafts_saved} draft(s) saved to{' '}
-                        <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">scheduled_posts</code>
+                        Agent run saved to{' '}
+                        <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">agent_runs</code>{' '}
+                        table
                       </p>
-                    )}
-              {response.metadata?.assets_saved && (
-                <p className="text-green-800 flex items-center gap-2">
-                  <span className="text-green-600">✓</span>
-                  {response.metadata.assets_saved} asset(s) saved to{' '}
-                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">assets</code>
-                </p>
-              )}
-              {response.metadata?.scan_saved && (
-                <p className="text-green-800 flex items-center gap-2 flex-wrap">
-                  <span className="text-green-600">✓</span>
-                  Compliance scan saved to{' '}
-                  <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">compliance_scans</code>
-                  {response.metadata.scan_id && response.metadata.scan_id !== 'unknown' && (
-                    <span className="text-green-700 font-mono text-xs">
-                      (ID: {String(response.metadata.scan_id).substring(0, 8)}...)
-                    </span>
-                  )}
-                  {response.metadata.flagged_count !== undefined && (
-                    <span className="text-green-700">
-                      — {response.metadata.flagged_count} flagged, {response.metadata.clean_count || 0} clean
-                    </span>
-                  )}
-                </p>
-              )}
+                      {(response as GoldenPathResponse).metadata?.drafts_saved && (
+                        <p className="text-green-800 flex items-center gap-2">
+                          <span className="text-green-600">✓</span>
+                          {(response as GoldenPathResponse).metadata.drafts_saved} draft(s) saved to{' '}
+                          <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">scheduled_posts</code>
+                        </p>
+                      )}
+                      {(response as GoldenPathResponse).metadata?.assets_saved && (
+                        <p className="text-green-800 flex items-center gap-2">
+                          <span className="text-green-600">✓</span>
+                          {(response as GoldenPathResponse).metadata.assets_saved} asset(s) saved to{' '}
+                          <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">assets</code>
+                        </p>
+                      )}
+                      {(response as GoldenPathResponse).metadata?.scan_saved && (
+                        <p className="text-green-800 flex items-center gap-2 flex-wrap">
+                          <span className="text-green-600">✓</span>
+                          Compliance scan saved to{' '}
+                          <code className="bg-green-100 px-2 py-1 rounded font-mono text-sm">compliance_scans</code>
+                          {(response as GoldenPathResponse).metadata.scan_id && (response as GoldenPathResponse).metadata.scan_id !== 'unknown' && (
+                            <span className="text-green-700 font-mono text-xs">
+                              (ID: {String((response as GoldenPathResponse).metadata.scan_id).substring(0, 8)}...)
+                            </span>
+                          )}
+                          {(response as GoldenPathResponse).metadata.flagged_count !== undefined && (
+                            <span className="text-green-700">
+                              — {(response as GoldenPathResponse).metadata.flagged_count} flagged, {(response as GoldenPathResponse).metadata.clean_count || 0} clean
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Raw JSON Response */}
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
