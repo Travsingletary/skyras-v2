@@ -393,7 +393,27 @@ curl https://skyras-v2.vercel.app/api/data/plans
 }
 ```
 
-**Observation:** New workflow appears in plans list (total increases from 6 to 7).
+**Verification of Test Workflow:**
+```bash
+curl https://skyras-v2.vercel.app/api/data/plans | jq '.data[] | select(.name | contains("Demo: Compliance Scan"))'
+```
+
+**Response:**
+```json
+{
+  "name": "Demo: Compliance Scan - E2E Test",
+  "type": "licensing",
+  "user_id": "test_user_onboarding_e2e_1766904453",
+  "created_at": "2025-12-28T06:47:34.594184+00:00",
+  "id": "c98e9b40-45e3-4eae-9ac3-b12165d2e746",
+  ...
+}
+```
+
+**Observation:** 
+- ✅ New workflow appears in plans list (total increases from 6 to 7)
+- ✅ Test workflow verified to exist with correct name and type
+- ✅ Workflow creation successful end-to-end
 
 ---
 
