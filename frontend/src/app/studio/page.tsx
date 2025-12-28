@@ -308,7 +308,7 @@ export default function Home() {
           pendingFiles.forEach((file) => {
             formData.append("files", file);
           });
-          formData.append("userId", userId);
+          // userId is derived server-side from auth session
 
           const uploadRes = await fetch('/api/upload', {
             method: 'POST',
@@ -412,9 +412,6 @@ export default function Home() {
       setLoading(false);
     }
   };
-
-  // Detect first-run state (no workflows/plans)
-  const isFirstRun = !plansLoading && plans.length === 0;
 
   return (
     <div className="min-h-screen bg-zinc-50 p-6 text-zinc-900">
