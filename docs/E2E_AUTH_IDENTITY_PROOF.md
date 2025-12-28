@@ -20,6 +20,8 @@
    - ✅ `/api/data/plans` - Derives userId from auth session, requires authentication
    - ✅ `/api/workflows` (GET) - Derives userId from auth session, returns only user's workflows
    - ✅ `/api/workflows` (POST) - Derives userId from auth session, creates workflows for authenticated user only
+   - ✅ `/api/chat` - Derives userId from auth session, requires authentication
+   - ✅ `/api/upload` - Derives userId from auth session, stores files in user-scoped paths, requires authentication
 
 3. **RLS Policies Updated**
    - ✅ `workflows` table: User-isolated policies using `auth.uid()`
@@ -29,6 +31,8 @@
 4. **Client Code Updated**
    - ✅ Studio page: Removed userId from `/api/data/plans` calls
    - ✅ Studio page: Removed userId from `/api/workflows` calls
+   - ✅ Studio page: Removed userId from `/api/chat` calls
+   - ✅ Studio page: Removed userId from `/api/upload` calls
    - ✅ Studio page: Removed userId from `/api/test/golden-path` calls (for demo workflow creation)
 
 ---
@@ -221,9 +225,23 @@ ORDER BY tablename, policyname;
    - Returns 401 if not authenticated
    - Creates workflows with authenticated user's ID
 
-4. **`frontend/src/app/studio/page.tsx`**
+4. **`frontend/src/app/api/chat/route.ts`**
+   - Removed `userId` from request payload
+   - Uses `getAuthenticatedUserId()` to derive user identity
+   - Returns 401 if not authenticated
+   - Passes auth-derived userId to Marcus agent
+
+5. **`frontend/src/app/api/upload/route.ts`**
+   - Removed `userId` from formData
+   - Uses `getAuthenticatedUserId()` to derive user identity
+   - Returns 401 if not authenticated
+   - Stores files in user-scoped paths (already implemented in `saveFile`)
+
+6. **`frontend/src/app/studio/page.tsx`**
    - Removed `userId` from `/api/data/plans` fetch calls
    - Removed `userId` from `/api/workflows` POST calls
+   - Removed `userId` from `/api/chat` POST calls
+   - Removed `userId` from `/api/upload` POST calls
    - Removed `userId` from `/api/test/golden-path` calls (for demo workflow creation)
 
 ### Database Migrations
@@ -249,9 +267,11 @@ ORDER BY tablename, policyname;
 
 ## Definition of DONE Status
 
-- ✅ No endpoint accepts or requires userId from the client (for `/api/data/plans` and `/api/workflows`)
+- ✅ No endpoint accepts or requires userId from the client (for `/api/data/plans`, `/api/workflows`, `/api/chat`, and `/api/upload`)
 - ✅ All user scoping is server-derived (infrastructure ready, requires auth setup)
 - ✅ RLS prevents cross-user access (policies updated and active)
+- ✅ File uploads are stored in user-scoped paths (`YYYY-MM-DD/user_id/fileId.ext`)
+- ✅ Auth logging added to all user-scoped endpoints
 - ⏳ Production E2E proof (pending Supabase Auth implementation)
 
 ---
