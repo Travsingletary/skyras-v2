@@ -10,11 +10,26 @@ import {
 } from '@/lib/fileStorage.supabase';
 import { filesDb } from '@/lib/database';
 import { createAutoProcessingRecords, generateWorkflowSuggestions } from '@/lib/fileProcessing';
+import { getAuthenticatedUserId, logAuthIdentity } from '@/lib/auth';
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
+    // Derive user identity from auth session (server-side only)
+    const userId = await getAuthenticatedUserId(request);
+    logAuthIdentity('/api/upload', userId);
+
+    if (!userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Authentication required',
+        },
+        { status: 401 }
+      );
+    }
+
     // Check if storage is configured
     const storageConfigured = await isStorageConfigured();
     if (!storageConfigured) {
@@ -31,19 +46,8 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
-    const userId = formData.get('userId') as string | null;
     const projectId = formData.get('projectId') as string | null;
-
-    // Validate userId
-    if (!userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'userId is required',
-        },
-        { status: 400 }
-      );
-    }
+    // Note: userId is ignored if provided in formData (derived from auth session only)
 
     // Validate file count
     if (!validateFileCount(files.length)) {

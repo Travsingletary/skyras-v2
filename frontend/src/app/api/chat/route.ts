@@ -1,23 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMarcusAgent } from "@/agents/marcus";
 import { logAgentExecution, generateRequestId } from "@/lib/agentLogging";
+import { getAuthenticatedUserId, logAuthIdentity } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
   
   try {
+    // Derive user identity from auth session (server-side only)
+    const userId = await getAuthenticatedUserId(request);
+    logAuthIdentity('/api/chat', userId);
+
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const payload = await request.json().catch((parseError) => {
       console.error('[/api/chat] JSON parse error:', parseError);
       return {};
     });
-    const { conversationId, userId, message, files } = payload;
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'userId is required' },
-        { status: 400 }
-      );
-    }
+    const { conversationId, message, files } = payload;
+    // Note: userId is ignored if provided in payload (derived from auth session only)
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
