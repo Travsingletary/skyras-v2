@@ -39,28 +39,47 @@ export async function getMarcusManagerState(
   context: AgentExecutionContext,
   userId: string = 'public'
 ): Promise<MarcusManagerState> {
-  const { data, error } = await context.supabase
-    .from('marcus_manager_state')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
+  try {
+    // Use SupabaseClientLike wrapper API (select with filters object, returns array)
+    const { data: rows, error } = await context.supabase
+      .from('marcus_manager_state')
+      .select({ user_id: userId });
 
-  if (error && error.code !== 'PGRST116') { // PGRST116 = not found
-    throw new Error(`Failed to get Marcus Manager state: ${error.message}`);
-  }
+    if (error) {
+      console.error('[getMarcusManagerState] Supabase query error:', {
+        table: 'marcus_manager_state',
+        user_id: userId,
+        error_code: (error as any)?.code,
+        error_message: error.message,
+      });
+      throw new Error(`Failed to get Marcus Manager state: ${error.message}`);
+    }
 
-  if (data) {
-    return {
-      active_priority: data.active_priority || null,
-      today_task: data.today_task || null,
-      why_it_matters: data.why_it_matters || null,
-      checklist: (data.checklist as ChecklistItem[]) || [],
-      backlog: (data.backlog as BacklogItem[]) || [],
-      last_completed_task: data.last_completed_task || null,
-      last_completed_at: data.last_completed_at || null,
-      next_review_time: data.next_review_time || null,
-      metadata: (data.metadata as Record<string, unknown>) || {},
-    };
+    // Handle array result (get first matching row)
+    const data = rows?.[0] || null;
+
+    if (data) {
+      return {
+        active_priority: data.active_priority || null,
+        today_task: data.today_task || null,
+        why_it_matters: data.why_it_matters || null,
+        checklist: (data.checklist as ChecklistItem[]) || [],
+        backlog: (data.backlog as BacklogItem[]) || [],
+        last_completed_task: data.last_completed_task || null,
+        last_completed_at: data.last_completed_at || null,
+        next_review_time: data.next_review_time || null,
+        metadata: (data.metadata as Record<string, unknown>) || {},
+      };
+    }
+  } catch (error) {
+    // Log query context (no secrets, no payload bodies)
+    console.error('[getMarcusManagerState] Query failed:', {
+      table: 'marcus_manager_state',
+      user_id: userId,
+      error_type: error instanceof Error ? error.constructor.name : typeof error,
+      error_message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
   }
 
   // Create default state
