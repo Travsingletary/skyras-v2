@@ -12,26 +12,21 @@ All requested features have been implemented and deployment configuration is com
 - **Branch**: `main`
 - **Status**: Clean, ready for deployment
 
-### 2. Vercel Frontend Deployment
-- **Project**: `frontend`
-- **URL**: `https://skyras-v2-frontend-app-git-main-travis-singletarys-projects.vercel.app`
+### 2. Vercel Deployment (Frontend + Backend API Routes)
+- **Project**: `skyras-v2`
+- **URL**: `https://skyras-v2.vercel.app`
 - **Environment Variables Configured**:
-  - ✅ `NEXT_PUBLIC_API_BASE_URL` → Railway backend URL
-  - ✅ `SUPABASE_URL` → `https://zzxedixpbvivpsnztjsc.supabase.co`
+  - ✅ `NEXT_PUBLIC_SUPABASE_URL` → `https://zzxedixpbvivpsnztjsc.supabase.co`
+  - ✅ `NEXT_PUBLIC_SUPABASE_ANON_KEY` → (configured)
+  - ✅ `SUPABASE_URL` → (configured)
   - ✅ `SUPABASE_ANON_KEY` → (configured)
+  - ✅ `NEXT_PUBLIC_ACCESS_CODE` → (configured)
 
-### 3. Railway Backend Deployment
-- **Service**: Backend deployed on Railway
-- **URL**: Railway-provided URL (check Railway dashboard)
-- **Required Environment Variables** (add in Railway dashboard):
-  ```
-  NODE_ENV=production
-  PORT=4000
-  OPENAI_API_KEY=<your-key>
-  SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
-  SUPABASE_ANON_KEY=<your-key>
-  ELEVENLABS_API_KEY=<your-key>  # Required for voice features
-  ```
+### 3. Backend API Routes (Vercel)
+- **Location**: Next.js API routes in `frontend/src/app/api/`
+- **Deployment**: Automatically deployed with Vercel frontend
+- **No separate backend service required**
+- **All API functionality is in Next.js Route Handlers**
 
 ### 4. Marcus System Prompt Enhancement
 **File**: `frontend/src/agents/marcus/marcusSystemPrompt.md`
@@ -129,19 +124,7 @@ ELEVENLABS_API_KEY=<your-key>
 
 ## 🚀 Deployment Instructions
 
-### Deploy Backend to Railway
-1. Go to https://railway.app/dashboard
-2. Create new project and service
-3. Add environment variables:
-   - `NODE_ENV` → `production`
-   - `PORT` → `4000`
-   - `OPENAI_API_KEY` → (your OpenAI key)
-   - `SUPABASE_URL` → `https://zzxedixpbvivpsnztjsc.supabase.co`
-   - `SUPABASE_ANON_KEY` → (your Supabase anon key)
-   - `ELEVENLABS_API_KEY` → (get from https://elevenlabs.io/app/settings/api-keys)
-4. Click "Manual Deploy" → "Deploy latest commit"
-
-### Deploy Frontend to Vercel
+### Deploy Application to Vercel
 Environment variables already configured via CLI. Just deploy:
 ```bash
 cd frontend
@@ -156,12 +139,6 @@ Or push to `main` branch for automatic deployment.
 
 After deployment, verify:
 
-### Backend Health Check
-```bash
-curl https://your-railway-backend-url.up.railway.app/health
-# Expected: {"status":"ok","message":"SkyRas v2 Backend running"}
-```
-
 ### Frontend Loads
 - Visit: `https://skyras-v2-frontend-app-git-main-travis-singletarys-projects.vercel.app`
 - Should load chat interface
@@ -170,16 +147,11 @@ curl https://your-railway-backend-url.up.railway.app/health
 - Upload a file in chat interface
 - Check Supabase `files` table for metadata
 
-### Voice Features (requires ELEVENLABS_API_KEY)
+### API Routes Test
 ```bash
-# Test TTS
-curl -X POST https://your-railway-backend-url.up.railway.app/api/voice/tts \
-  -H "Content-Type: application/json" \
-  -d '{"text":"Hello from Marcus"}' \
-  --output test.mp3
-
-# Test voices list
-curl https://your-railway-backend-url.up.railway.app/api/voice/voices
+# Test API endpoint (should return 401 if unauthenticated, but endpoint works)
+curl https://your-app.vercel.app/api/data/plans
+# Expected: {"success":false,"error":"Authentication required"}
 ```
 
 ---
@@ -198,8 +170,7 @@ curl https://your-railway-backend-url.up.railway.app/api/voice/voices
 ## 📞 Support
 
 - **GitHub Repo**: https://github.com/Travsingletary/skyras-v2
-- **Vercel Dashboard**: https://vercel.com/travis-singletarys-projects/frontend
-- **Railway Dashboard**: https://railway.app/dashboard
+- **Vercel Dashboard**: https://vercel.com/travis-singletarys-projects/skyras-v2
 
 ---
 

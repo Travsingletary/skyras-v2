@@ -1,6 +1,31 @@
 # Railway Production Setup Guide
 
-## Environment Variables
+> **⚠️ ARCHIVED / DEPRECATED**  
+> **Date:** 2025-01-28  
+> **Status:** Railway has been decommissioned. Production now uses Vercel as the canonical backend.  
+> **See:** `docs/RAILWAY_DECISION.md` for the decommission decision and rationale.
+
+---
+
+## ⚠️ This Document is Archived
+
+Railway is no longer used in production. All backend functionality has been migrated to Vercel (Next.js API routes).
+
+**Current Architecture:**
+- **Frontend:** Vercel (Next.js)
+- **Backend:** Vercel (Next.js API routes in `frontend/src/app/api/`)
+- **Database:** Supabase
+- **No external backend service required**
+
+For current deployment instructions, see:
+- `DEPLOYMENT.md` (updated for Vercel-only)
+- `docs/RAILWAY_DECISION.md` (decommission decision)
+
+---
+
+## Archived Content (Historical Reference Only)
+
+### Environment Variables
 
 ### Required for Railway Backend
 

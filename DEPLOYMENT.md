@@ -2,18 +2,11 @@
 
 ## Recommended Hosting Combo
 
-**Railway (Backend) + Vercel (Frontend)**
+**Vercel (Frontend + Backend API Routes)**
 
-### Why This Combo?
+> **Note:** Railway backend has been decommissioned. Production now uses Vercel for both frontend and backend (Next.js API routes). See `docs/RAILWAY_DECISION.md` for details.
 
-- **Railway**: 
-  - Excellent for Express/Node.js backends
-  - Free tier includes $5/month credit
-  - Simple deployment from GitHub
-  - Automatic HTTPS
-  - Environment variable management
-  - Services stay active (no sleep mode)
-  - Good for APIs and background services
+### Why Vercel?
 
 - **Vercel**:
   - Built by Next.js team, perfect for Next.js apps
@@ -39,47 +32,9 @@ See `frontend/.env.local.example`
 
 ## Step-by-Step Deployment
 
-### Part 1: Deploy Express Backend to Railway
+### Deploy Next.js Application to Vercel
 
-1. **Prepare Repository**
-   - Ensure `server.js` is in root
-   - Create `package.json` with start script: `"start": "node server.js"`
-   - Commit and push to GitHub
-
-2. **Create Railway Service**
-   - Go to https://railway.app
-   - Sign up/login with GitHub
-   - Click "New Project" → "Deploy from GitHub repo"
-   - Connect your GitHub repository
-   - Select the repository
-
-3. **Configure Service**
-   - Railway auto-detects Node.js projects
-   - **Start Command**: Set to `npm start` in service settings
-   - Railway automatically runs `npm install` during build
-
-4. **Set Environment Variables** (in Railway dashboard)
-   ```
-   PORT=4000
-   OPENAI_API_KEY=your_openai_key
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_ANON_KEY=your_supabase_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key (if needed)
-   NODE_ENV=production
-   ```
-
-5. **Deploy**
-   - Railway automatically deploys after connecting repo
-   - Wait for build and deployment
-   - Note the service URL (e.g., `https://your-service-name.up.railway.app`)
-
-6. **Important**: Railway free tier includes $5/month credit. Services stay active:
-   - Upgrading to paid tier for always-on
-   - Or use Railway (better free tier for always-on)
-
----
-
-### Part 2: Deploy Next.js Frontend to Vercel
+> **Note:** All backend functionality is now in Next.js API routes (`frontend/src/app/api/`). No separate backend service is required.
 
 1. **Prepare Repository**
    - Ensure `frontend/` directory exists
@@ -102,11 +57,14 @@ See `frontend/.env.local.example`
    
    **Required:**
    ```
-   NEXT_PUBLIC_API_BASE_URL=https://your-railway-backend-url.up.railway.app
    NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025
+   NEXT_PUBLIC_SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6eGVkaXhwYnZpdnBzbnp0anNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODkyMTksImV4cCI6MjA3ODk2NTIxOX0.xDUS_lPMxQvI-J1ZaafWOhaAhqwRW-whr-PrYFQh1RQ
    SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
    SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6eGVkaXhwYnZpdnBzbnp0anNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODkyMTksImV4cCI6MjA3ODk2NTIxOX0.xDUS_lPMxQvI-J1ZaafWOhaAhqwRW-whr-PrYFQh1RQ
    ```
+   
+   **Note:** `NEXT_PUBLIC_API_BASE_URL` is not needed. Frontend uses same-origin API calls to Next.js API routes.
    
    **Optional (for studio features):**
    ```
@@ -122,29 +80,19 @@ See `frontend/.env.local.example`
    - Wait for build and deployment
    - Note the deployment URL (e.g., `https://skyras.vercel.app`)
 
-6. **Update Backend URL**
-   - After deployment, update `NEXT_PUBLIC_API_BASE_URL` in Vercel to point to your Railway backend URL
-   - Redeploy if needed (Vercel auto-redeploys on env var changes)
-
 ---
 
-### Part 3: Verify Deployment
+### Verify Deployment
 
-1. **Test Backend**
-   ```bash
-   curl https://your-railway-backend-url.up.railway.app/health
-   # Should return: {"status":"ok","message":"SkyRas v2 Backend running"}
-   ```
-
-2. **Test Frontend**
+1. **Test Frontend**
    - Visit `https://your-app.vercel.app`
    - Should see access code screen
    - Enter code, should see Marcus Chat
 
-3. **Test API Connection**
+2. **Test API Routes**
    - Open browser DevTools → Network tab
    - Send a test message
-   - Verify requests go to `https://your-railway-backend-url.up.railway.app/api/chat`
+   - Verify requests go to `/api/chat` (same-origin, no external backend)
 
 ---
 
@@ -161,15 +109,9 @@ The frontend now includes a simple access code gate at `/` (Marcus Chat page).
 
 ## Troubleshooting
 
-### Backend Issues
-
-- **Service sleeping**: Render free tier spins down. First request will be slow (~30s). Consider Railway for always-on.
-- **CORS errors**: Ensure backend has `cors()` middleware enabled (already in server.js)
-- **Environment variables**: Double-check all vars are set in Render dashboard
-
 ### Frontend Issues
 
-- **API calls failing**: Check `NEXT_PUBLIC_API_BASE_URL` is set correctly in Vercel
+- **API calls failing**: Check that API routes exist in `frontend/src/app/api/`. All API calls should be same-origin (no external backend needed).
 - **Build errors**: Ensure all dependencies are in `package.json`
 - **Access code not working**: Verify `NEXT_PUBLIC_ACCESS_CODE` is set in Vercel
 
@@ -182,10 +124,9 @@ The frontend now includes a simple access code gate at `/` (Marcus Chat page).
 
 ## Cost Estimate (Free Tier)
 
-- **Railway**: Free tier ($5/month credit) or paid plans available
-- **Vercel**: Free (generous limits)
+- **Vercel**: Free (generous limits for Next.js apps)
 - **Supabase**: Free tier (500MB database, 1GB storage)
-- **Total**: $0-5+/month depending on Railway usage
+- **Total**: $0/month (fully free tier)
 
 ---
 

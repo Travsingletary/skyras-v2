@@ -1,98 +1,10 @@
 # Deploy SkyRas v2 - Step-by-Step Script
 
-## SECTION 1: BACKEND DEPLOYMENT (Railway)
+> **Note:** Railway backend has been decommissioned. All backend functionality is now in Next.js API routes on Vercel. See `docs/RAILWAY_DECISION.md` for details.
 
-### Step 1: Go to Railway
-1. Open https://railway.app in your browser
-2. Click **"Start a New Project"** or **"Sign In"** (use GitHub to sign in)
+## DEPLOYMENT (Vercel - Frontend + Backend API Routes)
 
-### Step 2: Create New Project
-1. Once logged in, click **"New Project"**
-2. Click **"Deploy from GitHub repo"**
-
-### Step 3: Connect Repository
-1. You'll see "Connect a repository"
-2. Click **"Configure GitHub App"** if you haven't connected GitHub yet
-3. Authorize Railway to access your GitHub
-4. Select your repository: `skyras-v2` (or whatever your repo is named)
-5. Click **"Deploy Now"**
-
-### Step 4: Configure Service Settings
-
-**Basic Settings:**
-- Railway auto-detects Node.js projects
-- **Root Directory**: Leave **empty** (deploy from repo root)
-- **Branch**: Select `main` (or your default branch)
-- **Start Command**: Set to `npm start` in service settings (Railway auto-detects this)
-
-**Environment Variables:**
-Click **"Add Environment Variable"** and add these one by one:
-
-```
-Key: PORT
-Value: 4000
-```
-
-```
-Key: NODE_ENV
-Value: production
-```
-
-```
-Key: OPENAI_API_KEY
-Value: sk-proj-...your-openai-key-here...
-```
-*(Use your actual OpenAI key from your .env file)*
-
-```
-Key: SUPABASE_URL
-Value: https://zzxedixpbvivpsnztjsc.supabase.co
-```
-
-```
-Key: SUPABASE_ANON_KEY
-Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6eGVkaXhwYnZpdnBzbnp0anNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzODkyMTksImV4cCI6MjA3ODk2NTIxOX0.xDUS_lPMxQvI-J1ZaafWOhaAhqwRW-whr-PrYFQh1RQ
-```
-
-```
-Key: SUPABASE_SERVICE_ROLE_KEY
-Value: [Your service role key from Supabase dashboard]
-```
-
-```
-Key: ELEVENLABS_API_KEY
-Value: [Your ElevenLabs key if you have one, or leave empty]
-```
-
-### Step 5: Deploy
-1. Scroll down and click **"Create Web Service"**
-2. Wait for deployment (2-5 minutes)
-3. Watch the build logs - you should see:
-   - "Installing dependencies..."
-   - "Build successful"
-   - "Your service is live"
-
-### Step 6: Get Your Backend URL
-1. Once deployed, you'll see a URL at the top like:
-   - `https://skyras-backend.onrender.com`
-   - OR `https://skyras-backend-xxxx.onrender.com`
-2. **COPY THIS URL** - you'll need it for frontend
-
-### Step 7: Verify Backend Health
-1. Open a new browser tab
-2. Go to: `https://your-backend-url.onrender.com/health`
-   *(Replace with your actual URL)*
-3. You should see:
-   ```json
-   {"status":"ok","message":"SkyRas v2 Backend running"}
-   ```
-4. ✅ **If you see this, backend is working!**
-
-**Note:** If you get an error or timeout, wait 30 seconds (first request on free tier is slow) and try again.
-
----
-
-## SECTION 2: FRONTEND DEPLOYMENT (Vercel)
+### Step 1: Go to Vercel
 
 ### Step 1: Go to Vercel
 1. Open https://vercel.com in your browser

@@ -20,17 +20,9 @@ git commit -m "Prepare for friends beta deployment"
 git push origin main
 ```
 
-### 2. Deploy Backend to Railway
+### 2. Deploy Application to Vercel
 
-1. Go to https://railway.app → New Project
-2. Connect GitHub repo
-3. Configure:
-   - Railway auto-detects Node.js
-   - **Start Command**: `npm start` (set in service settings)
-   - **Environment Variables** (see below)
-4. Deploy → **Save backend URL**
-
-### 3. Deploy Frontend to Vercel
+> **Note:** Backend functionality is in Next.js API routes. No separate backend service is required.
 
 1. Go to https://vercel.com → Add New Project
 2. Import GitHub repo
@@ -49,26 +41,17 @@ git push origin main
 
 ## 📋 Environment Variables
 
-### Backend (Railway)
+### Vercel (Frontend + Backend API Routes)
 
 ```bash
-PORT=4000
-NODE_ENV=production
-OPENAI_API_KEY=sk-proj-...your-key...
-SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.c=o
-SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-ELEVENLABS_API_KEY=your-elevenlabs-key (optional)
-```
-
-### Frontend (Vercel)
-
-```bash
-NEXT_PUBLIC_API_BASE_URL=https://your-railway-backend-url.up.railway.app
 NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025
+NEXT_PUBLIC_SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_URL=https://zzxedixpbvivpsnztjsc.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+
+**Note:** `NEXT_PUBLIC_API_BASE_URL` is not needed. Frontend uses same-origin API calls to Next.js API routes.
 
 **Optional (for studio features):**
 ```bash
@@ -109,17 +92,17 @@ Access Code: PICOSQUAD2025
 - [ ] Send message → Onboarding starts
 - [ ] Complete onboarding → Workflow created
 - [ ] Dashboard shows workflow: `https://your-app.vercel.app/dashboard`
-- [ ] Backend health check: `curl https://your-railway-backend-url.up.railway.app/health`
-- [ ] Network tab shows API calls to Render backend
+- [ ] API routes working: `curl https://your-app.vercel.app/api/data/plans` (should return 401, not 500)
+- [ ] Network tab shows API calls to same-origin `/api/*` routes
 - [ ] Supabase has new conversation/workflow data
 
 ---
 
 ## 📝 Important Notes
 
-1. **Railway Free Tier**: Includes $5/month credit. Services stay active (no sleep mode). Consider paid plan if you exceed free tier limits.
+1. **Vercel Free Tier**: Generous limits for Next.js apps. All backend functionality is in Next.js API routes (no separate backend service needed).
 
-2. **Environment Variables**: Must be set in both Railway and Vercel dashboards. Frontend needs backend URL after Railway deploys.
+2. **Environment Variables**: Must be set in Vercel dashboard. No external backend URL needed.
 
 3. **Root Directory**: Vercel must have `frontend` set as root directory.
 
@@ -131,10 +114,10 @@ Access Code: PICOSQUAD2025
 
 ## 🐛 Troubleshooting
 
-**Backend not responding?**
-- Check Render logs
-- Verify environment variables
-- Test health endpoint: `curl https://your-railway-backend-url.up.railway.app/health`
+**API routes not responding?**
+- Check Vercel function logs
+- Verify environment variables in Vercel dashboard
+- Test API endpoint: `curl https://your-app.vercel.app/api/data/plans`
 
 **Frontend build fails?**
 - Check Vercel build logs
@@ -142,9 +125,9 @@ Access Code: PICOSQUAD2025
 - Check TypeScript errors
 
 **API calls failing?**
-- Verify `NEXT_PUBLIC_API_BASE_URL` points to Railway backend
-- Check CORS (should be enabled in backend)
+- Verify API routes exist in `frontend/src/app/api/`
 - Check browser console for errors
+- All API calls should be same-origin (no external backend)
 
 **Access code not working?**
 - Verify `NEXT_PUBLIC_ACCESS_CODE=PICOSQUAD2025` in Vercel
@@ -162,8 +145,7 @@ Access Code: PICOSQUAD2025
 
 ## 🎯 Next Steps
 
-1. Deploy backend to Render
-2. Deploy frontend to Vercel (use backend URL)
+1. Deploy application to Vercel (includes frontend + API routes)
 3. Test all functionality
 4. Share URL with friends: `https://your-app.vercel.app/`
 5. Share access code: `PICOSQUAD2025`
