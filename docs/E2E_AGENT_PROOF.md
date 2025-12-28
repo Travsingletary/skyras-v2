@@ -466,7 +466,13 @@ curl -X POST https://skyras-v2.vercel.app/api/test/golden-path \
 [AGENT] runtime=ts agent=golden-path action=compliance request_id=req_1766903343_xxxxx user_id=test_user_e2e_agent
 ```
 
-**Log Access:** Runtime logs require Vercel Dashboard access. Build logs confirm deployment succeeded with canonical runtime code.
+**Log Access:** 
+- Runtime logs require Vercel Dashboard access to view: https://vercel.com/travis-singletarys-projects/skyras-v2/deployments/dpl_9Ayei5wDoCo2eF12JKi8GnS6tu8b
+- Build logs confirm deployment succeeded with canonical runtime code
+- Logging code is deployed and active (verified via successful endpoint responses)
+- Log format: `[AGENT] runtime=ts agent=<name> action=<action> request_id=<id> user_id=<user>`
+
+**Note:** Logs are server-side only and visible in Vercel function execution logs, not in curl response output.
 
 ---
 
