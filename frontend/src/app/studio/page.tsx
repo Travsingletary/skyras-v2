@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import FilePreview from "@/components/FilePreview";
 import WorkflowSuggestions from "@/components/WorkflowSuggestions";
+import OnboardingBanner from "@/components/OnboardingBanner";
 
 export const dynamic = 'force-dynamic';
 
@@ -68,6 +69,7 @@ export default function Home() {
   }>>([]);
   const [plansLoading, setPlansLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoLoading, setDemoLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Do not use NEXT_PUBLIC_API_BASE_URL for internal Next.js API routes.
   // We always call same-origin `/api/*` in production to avoid CORS issues.
@@ -86,26 +88,26 @@ export default function Home() {
     setUserId(storedUserId);
   }, []);
 
-  // Fetch plans on mount
-  useEffect(() => {
-    async function fetchPlans() {
-      try {
-        setPlansLoading(true);
-        const res = await fetch('/api/data/plans');
-        const data = await res.json();
-        
-        if (data.success) {
-          setPlans(data.data || []);
-        } else {
-          console.error('[Plans] Error:', data.error);
-        }
-      } catch (err) {
-        console.error('[Plans] Fetch error:', err);
-      } finally {
-        setPlansLoading(false);
+  // Fetch plans on mount and when workflows might have changed
+  const fetchPlans = async () => {
+    try {
+      setPlansLoading(true);
+      const res = await fetch('/api/data/plans');
+      const data = await res.json();
+      
+      if (data.success) {
+        setPlans(data.data || []);
+      } else {
+        console.error('[Plans] Error:', data.error);
       }
+    } catch (err) {
+      console.error('[Plans] Fetch error:', err);
+    } finally {
+      setPlansLoading(false);
     }
+  };
 
+  useEffect(() => {
     fetchPlans();
   }, []);
 
@@ -120,6 +122,84 @@ export default function Home() {
 
   const handleRemoveUploadedFile = (fileId: string) => {
     setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
+  };
+
+  const handleRunDemo = async () => {
+    if (!userId) {
+      setError("User ID not initialized");
+      return;
+    }
+
+    setDemoLoading(true);
+    setError(null);
+
+    try {
+      // Trigger compliance golden path demo (quick and shows multiple agents)
+      const res = await fetch('/api/test/golden-path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenario: 'compliance',
+          userId,
+          project: 'SkySky',
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Failed to run demo');
+      }
+
+      const data = await res.json();
+      console.log('[Demo] Result:', data);
+
+      // Create a workflow to track this demo (so onboarding disappears)
+      try {
+        const workflowRes = await fetch('/api/workflows', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId,
+            name: 'Demo: Compliance Scan',
+            type: 'licensing',
+            planMarkdown: 'Initial demo workflow - compliance scan completed successfully.',
+            summary: data.output || 'Compliance scan completed',
+            tasks: [
+              {
+                title: 'Review compliance scan results',
+                description: 'Compliance scan completed with demo workflow',
+              },
+            ],
+          }),
+        });
+
+        if (workflowRes.ok) {
+          console.log('[Demo] Created workflow for onboarding');
+        }
+      } catch (workflowErr) {
+        console.warn('[Demo] Failed to create workflow (non-critical):', workflowErr);
+        // Don't fail the demo if workflow creation fails
+      }
+
+      // Show success message
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg_${Date.now()}`,
+          content: `✓ Demo completed! ${data.output || 'Compliance scan finished successfully.'}`,
+          sender: 'agent',
+          timestamp: new Date(),
+        },
+      ]);
+
+      // Refresh plans to check if onboarding should be hidden
+      await fetchPlans();
+    } catch (err) {
+      console.error('[Demo] Error:', err);
+      setError(`Failed to run demo: ${(err as Error).message}`);
+    } finally {
+      setDemoLoading(false);
+    }
   };
 
   const handleCreateWorkflow = async (suggestion: WorkflowSuggestion) => {
@@ -168,6 +248,9 @@ export default function Home() {
       setWorkflowSuggestions((prev) =>
         prev.filter((s) => s.workflowType !== suggestion.workflowType)
       );
+
+      // Refresh plans to check if onboarding should be hidden
+      await fetchPlans();
     } catch (err) {
       console.error('[Workflow] Error:', err);
       setError(`Failed to create workflow: ${(err as Error).message}`);
@@ -292,6 +375,9 @@ export default function Home() {
 
       // Clear input
       setMessage("");
+
+      // Refresh plans in case a workflow was created
+      await fetchPlans();
     } catch (err) {
       const errorMessage = (err as Error).message;
       console.error("[Chat] Error:", errorMessage);
@@ -301,6 +387,9 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  // Detect first-run state (no workflows/plans)
+  const isFirstRun = !plansLoading && plans.length === 0;
 
   return (
     <div className="min-h-screen bg-zinc-50 p-6 text-zinc-900">
@@ -328,6 +417,11 @@ export default function Home() {
             </Link>
           </div>
         </header>
+
+        {/* Onboarding Banner (first-run only) */}
+        {isFirstRun && (
+          <OnboardingBanner onRunDemo={handleRunDemo} loading={demoLoading} />
+        )}
 
         {/* Connection Status */}
         <div className="rounded-lg border bg-white p-3 shadow-sm">
