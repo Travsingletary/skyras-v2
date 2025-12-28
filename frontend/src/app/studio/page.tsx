@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import FilePreview from "@/components/FilePreview";
 import WorkflowSuggestions from "@/components/WorkflowSuggestions";
 import OnboardingBanner from "@/components/OnboardingBanner";
@@ -49,11 +50,12 @@ interface WorkflowSuggestion {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [message, setMessage] = useState("Run a creative concept for SkySky");
   const [messages, setMessages] = useState<Message[]>([]);
   const [response, setResponse] = useState<ChatResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string>("");
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -74,6 +76,29 @@ export default function Home() {
   // Do not use NEXT_PUBLIC_API_BASE_URL for internal Next.js API routes.
   // We always call same-origin `/api/*` in production to avoid CORS issues.
   const apiBaseUrl = "same-origin";
+
+  // Check auth state on mount and when page becomes visible
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/user');
+        const data = await res.json();
+        if (data.user) {
+          setUser(data.user);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('[Auth] Error checking auth state:', err);
+        setUser(null);
+      }
+    };
+    
+    checkAuth();
+    // Check auth state periodically (every 30 seconds) to catch logout from other tabs
+    const interval = setInterval(checkAuth, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Note: User identity is now derived server-side from auth session (no client-side userId needed)
 
@@ -104,7 +129,23 @@ export default function Home() {
 
   useEffect(() => {
     fetchPlans();
-  }, []);
+  }, [user]); // Refetch plans when auth state changes
+
+  const handleLogout = async () => {
+    try {
+      const res = await fetch('/api/auth/logout', { method: 'POST' });
+      if (res.ok) {
+        setUser(null);
+        setPlans([]);
+        setMessages([]);
+        router.push('/login');
+      }
+    } catch (err) {
+      console.error('[Auth] Logout error:', err);
+    }
+  };
+
+  const isFirstRun = !plansLoading && plans.length === 0 && user;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -310,17 +351,16 @@ export default function Home() {
       console.log('[Chat] Sending message to /api/chat');
       console.log("[Chat] Payload:", {
         conversationId,
-        userId,
         message,
         files: fileIds.map((id) => ({ fileId: id })),
       });
 
+      // Note: userId is derived server-side from auth session
       const res = await fetch('/api/chat', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId,
-          userId,
           message,
           files: fileIds.map((id) => ({ fileId: id })),
         }),
@@ -388,6 +428,34 @@ export default function Home() {
             </p>
           </div>
           <div className="flex gap-3">
+            {user ? (
+              <>
+                <span className="text-sm text-zinc-600 self-center">
+                  {user.email}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/signup"
+                  className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 transition-colors"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
             <Link
               href="/workflows"
               className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
@@ -415,7 +483,7 @@ export default function Home() {
               API: <span className="font-mono text-zinc-900">{apiBaseUrl}</span>
             </span>
             <span className="text-zinc-600">
-              Status: <span className="font-mono text-zinc-900">Authenticated</span>
+              Status: <span className="font-mono text-zinc-900">{user ? `Authenticated (${user.email})` : 'Not authenticated'}</span>
             </span>
           </div>
         </div>
