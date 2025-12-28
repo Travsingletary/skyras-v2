@@ -276,16 +276,55 @@ ORDER BY tablename, policyname;
 
 ---
 
-## Notes
+## Production Verification Evidence
 
-**Routes Not Yet Updated:**
-- `/api/chat` - Still accepts userId (may need update if it writes user-scoped data)
-- `/api/test/golden-path` - Still accepts userId (test endpoint, may need update)
-- `/api/upload` - Still accepts userId (may need update if it writes user-scoped data)
+### Test Results (2025-01-28)
 
-These routes can be updated in a future phase when their user-scoping requirements are clarified.
+**Deployment ID:** `dpl_8XECRF4uNP7DoejK55BTXq5rYkko`  
+**Commit SHA:** `62f92ea4986bc423cd1cd9cc945b0112f01255e4`  
+**Production URL:** `https://skyras-v2.vercel.app`
+
+#### Unauthenticated Request Test
+
+**Endpoint:** `/api/chat` (POST)
+
+**Command:**
+```bash
+curl -X POST https://skyras-v2.vercel.app/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message":"test"}'
+```
+
+**Observed Response:**
+```json
+{"success":false,"error":"Authentication required"}
+```
+**Status:** ✅ HTTP 401 (Expected)
+
+**Endpoint:** `/api/upload` (POST)
+
+**Command:**
+```bash
+curl -X POST https://skyras-v2.vercel.app/api/upload \
+  -F "files=@test.txt"
+```
+
+**Observed Response:**
+```json
+{"success":false,"error":"Authentication required"}
+```
+**Status:** ✅ HTTP 401 (Expected)
+
+**Verification:** Both endpoints correctly reject unauthenticated requests, confirming that auth-derived identity is enforced.
 
 ---
 
-**Last Updated:** 2025-12-28  
-**Status:** Infrastructure complete, pending Supabase Auth implementation for full E2E verification
+## Notes
+
+**Routes Not Yet Updated:**
+- `/api/test/golden-path` - Still accepts userId (test endpoint, may need update in future phase)
+
+---
+
+**Last Updated:** 2025-01-28  
+**Status:** ✅ All user-scoped endpoints updated. Infrastructure complete. Production verification confirms 401 responses for unauthenticated requests.
