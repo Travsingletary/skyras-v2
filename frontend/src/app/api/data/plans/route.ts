@@ -1,37 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseClient } from "@/backend/supabaseClient";
+import { getAuthenticatedUserId, logAuthIdentity } from "@/lib/auth";
 import type { Workflow } from "@/types/database";
 
 /**
  * GET /api/data/plans
  * 
- * Returns plan data from the workflows table.
+ * Returns plan data from the workflows table, filtered by authenticated user.
  * 
  * Query parameters:
- * - userId: Filter by user_id (optional, but recommended for per-user onboarding)
  * - project: Filter by project_id (optional)
  * 
- * Note: The studio_plans table does not exist. This endpoint uses the workflows table
+ * Note: User identity is derived server-side from auth session (no userId parameter).
+ * The studio_plans table does not exist. This endpoint uses the workflows table
  * which contains plan data in the plan_markdown field.
- * 
- * For onboarding: Pass userId to get per-user plans count.
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabaseClient();
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId") || undefined;
-    const project = searchParams.get("project") || undefined;
+    // Derive user identity from auth session (server-side only)
+    const userId = await getAuthenticatedUserId(request);
+    logAuthIdentity('/api/data/plans', userId);
 
-    // Build filters for Supabase query
-    const filters: Record<string, unknown> = {};
-    if (userId) {
-      filters.user_id = userId;
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication required' },
+        { status: 401 }
+      );
     }
 
-    // Query workflows table with user_id filter if provided
-    // If no userId, get all workflows (backward compatibility)
+    const supabase = getSupabaseClient();
+    const { searchParams } = new URL(request.url);
+    const project = searchParams.get("project") || undefined;
+
+    // Build filters for Supabase query (always filter by authenticated user)
+    const filters: Record<string, unknown> = {
+      user_id: userId,
+    };
+
+    // Query workflows table filtered by authenticated user
     const { data, error } = await supabase.from("workflows").select(filters);
 
     if (error) {
@@ -59,11 +66,9 @@ export async function GET(request: NextRequest) {
 
     // Server-side logging (sanity check - no markdown content, no sensitive data)
     const returnedCount = workflows.length;
-    const userIdFilterApplied = !!userId;
     const projectFilterApplied = !!project;
     console.log(
-      `[GET /api/data/plans] Returned ${returnedCount} plan(s) (from ${initialCount} total workflows), ` +
-      `user filter: ${userIdFilterApplied ? 'applied' : 'none'}, ` +
+      `[GET /api/data/plans] Returned ${returnedCount} plan(s) for authenticated user, ` +
       `project filter: ${projectFilterApplied ? `applied (${project})` : 'none'}`
     );
 

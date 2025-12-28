@@ -90,24 +90,24 @@ export default function Home() {
 
   // Fetch plans on mount and when workflows might have changed
   const fetchPlans = async () => {
-    if (!userId) {
-      // Wait for userId to be initialized
-      return;
-    }
-
     try {
       setPlansLoading(true);
-      // Pass userId to get per-user plans (for onboarding detection)
-      const res = await fetch(`/api/data/plans?userId=${encodeURIComponent(userId)}`);
+      // User identity is derived server-side from auth session (no userId parameter)
+      const res = await fetch('/api/data/plans');
       const data = await res.json();
       
       if (data.success) {
         setPlans(data.data || []);
       } else {
         console.error('[Plans] Error:', data.error);
+        // If auth required, show appropriate message
+        if (data.error === 'Authentication required') {
+          setError('Please sign in to view your plans');
+        }
       }
     } catch (err) {
       console.error('[Plans] Fetch error:', err);
+      setError('Failed to load plans');
     } finally {
       setPlansLoading(false);
     }
@@ -115,7 +115,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchPlans();
-  }, [userId]);
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -131,22 +131,17 @@ export default function Home() {
   };
 
   const handleRunDemo = async () => {
-    if (!userId) {
-      setError("User ID not initialized");
-      return;
-    }
-
     setDemoLoading(true);
     setError(null);
 
     try {
       // Trigger compliance golden path demo (quick and shows multiple agents)
+      // Note: userId is derived server-side from auth session (if auth is configured)
       const res = await fetch('/api/test/golden-path', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           scenario: 'compliance',
-          userId,
           project: 'SkySky',
         }),
       });
@@ -161,11 +156,11 @@ export default function Home() {
 
       // Create a workflow to track this demo (so onboarding disappears)
       try {
+        // Note: userId is derived server-side from auth session
         const workflowRes = await fetch('/api/workflows', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId,
             name: 'Demo: Compliance Scan',
             type: 'licensing',
             planMarkdown: 'Initial demo workflow - compliance scan completed successfully.',
@@ -209,17 +204,12 @@ export default function Home() {
   };
 
   const handleCreateWorkflow = async (suggestion: WorkflowSuggestion) => {
-    if (!userId) {
-      setError("User ID not initialized");
-      return;
-    }
-
     try {
+      // Note: userId is derived server-side from auth session
       const res = await fetch('/api/workflows', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId,
           name: suggestion.title,
           type: suggestion.workflowType,
           planMarkdown: suggestion.description,

@@ -1,29 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { workflowsDb, workflowTasksDb } from '@/lib/database';
+import { getAuthenticatedUserId, logAuthIdentity } from '@/lib/auth';
 import type { WorkflowInsert, WorkflowTaskInsert } from '@/types/database';
 
-// GET /api/workflows - List workflows for a user or project
+// GET /api/workflows - List workflows for authenticated user
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get('userId');
-  const projectId = searchParams.get('projectId');
-
-  if (!userId && !projectId) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'userId or projectId parameter is required',
-      },
-      { status: 400 }
-    );
-  }
-
   try {
+    // Derive user identity from auth session (server-side only)
+    const userId = await getAuthenticatedUserId(request);
+    logAuthIdentity('/api/workflows', userId);
+
+    if (!userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Authentication required',
+        },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const projectId = searchParams.get('projectId');
+
     let workflows;
 
     if (projectId) {
+      // Filter by project AND authenticated user
       workflows = await workflowsDb.getByProjectId(projectId);
-    } else if (userId) {
+      // Additional server-side filter to ensure user owns the project workflows
+      workflows = workflows?.filter((w) => w.user_id === userId) || [];
+    } else {
+      // Get workflows for authenticated user only
       workflows = await workflowsDb.getByUserId(userId);
     }
 
@@ -49,9 +57,22 @@ export async function GET(request: NextRequest) {
 // POST /api/workflows - Create a new workflow with tasks
 export async function POST(request: NextRequest) {
   try {
+    // Derive user identity from auth session (server-side only)
+    const userId = await getAuthenticatedUserId(request);
+    logAuthIdentity('/api/workflows', userId);
+
+    if (!userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Authentication required',
+        },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const {
-      userId,
       projectId,
       name,
       type,
@@ -60,17 +81,6 @@ export async function POST(request: NextRequest) {
       agentName,
       tasks,
     } = body;
-
-    // Validate required fields
-    if (!userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'userId is required',
-        },
-        { status: 400 }
-      );
-    }
 
     if (!name) {
       return NextResponse.json(
