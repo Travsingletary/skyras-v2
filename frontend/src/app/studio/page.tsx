@@ -90,9 +90,15 @@ export default function Home() {
 
   // Fetch plans on mount and when workflows might have changed
   const fetchPlans = async () => {
+    if (!userId) {
+      // Wait for userId to be initialized
+      return;
+    }
+
     try {
       setPlansLoading(true);
-      const res = await fetch('/api/data/plans');
+      // Pass userId to get per-user plans (for onboarding detection)
+      const res = await fetch(`/api/data/plans?userId=${encodeURIComponent(userId)}`);
       const data = await res.json();
       
       if (data.success) {
@@ -109,7 +115,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchPlans();
-  }, []);
+  }, [userId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);

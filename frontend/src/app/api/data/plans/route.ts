@@ -9,20 +9,30 @@ import type { Workflow } from "@/types/database";
  * Returns plan data from the workflows table.
  * 
  * Query parameters:
+ * - userId: Filter by user_id (optional, but recommended for per-user onboarding)
  * - project: Filter by project_id (optional)
  * 
  * Note: The studio_plans table does not exist. This endpoint uses the workflows table
  * which contains plan data in the plan_markdown field.
+ * 
+ * For onboarding: Pass userId to get per-user plans count.
  */
 export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseClient();
     const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId") || undefined;
     const project = searchParams.get("project") || undefined;
 
-    // Query workflows table (studio_plans doesn't exist)
-    // Use empty filter to get all workflows, then filter by project_id if provided
-    const { data, error } = await supabase.from("workflows").select({});
+    // Build filters for Supabase query
+    const filters: Record<string, unknown> = {};
+    if (userId) {
+      filters.user_id = userId;
+    }
+
+    // Query workflows table with user_id filter if provided
+    // If no userId, get all workflows (backward compatibility)
+    const { data, error } = await supabase.from("workflows").select(filters);
 
     if (error) {
       console.error("[GET /api/data/plans] Database error:", error);
@@ -47,10 +57,15 @@ export async function GET(request: NextRequest) {
       return bDate - aDate;
     });
 
-    // Server-side logging (sanity check - no markdown content)
+    // Server-side logging (sanity check - no markdown content, no sensitive data)
     const returnedCount = workflows.length;
-    const filterApplied = !!project;
-    console.log(`[GET /api/data/plans] Returned ${returnedCount} plan(s) (from ${initialCount} total workflows), project filter: ${filterApplied ? `applied (${project})` : 'none'}`);
+    const userIdFilterApplied = !!userId;
+    const projectFilterApplied = !!project;
+    console.log(
+      `[GET /api/data/plans] Returned ${returnedCount} plan(s) (from ${initialCount} total workflows), ` +
+      `user filter: ${userIdFilterApplied ? 'applied' : 'none'}, ` +
+      `project filter: ${projectFilterApplied ? `applied (${project})` : 'none'}`
+    );
 
     // Transform workflows to plan format
     const plans = workflows.map((workflow) => ({
