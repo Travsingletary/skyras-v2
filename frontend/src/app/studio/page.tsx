@@ -57,6 +57,16 @@ export default function Home() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [workflowSuggestions, setWorkflowSuggestions] = useState<WorkflowSuggestion[]>([]);
+  const [plans, setPlans] = useState<Array<{
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+    plan: string | null;
+    summary: string | null;
+    created_at: string;
+  }>>([]);
+  const [plansLoading, setPlansLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Do not use NEXT_PUBLIC_API_BASE_URL for internal Next.js API routes.
@@ -74,6 +84,29 @@ export default function Home() {
       localStorage.setItem("userId", storedUserId);
     }
     setUserId(storedUserId);
+  }, []);
+
+  // Fetch plans on mount
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        setPlansLoading(true);
+        const res = await fetch('/api/data/plans');
+        const data = await res.json();
+        
+        if (data.success) {
+          setPlans(data.data || []);
+        } else {
+          console.error('[Plans] Error:', data.error);
+        }
+      } catch (err) {
+        console.error('[Plans] Fetch error:', err);
+      } finally {
+        setPlansLoading(false);
+      }
+    }
+
+    fetchPlans();
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -463,6 +496,54 @@ export default function Home() {
             )}
           </div>
         )}
+
+        {/* Plans Section */}
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold">Plans</h3>
+            {plansLoading && <span className="text-xs text-zinc-500">Loading...</span>}
+          </div>
+          
+          {!plansLoading && plans.length === 0 ? (
+            <div className="text-center py-8 text-sm text-zinc-500">
+              <p>No plans found.</p>
+              <p className="mt-1 text-xs">Plans will appear here when workflows are created.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {plans.map((plan) => (
+                <div key={plan.id} className="rounded border border-zinc-200 p-3 hover:bg-zinc-50 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="text-sm font-medium text-zinc-900">{plan.name}</h4>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          plan.status === 'active' ? 'bg-blue-100 text-blue-700' :
+                          plan.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {plan.status}
+                        </span>
+                        <span className="text-xs text-zinc-500">{plan.type}</span>
+                      </div>
+                      {plan.plan && (
+                        <p className="text-xs text-zinc-600 mt-1 line-clamp-2">
+                          {plan.plan.length > 200 ? `${plan.plan.substring(0, 200)}...` : plan.plan}
+                        </p>
+                      )}
+                      {plan.summary && !plan.plan && (
+                        <p className="text-xs text-zinc-600 mt-1">{plan.summary}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-400">
+                    {new Date(plan.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-lg border bg-white p-4 shadow-sm">
