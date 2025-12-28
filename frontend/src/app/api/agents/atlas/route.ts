@@ -7,10 +7,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAtlasAgent } from '@/agents/atlas';
 import { getSupabaseClient } from '@/backend/supabaseClient';
 import { getMarcusManagerState } from '@/agents/marcusManager/marcusManagerActions';
+import { logAgentExecution, generateRequestId } from '@/lib/agentLogging';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
+  
   try {
     const body = await request.json();
     const { message, userId = 'public' } = body;
@@ -21,6 +24,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Log agent execution with canonical runtime identification
+    logAgentExecution({
+      agent: 'atlas',
+      action: 'processMessage',
+      requestId,
+      userId,
+    });
 
     // Create Atlas agent
     const atlas = createAtlasAgent();

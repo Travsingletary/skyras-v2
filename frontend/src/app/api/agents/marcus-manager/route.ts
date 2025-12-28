@@ -5,11 +5,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createMarcusManagerAgent } from '@/agents/marcusManager';
+import { logAgentExecution, generateRequestId } from '@/lib/agentLogging';
 import { getSupabaseClient } from '@/backend/supabaseClient';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
+  
   try {
     const body = await request.json();
     const { message, userId = 'public' } = body;
@@ -20,6 +23,14 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Log agent execution with canonical runtime identification
+    logAgentExecution({
+      agent: 'marcus-manager',
+      action: 'processMessage',
+      requestId,
+      userId,
+    });
 
     // Create Marcus Manager agent
     const marcusManager = createMarcusManagerAgent();

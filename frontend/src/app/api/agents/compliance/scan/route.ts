@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createComplianceAgent } from "@/agents/compliance";
+import { logAgentExecution, generateRequestId } from "@/lib/agentLogging";
 
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
+  
   try {
     const body = await request.json();
     const projectId = body?.projectId;
@@ -10,6 +13,14 @@ export async function POST(request: NextRequest) {
     if (!projectId || !Array.isArray(files)) {
       return NextResponse.json({ success: false, error: "projectId and files[] are required" }, { status: 400 });
     }
+
+    // Log agent execution with canonical runtime identification
+    logAgentExecution({
+      agent: 'cassidy',
+      action: 'scanFilesForLicensing',
+      requestId,
+      metadata: { projectId, fileCount: files.length },
+    });
 
     const compliance = createComplianceAgent();
     const result = await compliance.run({

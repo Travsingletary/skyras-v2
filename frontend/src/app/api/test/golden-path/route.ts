@@ -14,6 +14,7 @@ import {
   type ProofMarker,
 } from '@/agents/core/AgentContract';
 import { FEATURE_FLAGS } from '@/lib/featureFlags';
+import { logAgentExecution, generateRequestId } from '@/lib/agentLogging';
 
 export const runtime = 'nodejs';
 
@@ -49,12 +50,22 @@ interface GoldenPathRequest {
  * Tests 3 core agent workflows with proof markers
  */
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
   const proofMarkers: ProofMarker[] = [];
   const startTime = Date.now();
 
   try {
     const body: GoldenPathRequest = await request.json();
     const { scenario, userId = 'public', project = 'SkySky', input = {} } = body;
+
+    // Log agent execution with canonical runtime identification
+    logAgentExecution({
+      agent: 'golden-path',
+      action: scenario,
+      requestId,
+      userId,
+      metadata: { project },
+    });
 
     if (!['creative', 'compliance', 'distribution'].includes(scenario)) {
       return NextResponse.json(

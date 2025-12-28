@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMarcusAgent } from "@/agents/marcus";
+import { logAgentExecution, generateRequestId } from "@/lib/agentLogging";
 
 export async function POST(request: NextRequest) {
+  const requestId = generateRequestId();
+  
   try {
     const payload = await request.json().catch((parseError) => {
       console.error('[/api/chat] JSON parse error:', parseError);
@@ -34,6 +37,15 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    // Log agent execution with canonical runtime identification
+    logAgentExecution({
+      agent: 'marcus',
+      action: 'chat',
+      requestId,
+      userId,
+      metadata: { conversationId, hasFiles: !!files?.length },
+    });
 
     let result;
     try {

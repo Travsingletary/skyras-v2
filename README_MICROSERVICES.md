@@ -1,8 +1,17 @@
 # SkyRas v2 - Phase 0 Microservices Architecture
 
+> **⚠️ NON-CANONICAL: This architecture is NOT used in production.**
+>
+> The canonical agent runtime is **TypeScript AgentKit** (Next.js API routes).  
+> Python microservices are legacy Phase 0 architecture and are NOT called by production code.
+>
+> See `docs/AGENT_CANONICAL_PATH.md` for the canonical execution path.
+
 ## 🎯 Overview
 
 This is the **Phase 0 proof-of-concept** for SkyRas v2's microservices architecture, featuring Marcus (Task Management) and Letitia (Library Management) agents communicating via Redis events.
+
+**Status:** Archived / Dev-only. Not part of production deployment.
 
 ### Architecture
 
