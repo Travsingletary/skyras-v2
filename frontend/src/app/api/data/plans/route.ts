@@ -19,7 +19,7 @@ import type { Workflow } from "@/types/database";
 export async function GET(request: NextRequest) {
   try {
     // Derive user identity from auth session (server-side only)
-    const userId = await getAuthenticatedUserId(request);
+    const userId = await getAuthenticatedUserId();
     logAuthIdentity('/api/data/plans', userId);
 
     if (!userId) {

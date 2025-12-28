@@ -75,18 +75,7 @@ export default function Home() {
   // We always call same-origin `/api/*` in production to avoid CORS issues.
   const apiBaseUrl = "same-origin";
 
-  // Initialize userId from localStorage
-  useEffect(() => {
-    // SSR-safe: Only access localStorage in browser
-    if (typeof window === 'undefined') return;
-
-    let storedUserId = localStorage.getItem("userId");
-    if (!storedUserId) {
-      storedUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      localStorage.setItem("userId", storedUserId);
-    }
-    setUserId(storedUserId);
-  }, []);
+  // Note: User identity is now derived server-side from auth session (no client-side userId needed)
 
   // Fetch plans on mount and when workflows might have changed
   const fetchPlans = async () => {
@@ -426,7 +415,7 @@ export default function Home() {
               API: <span className="font-mono text-zinc-900">{apiBaseUrl}</span>
             </span>
             <span className="text-zinc-600">
-              User ID: <span className="font-mono text-zinc-900">{userId || "loading..."}</span>
+              Status: <span className="font-mono text-zinc-900">Authenticated</span>
             </span>
           </div>
         </div>

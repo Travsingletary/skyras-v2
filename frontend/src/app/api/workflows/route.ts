@@ -7,7 +7,7 @@ import type { WorkflowInsert, WorkflowTaskInsert } from '@/types/database';
 export async function GET(request: NextRequest) {
   try {
     // Derive user identity from auth session (server-side only)
-    const userId = await getAuthenticatedUserId(request);
+    const userId = await getAuthenticatedUserId();
     logAuthIdentity('/api/workflows', userId);
 
     if (!userId) {
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Derive user identity from auth session (server-side only)
-    const userId = await getAuthenticatedUserId(request);
+    const userId = await getAuthenticatedUserId();
     logAuthIdentity('/api/workflows', userId);
 
     if (!userId) {
