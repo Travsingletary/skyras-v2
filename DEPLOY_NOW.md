@@ -117,14 +117,14 @@ Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6
 - [ ] Select a workflow (say: `1` or workflow name)
 - [ ] Full workflow structure appears
 
-### Test 4: Backend Connection
+### Test 4: API Routes Connection
 - [ ] Open browser DevTools (F12)
 - [ ] Go to **"Network"** tab
 - [ ] Send a message in chat
-- [ ] Look for request to: `https://your-railway-backend-url.up.railway.app/api/chat`
+- [ ] Look for request to: `/api/chat` (same-origin, no external backend)
 - [ ] Request should show status `200` (success)
 - [ ] Response should contain Marcus's message
-- [ ] ✅ **If you see this, backend connection works!**
+- [ ] ✅ **If you see this, API routes work!**
 
 ### Test 5: Workflow Saved to Database
 - [ ] Complete onboarding (from Test 3)
