@@ -59,10 +59,30 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      console.error('[Auth] Login error:', error.message);
+      // Log full error object for debugging
+      console.error('[Auth] Login error - Full error object:', {
+        message: error.message,
+        status: error.status,
+        name: error.name,
+        code: (error as any).code,
+        error_description: (error as any).error_description,
+      });
+      
+      // Check if it's an email confirmation error
+      const isEmailNotConfirmed = 
+        error.message?.toLowerCase().includes('email not confirmed') ||
+        error.message?.toLowerCase().includes('email_not_confirmed') ||
+        (error as any).code === 'email_not_confirmed' ||
+        (error as any).error_description?.toLowerCase().includes('email not confirmed');
+      
+      // Only return "Email not confirmed" if that's actually the error
+      const errorMessage = isEmailNotConfirmed 
+        ? 'Email not confirmed. Please check your email and click the confirmation link.'
+        : error.message || 'Login failed';
+      
       // Create JSON response and copy cookies
       const errorResponse = NextResponse.json(
-        { error: error.message },
+        { error: errorMessage },
         { status: 401 }
       );
       // Copy all cookies from the response object
@@ -86,6 +106,23 @@ export async function POST(request: NextRequest) {
       return errorResponse;
     }
 
+    // Force session refresh to ensure we have the latest user state
+    // This is critical after email confirmation
+    const { data: { user: refreshedUser }, error: refreshError } = await supabase.auth.getUser();
+    
+    if (refreshError) {
+      console.error('[Auth] Session refresh error:', refreshError);
+    }
+    
+    // Log user confirmation status for debugging
+    console.log('[Auth] Login successful:', {
+      userId: data.user.id,
+      email: data.user.email,
+      emailConfirmed: data.user.email_confirmed_at !== null,
+      emailConfirmedAt: data.user.email_confirmed_at,
+      refreshedEmailConfirmed: refreshedUser?.email_confirmed_at !== null,
+    });
+
     // Create success JSON response and copy cookies
     const successResponse = NextResponse.json(
       {
@@ -103,7 +140,6 @@ export async function POST(request: NextRequest) {
       successResponse.cookies.set(cookie.name, cookie.value);
     });
     
-    console.log('[Auth] Login successful:', { userId: data.user.id, email: data.user.email });
     return successResponse;
   } catch (error) {
     // Catch all errors and ensure we always return valid JSON

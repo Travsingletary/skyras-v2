@@ -60,9 +60,17 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Get the app URL for email confirmation redirect
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                   'https://skyras-v2.vercel.app';
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${appUrl}/auth/callback`,
+      },
     });
 
     if (error) {
