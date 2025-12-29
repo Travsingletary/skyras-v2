@@ -170,6 +170,23 @@ class MarcusAgent extends BaseAgent {
     return { valid: false, action: null };
   }
 
+  /**
+   * Clean and de-duplicate response text
+   */
+  private cleanResponseText(text: string): string {
+    // Remove placeholders like [email], [client_email], etc.
+    let cleaned = text.replace(/\[[^\]]+\]/g, '');
+    // Remove empty quotes and clean up spacing
+    cleaned = cleaned.replace(/\s+with\s+subject\s+''/gi, '');
+    cleaned = cleaned.replace(/\s+at\s+with/gi, ' with');
+    // De-duplicate repeated adjacent phrases
+    cleaned = cleaned.replace(/\b(your client|your project|your workflow)\s+\1/gi, '$1');
+    cleaned = cleaned.replace(/\b(at|with|for|to|in|on)\s+\1/gi, '$1');
+    // Clean up multiple spaces
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    return cleaned;
+  }
+
   protected async handleRun(input: AgentRunInput, context: AgentExecutionContext): Promise<AgentRunResult> {
     context.logger.info("Handling request", { prompt: input.prompt });
 
@@ -438,78 +455,23 @@ Your response must be ONLY the next action. Nothing else.`;
         let rawResponse = textContent && textContent.type === "text" ? textContent.text : outputLines.join('\n');
         
         // PHASE 1 POST-PROCESSING: Extract single action sentence only
-        // Remove "WHY This Matters" sections and all explanations
+        // Step 1: Strip ROUTE_OK / meta prefixes before extraction
+        rawResponse = rawResponse.replace(/ROUTE_OK:\s*Marcus→Giorgio\s*\|\s*FLOW_OK:\s*/gi, '').trim();
         rawResponse = rawResponse.replace(/\*\*WHY.*?\*\*/gi, '').replace(/WHY.*?Matters?:?/gi, '');
         rawResponse = rawResponse.replace(/\*\*.*?\*\*/g, ''); // Remove bold formatting
         
         // Split into sentences
         const sentences = rawResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
         
-        // Find first sentence that starts with a concrete action verb
-        // Allowed: concrete, immediately actionable verbs
-        const concreteVerbs = /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut|draft|prepare|organize|list|choose|select|pick|focus|work|begin|draft|compose|build|design|draw|sketch|record|film|shoot)/i;
-        // Denied: abstract, planning, thinking verbs
-        const abstractVerbs = /^(review|brainstorm|prioritize|decide|think|consider|plan|analyze|evaluate|assess|examine|explore|investigate|research|study|reflect|contemplate|ponder|meditate)/i;
+        // Step 2: Validate and extract action using validator gate
+        const validation = this.validateAndExtractAction(sentences, input.prompt);
         
-        // Find first sentence with concrete verb, reject abstract verbs
-        let actionSentence = sentences.find(s => {
-          const trimmed = s.trim();
-          return concreteVerbs.test(trimmed) && !abstractVerbs.test(trimmed);
-        });
-        
-        if (actionSentence) {
-          let cleaned = actionSentence.trim();
-          // Remove placeholders like [email], [client_email], etc.
-          cleaned = cleaned.replace(/\[[^\]]+\]/g, 'your client');
-          // Ensure it's specific (has details, not just generic)
-          if (cleaned.length < 20 || /^(write|create|make|do|start|begin)\s+(the|a|an|your)\s+\w+$/i.test(cleaned)) {
-            // Too vague, try to find a more specific sentence
-            const moreSpecific = sentences.find(s => {
-              const t = s.trim();
-              return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 30 && /(?:at|with|for|to|in|on|about|subject|title|name|file|folder|document|email|calendar|schedule|client|project)/i.test(t);
-            });
-            if (moreSpecific) {
-              cleaned = moreSpecific.trim().replace(/\[[^\]]+\]/g, 'your client');
-            }
-          }
-          // Final filter: reject if it starts with abstract verb
-          if (abstractVerbs.test(cleaned)) {
-            // Find any other concrete verb sentence
-            const alternative = sentences.find(s => {
-              const t = s.trim();
-              return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 15;
-            });
-            if (alternative) {
-              cleaned = alternative.trim().replace(/\[[^\]]+\]/g, 'your client');
-            }
-          }
-          finalResponseText = cleaned + '.';
-        } else if (sentences.length > 0) {
-          // Fallback: find ANY sentence with concrete verb, reject abstract verbs
-          const anyConcrete = sentences.find(s => {
-            const t = s.trim();
-            return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 15;
-          });
-          if (anyConcrete) {
-            finalResponseText = anyConcrete.trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
-          } else {
-            // Last resort: use first sentence only if it's not abstract
-            let firstSentence = sentences[0].trim();
-            if (abstractVerbs.test(firstSentence) || firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence)) {
-              // Reject abstract verbs - return a generic fallback
-              finalResponseText = 'Open your notes app and write down your next action.';
-            } else {
-              finalResponseText = firstSentence.replace(/\[[^\]]+\]/g, 'your client') + '.';
-            }
-          }
+        if (validation.valid && validation.action) {
+          // Step 3: Clean and de-duplicate
+          finalResponseText = this.cleanResponseText(validation.action) + '.';
         } else {
-          // Last resort: use raw response but limit length and reject abstract verbs
-          let fallback = rawResponse.substring(0, 100).trim().replace(/\[[^\]]+\]/g, 'your client');
-          if (abstractVerbs.test(fallback)) {
-            finalResponseText = 'Open your notes app and write down your next action.';
-          } else {
-            finalResponseText = fallback + '.';
-          }
+          // Step 4: Use context-aware fallback if validation fails
+          finalResponseText = this.generateContextAwareFallback(input.prompt);
         }
       } catch (error) {
         context.logger.error("Failed to wrap delegation results", { error });
