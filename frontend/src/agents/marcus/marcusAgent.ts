@@ -272,7 +272,11 @@ class MarcusAgent extends BaseAgent {
       files: notes.data,
     };
 
-    const shouldAuditLicensing = LICENSING_KEYWORDS.test(input.prompt);
+    // TEMPORARILY BYPASS DELEGATION FOR PHASE 1 VALIDATION (reduce variability)
+    // TODO: Re-enable after validation passes
+    const FORCE_SINGLE_ACTION_MODE = true;
+
+    const shouldAuditLicensing = !FORCE_SINGLE_ACTION_MODE && LICENSING_KEYWORDS.test(input.prompt);
     if (shouldAuditLicensing) {
       const projectId = (input.metadata?.projectId as string | undefined) ?? (input.metadata?.project as string | undefined);
       const files = input.metadata?.files as LicensingAuditFile[] | undefined;
