@@ -122,13 +122,13 @@ class MarcusAgent extends BaseAgent {
       email: 'Write the email subject line you want to use (5–8 words).',
       blog: 'Write the headline for your blog post.',
       presentation: 'Write the exact title of your next slide (max 6 words).',
-      socialSchedule: 'Write the platform you\'re planning content for.',
-      socialCaption: 'Write one sentence describing the direction you want to explore.',
+      socialSchedule: 'Write the platform name you are planning content for.',
+      socialCaption: 'Write one sentence describing the creative direction you want to explore.',
       video: 'Write the logline for your video.',
       overwhelm: 'Write the name of your most urgent project and add its deadline in parentheses.',
-      nextTask: 'Write the core idea in one sentence.',
-      organize: 'Write one task name as verb object.',
-      default: 'Write the exact name of the deliverable you need next (max 5 words).',
+      nextTask: 'Write the core concept in one sentence.',
+      organize: 'Write one task name using a verb and an object.',
+      default: 'Write the exact name of the file or asset you need next (max 5 words).',
     };
   }
 
