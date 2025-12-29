@@ -100,6 +100,75 @@ class MarcusAgent extends BaseAgent {
     }
   }
 
+  /**
+   * Generate context-aware fallback action
+   */
+  private generateContextAwareFallback(userPrompt: string): string {
+    const lowerPrompt = userPrompt.toLowerCase();
+    
+    // Extract context clues
+    if (lowerPrompt.includes('blog') || lowerPrompt.includes('post') || lowerPrompt.includes('article')) {
+      return 'Paste the exact draft or outline you\'re working with here.';
+    }
+    if (lowerPrompt.includes('script') || lowerPrompt.includes('video') || lowerPrompt.includes('film')) {
+      return 'Paste the exact script outline or scene you\'re working with here.';
+    }
+    if (lowerPrompt.includes('email') || lowerPrompt.includes('client') || lowerPrompt.includes('send')) {
+      return 'Write one sentence stating the email subject and recipient name.';
+    }
+    if (lowerPrompt.includes('presentation') || lowerPrompt.includes('slides') || lowerPrompt.includes('deck')) {
+      return 'Paste the exact section or slide outline you\'re working with here.';
+    }
+    if (lowerPrompt.includes('calendar') || lowerPrompt.includes('schedule') || lowerPrompt.includes('plan')) {
+      return 'Write one sentence stating what dates and times you need to schedule.';
+    }
+    if (lowerPrompt.includes('content') || lowerPrompt.includes('create') || lowerPrompt.includes('idea')) {
+      return 'Write one sentence stating your goal and who it\'s for.';
+    }
+    if (lowerPrompt.includes('workflow') || lowerPrompt.includes('organize') || lowerPrompt.includes('project')) {
+      return 'Write one sentence stating which workflow or project you want to organize.';
+    }
+    
+    // Default fallback
+    return 'Write one sentence stating your goal and who it\'s for.';
+  }
+
+  /**
+   * Validate and extract action sentence
+   */
+  private validateAndExtractAction(sentences: string[], userPrompt: string): { valid: boolean; action: string | null } {
+    // Allowed: concrete, immediately actionable verbs
+    const concreteVerbs = /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut|prepare|organize|list|choose|select|pick|focus|work|begin|compose|build|design|draw|sketch|record|film|shoot)/i;
+    // Denied: abstract, planning, thinking verbs
+    const abstractVerbs = /(?:review|brainstorm|prioritize|decide|think|consider|plan|analyze|evaluate|assess|examine|explore|investigate|research|study|reflect|contemplate|ponder|meditate|work on)/i;
+    
+    // Find first sentence with concrete verb
+    for (const sentence of sentences) {
+      const trimmed = sentence.trim();
+      
+      // Rule a: Must start with allowlisted verb
+      if (!concreteVerbs.test(trimmed)) continue;
+      
+      // Rule b: Must contain no denylisted verbs/phrases
+      if (abstractVerbs.test(trimmed)) continue;
+      
+      // Rule c: Must contain object/deliverable noun OR "for X" clause OR quoted/named deliverable
+      const hasObject = /(?:outline|script|email|shot|list|draft|document|file|folder|presentation|slides|deck|post|article|blog|video|film|scene|act|section|task|item|project|client|calendar|schedule|meeting|call|message|note|idea|concept|plan|goal)/i.test(trimmed);
+      const hasForClause = /\bfor\s+(?:your|the|a|an)\s+[\w\s]+/i.test(trimmed);
+      const hasQuoted = /['"][^'"]+['"]/.test(trimmed);
+      if (!hasObject && !hasForClause && !hasQuoted) continue;
+      
+      // Rule d: Must contain no "and/then"
+      if (/\b(and|then|next|after|before)\s+(?:then|next|after|before|and)/i.test(trimmed)) continue;
+      
+      // All rules passed
+      return { valid: true, action: trimmed };
+    }
+    
+    // No valid action found
+    return { valid: false, action: null };
+  }
+
   protected async handleRun(input: AgentRunInput, context: AgentExecutionContext): Promise<AgentRunResult> {
     context.logger.info("Handling request", { prompt: input.prompt });
 
@@ -273,79 +342,31 @@ class MarcusAgent extends BaseAgent {
       const aiResponse = await this.generateAIResponse(phase1Prompt, context, userId);
       
       // PHASE 1 POST-PROCESSING: Extract single action sentence only
-      // Remove "WHY This Matters" sections and all explanations
+      // Step 1: Strip meta prefixes
       let cleanedResponse = aiResponse.replace(/\*\*WHY.*?\*\*/gi, '').replace(/WHY.*?Matters?:?/gi, '');
       cleanedResponse = cleanedResponse.replace(/\*\*.*?\*\*/g, ''); // Remove bold formatting
       
       // Split into sentences
       const sentences = cleanedResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
       
-      // Find first sentence that starts with a concrete action verb
-      // Allowed: concrete, immediately actionable verbs
-      const concreteVerbs = /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut|draft|prepare|organize|list|choose|select|pick|focus|work|begin|draft|compose|build|design|draw|sketch|record|film|shoot)/i;
-      // Denied: abstract, planning, thinking verbs
-      const abstractVerbs = /^(review|brainstorm|prioritize|decide|think|consider|plan|analyze|evaluate|assess|examine|explore|investigate|research|study|reflect|contemplate|ponder|meditate)/i;
-      
-      // Find first sentence with concrete verb, reject abstract verbs
-      let actionSentence = sentences.find(s => {
-        const trimmed = s.trim();
-        return concreteVerbs.test(trimmed) && !abstractVerbs.test(trimmed);
-      });
+      // Step 2: Validate and extract action using validator gate
+      const validation = this.validateAndExtractAction(sentences, input.prompt);
       
       let finalResponse: string;
-      if (actionSentence) {
-        let cleaned = actionSentence.trim();
+      if (validation.valid && validation.action) {
+        let cleaned = validation.action;
+        
+        // Step 3: Fix placeholder duplication - prevent repeated token injection
         // Remove placeholders like [email], [client_email], etc.
-        cleaned = cleaned.replace(/\[[^\]]+\]/g, 'your client');
-        // Ensure it's specific (has details, not just generic)
-        if (cleaned.length < 20 || /^(write|create|make|do|start|begin)\s+(the|a|an|your)\s+\w+$/i.test(cleaned)) {
-          // Too vague, try to find a more specific sentence
-          const moreSpecific = sentences.find(s => {
-            const t = s.trim();
-            return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 30 && /(?:at|with|for|to|in|on|about|subject|title|name|file|folder|document|email|calendar|schedule|client|project)/i.test(t);
-          });
-          if (moreSpecific) {
-            cleaned = moreSpecific.trim().replace(/\[[^\]]+\]/g, 'your client');
-          }
-        }
-        // Final filter: reject if it starts with abstract verb
-        if (abstractVerbs.test(cleaned)) {
-          // Find any other concrete verb sentence
-          const alternative = sentences.find(s => {
-            const t = s.trim();
-            return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 15;
-          });
-          if (alternative) {
-            cleaned = alternative.trim().replace(/\[[^\]]+\]/g, 'your client');
-          }
-        }
-        finalResponse = cleaned + '.';
-      } else if (sentences.length > 0) {
-        // Fallback: find ANY sentence with concrete verb, reject abstract verbs
-        const anyConcrete = sentences.find(s => {
-          const t = s.trim();
-          return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 15;
-        });
-        if (anyConcrete) {
-          finalResponse = anyConcrete.trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
-        } else {
-          // Last resort: use first sentence only if it's not abstract
-          let firstSentence = sentences[0].trim();
-          if (abstractVerbs.test(firstSentence) || firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence)) {
-            // Reject abstract verbs - return a generic fallback
-            finalResponse = 'Open your notes app and write down your next action.';
-          } else {
-            finalResponse = firstSentence.replace(/\[[^\]]+\]/g, 'your client') + '.';
-          }
-        }
+        cleaned = cleaned.replace(/\[[^\]]+\]/g, '');
+        // De-duplicate repeated adjacent phrases
+        cleaned = cleaned.replace(/\b(your client|your project|your workflow)\s+\1/gi, '$1');
+        cleaned = cleaned.replace(/\b(at|with|for|to|in|on)\s+\1/gi, '$1');
+        
+        finalResponse = cleaned.trim() + '.';
       } else {
-        // Last resort: use cleaned response but limit length and reject abstract verbs
-        let fallback = cleanedResponse.substring(0, 100).trim().replace(/\[[^\]]+\]/g, 'your client');
-        if (abstractVerbs.test(fallback)) {
-          finalResponse = 'Open your notes app and write down your next action.';
-        } else {
-          finalResponse = fallback + '.';
-        }
+        // Step 4: Use context-aware fallback if validation fails
+        finalResponse = this.generateContextAwareFallback(input.prompt);
       }
       
       return {
