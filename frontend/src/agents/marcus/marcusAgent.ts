@@ -411,11 +411,23 @@ class MarcusAgent extends BaseAgent {
       
       // Step 2: Validate and extract action using validator gate
       const validation = this.validateAndExtractAction(sentences, input.prompt);
+      const lowerPrompt = input.prompt.toLowerCase();
       
       let finalResponse: string;
       if (validation.valid && validation.action) {
         // Step 3: Clean and de-duplicate
-        finalResponse = this.cleanResponseText(validation.action) + '.';
+        const cleaned = this.cleanResponseText(validation.action);
+        // If cleaning resulted in empty or broken action, use fallback
+        if (!cleaned || cleaned.length < 10 || /email\s+your\s+client\s*$/i.test(cleaned)) {
+          // Special case: email subject became empty
+          if (lowerPrompt.includes('email') || lowerPrompt.includes('client')) {
+            finalResponse = 'Write the email subject line you want to use (5–8 words).';
+          } else {
+            finalResponse = this.generateContextAwareFallback(input.prompt);
+          }
+        } else {
+          finalResponse = cleaned + '.';
+        }
       } else {
         // Step 4: Use context-aware fallback if validation fails
         finalResponse = this.generateContextAwareFallback(input.prompt);
