@@ -107,17 +107,17 @@ class MarcusAgent extends BaseAgent {
   private generateContextAwareFallback(userPrompt: string): string {
     const lowerPrompt = userPrompt.toLowerCase();
     
-    // Overwhelm/uncertainty prompts - enumeration actions only
+    // Overwhelm/uncertainty prompts - concrete enumeration actions
     if (lowerPrompt.includes('too many') || lowerPrompt.includes('don\'t know where to start') || 
         lowerPrompt.includes('don\'t know what to') || lowerPrompt.includes('overwhelm') ||
         lowerPrompt.includes('stuck') || lowerPrompt.includes('confused')) {
-      // Return enumeration action
+      // Return concrete enumeration action
       if (lowerPrompt.includes('project')) {
-        return 'List all active projects in one place.';
+        return 'Write down the name of one active project.';
       } else if (lowerPrompt.includes('task')) {
         return 'Write down the last task you worked on.';
       } else {
-        return 'List all active projects in one place.';
+        return 'Write down the name of one active project.';
       }
     }
     
@@ -204,15 +204,33 @@ class MarcusAgent extends BaseAgent {
       return true;
     }
     
-    // Block 2: Collaboration/scheduling phrases
-    const collaborationPhrases = /(?:schedule\s+a\s+meeting|collaborate\s+with|meet\s+with|work\s+with|partner\s+with)/i;
+    // Block 2: Collaboration/scheduling/discussion phrases
+    const collaborationPhrases = /(?:schedule\s+a\s+meeting|collaborate\s+with|meet\s+with|work\s+with|partner\s+with|discuss\s+(?:your|with))|talk\s+(?:to|with)|chat\s+(?:with|about)/i;
     if (collaborationPhrases.test(lowerAction)) {
       return true;
     }
     
-    // Block 3: Cognitive/thinking verbs
-    const cognitiveVerbs = /\b(review|identify|evaluate|assess|analyze|decide|figure\s+out)\b/i;
+    // Block 3: Cognitive/thinking/abstract verbs (expanded)
+    const cognitiveVerbs = /\b(review|identify|evaluate|assess|analyze|decide|figure\s+out|define|brainstorm|think|consider|plan|prioritize|explore|investigate|research|study|reflect|contemplate|ponder)\b/i;
     if (cognitiveVerbs.test(lowerAction)) {
+      return true;
+    }
+    
+    // Block 4: Vague enumeration without specificity ("list all", "list your")
+    const vagueEnumeration = /^list\s+(?:all|your|the)\s+/i;
+    if (vagueEnumeration.test(lowerAction)) {
+      return true;
+    }
+    
+    // Block 5: Multi-step/complex actions (containing "and" with multiple objects)
+    const multiStepPattern = /(?:create|build|make|design)\s+.*\s+(?:with|and)\s+(?:[^,]+,\s*)+/i;
+    if (multiStepPattern.test(lowerAction)) {
+      return true;
+    }
+    
+    // Block 6: Time-bound actions that are too long ("3-month", "weekly structure")
+    const longTimeBound = /(?:3-month|3\s+month|monthly|weekly\s+structure|yearly|annual)/i;
+    if (longTimeBound.test(lowerAction)) {
       return true;
     }
     
