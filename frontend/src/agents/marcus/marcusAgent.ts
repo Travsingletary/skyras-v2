@@ -107,6 +107,20 @@ class MarcusAgent extends BaseAgent {
   private generateContextAwareFallback(userPrompt: string): string {
     const lowerPrompt = userPrompt.toLowerCase();
     
+    // Overwhelm/uncertainty prompts - enumeration actions only
+    if (lowerPrompt.includes('too many') || lowerPrompt.includes('don\'t know where to start') || 
+        lowerPrompt.includes('don\'t know what to') || lowerPrompt.includes('overwhelm') ||
+        lowerPrompt.includes('stuck') || lowerPrompt.includes('confused')) {
+      // Return enumeration action
+      if (lowerPrompt.includes('project')) {
+        return 'List all active projects in one place.';
+      } else if (lowerPrompt.includes('task')) {
+        return 'Write down the last task you worked on.';
+      } else {
+        return 'List all active projects in one place.';
+      }
+    }
+    
     // Social media scheduling
     if (lowerPrompt.includes('schedule') || lowerPrompt.includes('calendar') || lowerPrompt.includes('posting') || lowerPrompt.includes('publish') || (lowerPrompt.includes('social media') && !lowerPrompt.includes('caption'))) {
       return 'Write: "Platform: __ | Cadence: __."';
@@ -138,7 +152,7 @@ class MarcusAgent extends BaseAgent {
     }
     
     // Priorities/tasks - deliverable-tied
-    if (lowerPrompt.includes('priority') || lowerPrompt.includes('overwhelm') || lowerPrompt.includes('task')) {
+    if (lowerPrompt.includes('priority') || lowerPrompt.includes('task')) {
       return 'List three deliverables due next (verb + object).';
     }
     
@@ -175,6 +189,34 @@ class MarcusAgent extends BaseAgent {
       }
     }
     return null;
+  }
+
+  /**
+   * Hard block: Check if action violates Phase 1 rules (internal agents, cognitive verbs, collaboration)
+   * Returns true if action should be blocked and fallback used instead
+   */
+  private shouldBlockAction(action: string): boolean {
+    const lowerAction = action.toLowerCase();
+    
+    // Block 1: Internal agents
+    const internalAgents = /\b(jamal|giorgio|cassidy|letitia|marcus)\b/i;
+    if (internalAgents.test(lowerAction)) {
+      return true;
+    }
+    
+    // Block 2: Collaboration/scheduling phrases
+    const collaborationPhrases = /(?:schedule\s+a\s+meeting|collaborate\s+with|meet\s+with|work\s+with|partner\s+with)/i;
+    if (collaborationPhrases.test(lowerAction)) {
+      return true;
+    }
+    
+    // Block 3: Cognitive/thinking verbs
+    const cognitiveVerbs = /\b(review|identify|evaluate|assess|analyze|decide|figure\s+out)\b/i;
+    if (cognitiveVerbs.test(lowerAction)) {
+      return true;
+    }
+    
+    return false;
   }
 
   /**
@@ -438,8 +480,14 @@ class MarcusAgent extends BaseAgent {
       let finalResponse: string;
       
       if (parsedAction && parsedAction.length > 10) {
-        // Successfully parsed ACTION: contract
-        finalResponse = parsedAction + '.';
+        // Check if action should be blocked (internal agents, cognitive verbs, collaboration)
+        if (this.shouldBlockAction(parsedAction)) {
+          // Hard block: use deterministic passing fallback
+          finalResponse = this.generateContextAwareFallback(input.prompt);
+        } else {
+          // Successfully parsed ACTION: contract and passed block checks
+          finalResponse = parsedAction + '.';
+        }
       } else {
         // Missing/invalid ACTION: contract -> use deterministic passing fallback
         finalResponse = this.generateContextAwareFallback(input.prompt);
@@ -524,8 +572,14 @@ Your response must be ONLY the next action. Nothing else.`;
         const parsedAction = this.parseActionContract(rawResponse);
         
         if (parsedAction && parsedAction.length > 10) {
-          // Successfully parsed ACTION: contract
-          finalResponseText = parsedAction + '.';
+          // Check if action should be blocked (internal agents, cognitive verbs, collaboration)
+          if (this.shouldBlockAction(parsedAction)) {
+            // Hard block: use deterministic passing fallback
+            finalResponseText = this.generateContextAwareFallback(input.prompt);
+          } else {
+            // Successfully parsed ACTION: contract and passed block checks
+            finalResponseText = parsedAction + '.';
+          }
         } else {
           // Missing/invalid ACTION: contract -> use deterministic passing fallback
           finalResponseText = this.generateContextAwareFallback(input.prompt);
