@@ -306,16 +306,25 @@ class MarcusAgent extends BaseAgent {
           ? `I routed this to: ${routingHeaders.join(', ')}\n\n`
           : '';
         
-        const wrapperPrompt = `${routingHeader}${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step.
+        const wrapperPrompt = `${routingHeader}${delegationSummary}\n\nCRITICAL: Your response must be EXACTLY ONE sentence that is a DO statement. No explanations, no context, no "WHY it matters" sections.
 
-CRITICAL: The next step must be:
-- CONCRETE: Specific action, not abstract (e.g., "Write the first sentence" not "Start writing")
-- SPECIFIC: Clear what to do, not general (e.g., "Email john@example.com with subject 'Project Update'" not "Reach out to your contact")
-- SMALL: One step, not multiple (e.g., "Create a new folder called 'drafts'" not "Set up your workspace, organize files, and start writing")
-- IMMEDIATELY ACTIONABLE: Can do it now, not later (e.g., "Open your notes app and write down 3 ideas" not "Plan your content strategy for next quarter")
+Give the user ONE clear next step they can do RIGHT NOW. Start with an action verb.
 
-Format: Start with a DO statement (e.g., 'Open your...', 'Write...', 'Email...', 'Create...').
-Do NOT give advice, reflection, or multi-step plans. Give ONE concrete action the user can do right now. Keep it direct and action-oriented. Format agent outputs as readable sections, not raw JSON.`;
+Requirements:
+- CONCRETE: Specific action, not abstract (e.g., "Write the first sentence of your blog post" not "Start writing")
+- SPECIFIC: Clear what to do, not general (e.g., "Email your client at john@example.com with subject 'Project Update'" not "Reach out to your contact")
+- SMALL: ONE step only, not multiple (e.g., "Open your notes app and write down 3 ideas" not "Set up your workspace, organize files, and start writing")
+- IMMEDIATELY ACTIONABLE: Can do it now, not later (e.g., "Create a new file called 'drafts.md' in your project folder" not "Plan your content strategy")
+
+CRITICAL RULES:
+- ✅ DO: "Open your calendar and block 2 hours for writing"
+- ✅ DO: "Write the first paragraph of your blog post about [topic]"
+- ❌ DON'T: Include "WHY it matters" or explanations
+- ❌ DON'T: Give advice like "You should consider..."
+- ❌ DON'T: Give multi-step plans
+- ❌ DON'T: Include context or background information
+
+Your response must be ONLY the next action. Nothing else.`;
 
         // Add wrapper prompt as latest user message
         conversationMessages.push({
