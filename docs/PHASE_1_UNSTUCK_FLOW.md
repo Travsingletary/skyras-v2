@@ -158,12 +158,64 @@
 
 **Primary Metric:** Users feel less overwhelmed BEFORE being asked to sign up.
 
+**Success Signal:** Users say they feel helped before encountering login.
+
 **Success Criteria:**
 - ✅ User receives next action without login
 - ✅ User understands value before seeing login prompt
 - ✅ Login prompt appears after value is delivered
 - ✅ Login feels like benefit, not barrier
+- ✅ User feels less overwhelmed (qualitative feedback)
 
 ---
 
-**Status:** ✅ **IMPLEMENTED - READY FOR VALIDATION**
+## Validation Rules
+
+### ❌ Do NOT Add:
+- Features (any new functionality)
+- Agents (multi-agent system references)
+- Automation (workflow suggestions, auto-suggestions)
+- Exploration (test URLs, tips, complex navigation)
+
+### ✅ Only Adjust If Validation Fails:
+- Copy/language (if users don't understand)
+- Timing (if login prompt appears too early/late)
+- Constraint cues (if philosophy not clear)
+
+---
+
+## Validation Test Scenarios
+
+### Scenario 1: First-Time User (Unstuck Flow)
+**Setup:** New user lands on `/` (unauthenticated)  
+**Expected Behavior:**
+1. Sees simple prompt: "What do you need help with?"
+2. Types question/request
+3. Receives one clear next action (no login required)
+4. Sees login prompt: "Want to save this and get the next step when you come back?"
+5. Feels helped before encountering login
+
+**Validation Questions:**
+- Did you receive a next action without signing up? (Yes/No)
+- Did you feel helped before seeing the login prompt? (Yes/No)
+- Did the login prompt feel like a benefit or a barrier? (Benefit/Barrier)
+- Did you feel less overwhelmed? (Yes/No, scale 1-5)
+
+### Scenario 2: Returning User (Studio Flow)
+**Setup:** User with account returns to `/studio`  
+**Expected Behavior:**
+1. Sees: "Your saved progress. Continue where you left off."
+2. Previous actions visible (if any)
+3. Can continue getting next actions
+4. History preserved
+
+**Validation Questions:**
+- Did you find your saved progress? (Yes/No)
+- Was it clear this is a continuation space? (Yes/No)
+- Did you feel less overwhelmed than before? (Yes/No, scale 1-5)
+
+---
+
+**Status:** ✅ **COMPLETE - READY FOR VALIDATION**
+
+**No further changes until validation results are in.**
