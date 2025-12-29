@@ -266,9 +266,28 @@ class MarcusAgent extends BaseAgent {
     if (!hasSpecificAction) {
       context.logger.info("No specific action keywords detected, generating AI response");
       const userId = input.metadata?.userId as string | undefined;
-      const aiResponse = await this.generateAIResponse(input.prompt, context, userId);
+      
+      // Enhance prompt to enforce Phase 1 requirement
+      const phase1Prompt = `${input.prompt}\n\nCRITICAL: Your response must be EXACTLY ONE sentence that is a DO statement. No explanations, no context, no "WHY it matters" sections. Give ONE concrete action the user can do RIGHT NOW. Start with an action verb (Open, Write, Email, Create, etc.).`;
+      
+      const aiResponse = await this.generateAIResponse(phase1Prompt, context, userId);
+      
+      // Post-process to extract single action if response is too long
+      let finalResponse = aiResponse;
+      if (aiResponse.length > 200 || aiResponse.includes('WHY') || aiResponse.includes('**WHY')) {
+        // Try to extract the first sentence that starts with an action verb
+        const sentences = aiResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        const actionSentence = sentences.find(s => /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut)/i.test(s.trim()));
+        if (actionSentence) {
+          finalResponse = actionSentence.trim() + '.';
+        } else {
+          // Fallback: use first sentence
+          finalResponse = sentences[0]?.trim() + '.' || aiResponse;
+        }
+      }
+      
       return {
-        output: aiResponse,
+        output: finalResponse,
         delegations,
         notes: notesPayload,
       };
