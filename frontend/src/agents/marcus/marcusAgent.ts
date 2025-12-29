@@ -555,14 +555,9 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
-    // If no specific keywords matched, check for intent templates or generate AI response
+    // If no specific keywords matched, use canonical templates
     const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog || fetchedLinks;
     if (!hasSpecificAction) {
-      // Phase 1: Check for narrow intent templates first
-      const detectedIntent = detectIntent(input.prompt);
-      const templateId = detectedIntent || 'default';
-      const template = getIntentTemplate(templateId as keyof typeof INTENT_TEMPLATES);
-      
       // PHASE 1 CANONICAL TEMPLATES: No free-form generation, use fixed templates only
       // Route prompt to template category using lightweight keyword intent classification
       const templateResult = this.selectCanonicalTemplate(input.prompt);
