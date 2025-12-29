@@ -107,31 +107,54 @@ class MarcusAgent extends BaseAgent {
   private generateContextAwareFallback(userPrompt: string): string {
     const lowerPrompt = userPrompt.toLowerCase();
     
-    // Extract context clues
+    // Social media intent routing
+    if (lowerPrompt.includes('schedule') || lowerPrompt.includes('calendar') || lowerPrompt.includes('posting') || lowerPrompt.includes('publish') || lowerPrompt.includes('social media')) {
+      return 'Write the platform and posting cadence (e.g., "IG 3x/week, TikTok daily").';
+    }
+    if ((lowerPrompt.includes('social media') || lowerPrompt.includes('instagram') || lowerPrompt.includes('tiktok') || lowerPrompt.includes('twitter')) && (lowerPrompt.includes('caption') || lowerPrompt.includes('hook') || lowerPrompt.includes('script'))) {
+      return 'Paste your hook/caption draft here.';
+    }
+    
+    // Content creation
     if (lowerPrompt.includes('blog') || lowerPrompt.includes('post') || lowerPrompt.includes('article')) {
       return 'Paste the exact draft or outline you\'re working with here.';
     }
     if (lowerPrompt.includes('script') || lowerPrompt.includes('video') || lowerPrompt.includes('film')) {
       return 'Paste the exact script outline or scene you\'re working with here.';
     }
+    
+    // Email
     if (lowerPrompt.includes('email') || lowerPrompt.includes('client') || lowerPrompt.includes('send')) {
-      return 'Write one sentence stating the email subject and recipient name.';
+      return 'Write the email subject line you want to use (5–8 words).';
     }
+    
+    // Presentation
     if (lowerPrompt.includes('presentation') || lowerPrompt.includes('slides') || lowerPrompt.includes('deck')) {
       return 'Paste the exact section or slide outline you\'re working with here.';
     }
-    if (lowerPrompt.includes('calendar') || lowerPrompt.includes('schedule') || lowerPrompt.includes('plan')) {
-      return 'Write one sentence stating what dates and times you need to schedule.';
-    }
-    if (lowerPrompt.includes('content') || lowerPrompt.includes('create') || lowerPrompt.includes('idea')) {
-      return 'Write one sentence stating your goal and who it\'s for.';
-    }
-    if (lowerPrompt.includes('workflow') || lowerPrompt.includes('organize') || lowerPrompt.includes('project')) {
-      return 'Write one sentence stating which workflow or project you want to organize.';
+    
+    // Calendar/scheduling
+    if (lowerPrompt.includes('calendar') || (lowerPrompt.includes('schedule') && !lowerPrompt.includes('social'))) {
+      return 'Write the platform and posting cadence (e.g., "IG 3x/week, TikTok daily").';
     }
     
-    // Default fallback
-    return 'Write one sentence stating your goal and who it\'s for.';
+    // Priorities/tasks - use deliverable-tied action
+    if (lowerPrompt.includes('priority') || lowerPrompt.includes('overwhelm') || lowerPrompt.includes('task')) {
+      return 'List the top 3 tasks you will complete today as verb+object.';
+    }
+    
+    // Workflow/organize - use structured template
+    if (lowerPrompt.includes('workflow') || lowerPrompt.includes('organize') || lowerPrompt.includes('project')) {
+      return 'Write: "I\'m creating ___ for ___ and the next deliverable is ___."';
+    }
+    
+    // Content/idea - use structured template
+    if (lowerPrompt.includes('content') || lowerPrompt.includes('create') || lowerPrompt.includes('idea') || lowerPrompt.includes('explore')) {
+      return 'Write: "I\'m creating ___ for ___ and the next deliverable is ___."';
+    }
+    
+    // Default fallback - use structured template
+    return 'Write: "I\'m creating ___ for ___ and the next deliverable is ___."';
   }
 
   /**
@@ -176,14 +199,33 @@ class MarcusAgent extends BaseAgent {
   private cleanResponseText(text: string): string {
     // Remove placeholders like [email], [client_email], etc.
     let cleaned = text.replace(/\[[^\]]+\]/g, '');
-    // Remove empty quotes and clean up spacing
+    
+    // Handle empty quotes in subject lines
+    cleaned = cleaned.replace(/\ssubject\s+["']\s*["']/gi, '');
     cleaned = cleaned.replace(/\s+with\s+subject\s+''/gi, '');
+    cleaned = cleaned.replace(/\s+with\s+subject\s+""/gi, '');
+    
+    // Fix "at " with empty replacement
     cleaned = cleaned.replace(/\s+at\s+with/gi, ' with');
+    cleaned = cleaned.replace(/\s+at\s+$/gi, '');
+    
+    // Handle empty quotes at end
+    cleaned = cleaned.replace(/\s["']\s*["']\s*$/gi, '');
+    
     // De-duplicate repeated adjacent phrases
     cleaned = cleaned.replace(/\b(your client|your project|your workflow)\s+\1/gi, '$1');
     cleaned = cleaned.replace(/\b(at|with|for|to|in|on)\s+\1/gi, '$1');
-    // Clean up multiple spaces
+    
+    // Clean up multiple spaces and trim
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    
+    // If subject line is now empty, this should be caught by validation
+    // But we'll check for obviously broken email actions here
+    if (/email\s+your\s+client\s*$/i.test(cleaned) || /email\s+your\s+client\s+with\s*$/i.test(cleaned)) {
+      // Return empty to trigger fallback
+      return '';
+    }
+    
     return cleaned;
   }
 
@@ -465,10 +507,22 @@ Your response must be ONLY the next action. Nothing else.`;
         
         // Step 2: Validate and extract action using validator gate
         const validation = this.validateAndExtractAction(sentences, input.prompt);
+        const lowerPrompt = input.prompt.toLowerCase();
         
         if (validation.valid && validation.action) {
           // Step 3: Clean and de-duplicate
-          finalResponseText = this.cleanResponseText(validation.action) + '.';
+          const cleaned = this.cleanResponseText(validation.action);
+          // If cleaning resulted in empty or broken action, use fallback
+          if (!cleaned || cleaned.length < 10 || /email\s+your\s+client\s*$/i.test(cleaned)) {
+            // Special case: email subject became empty
+            if (lowerPrompt.includes('email') || lowerPrompt.includes('client')) {
+              finalResponseText = 'Write the email subject line you want to use (5–8 words).';
+            } else {
+              finalResponseText = this.generateContextAwareFallback(input.prompt);
+            }
+          } else {
+            finalResponseText = cleaned + '.';
+          }
         } else {
           // Step 4: Use context-aware fallback if validation fails
           finalResponseText = this.generateContextAwareFallback(input.prompt);
