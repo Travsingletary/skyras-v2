@@ -461,7 +461,7 @@ function StudioContent() {
           <div className="space-y-2">
             <h1 className="text-2xl font-semibold">SkyRas Studio</h1>
             <p className="text-sm text-zinc-600">
-              One clear next action. No overwhelm.
+              Your saved progress. Continue where you left off.
             </p>
           </div>
           <div className="flex gap-3">

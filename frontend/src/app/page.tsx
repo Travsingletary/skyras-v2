@@ -1,13 +1,26 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AuthLoading from "@/components/AuthLoading";
+import UnstuckPrompt from "@/components/UnstuckPrompt";
+
+interface Message {
+  id: string;
+  content: string;
+  sender: "user" | "agent";
+  timestamp: Date;
+}
 
 export default function Home() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [nextAction, setNextAction] = useState<string | null>(null);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   // Check auth state and redirect if authenticated
   useEffect(() => {
@@ -41,149 +54,179 @@ export default function Home() {
     return <AuthLoading message="Redirecting..." />;
   }
 
+  const handleGetNextAction = async () => {
+    if (!message.trim()) return;
+
+    setLoading(true);
+    setError(null);
+    setShowLoginPrompt(false);
+
+    try {
+      // Append user message locally
+      const userMessage: Message = {
+        id: `msg_${Date.now()}`,
+        content: message,
+        sender: "user",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
+
+      // Call chat API with 'public' userId (no auth required)
+      const res = await fetch('/api/chat', {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          userId: 'public', // Unauthenticated public access
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errorText}`);
+      }
+
+      const data = await res.json();
+      
+      // Extract next action from response
+      const actionText = data.data?.output || data.response || data.data?.message?.content || 'No response';
+      setNextAction(actionText);
+
+      // Append assistant message
+      const assistantMessage: Message = {
+        id: data.data?.message?.id || `msg_${Date.now()}`,
+        content: actionText,
+        sender: "agent",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+
+      // Show login prompt after delivering action
+      setShowLoginPrompt(true);
+
+      // Clear input
+      setMessage("");
+    } catch (err) {
+      const errorMessage = (err as Error).message;
+      console.error("[Unstuck] Error:", errorMessage);
+      setError(`Failed to get next action: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-b from-blue-50 to-white py-20 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-5xl font-bold text-zinc-900 mb-6">
-            Marcus · Your AI PM for Content & Marketing
+    <div className="min-h-screen bg-zinc-50">
+      {/* Unstuck Entry Point */}
+      <div className="max-w-2xl mx-auto px-6 py-12">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-zinc-900 mb-2">
+            SkyRas
           </h1>
-          <p className="text-xl text-zinc-600 mb-8 max-w-2xl mx-auto">
-            Answer 5 questions, get a weekly content & client workflow tailored to your real life.
+          <p className="text-base text-zinc-600 mb-1">
+            One clear next action. No overwhelm.
           </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Link
-              href="/signup"
-              className="inline-flex items-center px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors text-lg"
-            >
-              Sign Up
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center px-8 py-3 bg-white text-zinc-900 font-medium rounded-lg border-2 border-zinc-300 hover:bg-zinc-50 transition-colors text-lg"
-            >
-              Log In
-            </Link>
-          </div>
+          <p className="text-sm text-zinc-500">
+            Get unstuck right now—no signup required.
+          </p>
         </div>
-      </section>
 
-      {/* How It Works */}
-      <section className="py-20 px-6 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-zinc-900 text-center mb-12">
-            How It Works
-          </h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">1</span>
-              </div>
-              <h3 className="text-xl font-semibold text-zinc-900 mb-2">
-                Tell Marcus About You
-              </h3>
-              <p className="text-zinc-600">
-                Tell Marcus what you do, where you post, and how much time you really have.
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">2</span>
-              </div>
-              <h3 className="text-xl font-semibold text-zinc-900 mb-2">
-                Get Your Workflow
-              </h3>
-              <p className="text-zinc-600">
-                Marcus designs a weekly workflow for your clients, content, or launch.
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-blue-600">3</span>
-              </div>
-              <h3 className="text-xl font-semibold text-zinc-900 mb-2">
-                Run & Iterate
-              </h3>
-              <p className="text-zinc-600">
-                You run the system, adjust with Marcus, and keep iterating.
+        {/* Error Display */}
+        {error && (
+          <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4 mb-6">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
+        {/* Next Action Display */}
+        {nextAction && (
+          <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6 mb-6">
+            <h2 className="text-base font-semibold text-zinc-900 mb-3">Your Next Action</h2>
+            <div className="bg-white rounded-lg p-4 border border-green-100">
+              <p className="text-sm text-zinc-900 whitespace-pre-wrap leading-relaxed">
+                {nextAction}
               </p>
             </div>
           </div>
-        </div>
-      </section>
+        )}
 
-      {/* Who It's For */}
-      <section className="py-20 px-6 bg-zinc-50">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-zinc-900 text-center mb-12">
-            Who It's For
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-zinc-200">
-              <h3 className="text-lg font-semibold text-zinc-900 mb-2">
-                Freelance Content Creators
-              </h3>
-              <p className="text-sm text-zinc-600">
-                Build a sustainable system that fits your schedule and helps you land clients.
-              </p>
-            </div>
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-zinc-200">
-              <h3 className="text-lg font-semibold text-zinc-900 mb-2">
-                Social Media Managers
-              </h3>
-              <p className="text-sm text-zinc-600">
-                Streamline client work with workflows that scale across platforms.
-              </p>
-            </div>
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-zinc-200">
-              <h3 className="text-lg font-semibold text-zinc-900 mb-2">
-                Small Agency Owners
-              </h3>
-              <p className="text-sm text-zinc-600">
-                Organize your team's content production and client delivery.
-              </p>
-            </div>
-            <div className="bg-white rounded-lg p-6 shadow-sm border border-zinc-200">
-              <h3 className="text-lg font-semibold text-zinc-900 mb-2">
-                Solo Creators
-              </h3>
-              <p className="text-sm text-zinc-600">
-                Get organized and grow your audience without burning out.
-              </p>
+        {/* Login Prompt (after action delivered) */}
+        {showLoginPrompt && (
+          <div className="mb-6">
+            <UnstuckPrompt 
+              onLogin={() => router.push('/signup?next=/studio')}
+            />
+          </div>
+        )}
+
+        {/* Conversation (last 2 messages only) */}
+        {messages.length > 0 && (
+          <div className="rounded-lg border bg-white p-4 mb-6 shadow-sm space-y-3">
+            <div className="space-y-2">
+              {messages.slice(-2).map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`rounded-lg p-3 ${
+                    msg.sender === "user" ? "bg-blue-50" : "bg-zinc-50"
+                  }`}
+                >
+                  <p className="text-sm text-zinc-900 whitespace-pre-wrap">{msg.content}</p>
+                </div>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
+        )}
 
-      {/* Friends Beta */}
-      <section className="py-20 px-6 bg-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="bg-blue-50 rounded-lg p-8 border border-blue-200">
-            <h2 className="text-2xl font-bold text-zinc-900 mb-4">
-              Friends Beta
-            </h2>
-            <p className="text-zinc-600 mb-6 max-w-2xl mx-auto">
-              This is a private beta. You need an access code to use Marcus.
+        {/* Input Section */}
+        <div className="rounded-lg border bg-white p-6 shadow-sm space-y-4">
+          <div>
+            <label className="text-base font-medium text-zinc-900 block mb-2">
+              What do you need help with?
+            </label>
+            <textarea
+              className="w-full rounded-lg border border-zinc-300 p-4 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              rows={4}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  handleGetNextAction();
+                }
+              }}
+              placeholder="Tell us what you're working on, and we'll give you one clear next step..."
+            />
+            <p className="mt-2 text-xs text-zinc-500">
+              We focus on one step at a time to reduce overwhelm. After you complete this action, we'll give you the next one.
             </p>
-            <Link
-              href="/login?next=/studio"
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Have an access code? Open Marcus →
-            </Link>
           </div>
-        </div>
-      </section>
 
-      {/* Footer */}
-      <footer className="py-12 px-6 bg-zinc-900 text-zinc-400">
-        <div className="max-w-6xl mx-auto text-center">
-          <p className="text-sm">
-            © 2024 Marcus · Built for content creators and marketers
+          <button
+            onClick={handleGetNextAction}
+            disabled={loading || !message.trim()}
+            className="w-full inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-sm"
+          >
+            {loading ? "Getting your next action..." : "Get My Next Action"}
+          </button>
+        </div>
+
+        {/* Footer Note */}
+        <div className="mt-8 text-center">
+          <p className="text-xs text-zinc-500">
+            No saving, no memory, no history. Just one clear next action.
+          </p>
+          <p className="text-xs text-zinc-500 mt-1">
+            <button
+              onClick={() => router.push('/signup?next=/studio')}
+              className="text-blue-600 hover:text-blue-700 underline"
+            >
+              Sign up
+            </button>
+            {" "}to save your progress and continue in Studio.
           </p>
         </div>
-      </footer>
+      </div>
+
+      {/* Removed marketing sections - landing page is now unstuck entry point */}
     </div>
   );
 }
