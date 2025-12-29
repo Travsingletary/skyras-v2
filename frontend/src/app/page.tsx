@@ -1,8 +1,46 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import AuthLoading from "@/components/AuthLoading";
 
 export default function Home() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  // Check auth state and redirect if authenticated
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/user');
+        const data = await res.json();
+        if (data.authenticated && data.user) {
+          setIsAuthenticated(true);
+          // Redirect authenticated users to studio
+          router.push('/studio');
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (err) {
+        console.error('[Auth] Error checking auth state:', err);
+        setIsAuthenticated(false);
+      }
+    };
+    
+    checkAuth();
+  }, [router]);
+
+  // Show loading state while checking auth
+  if (isAuthenticated === null) {
+    return <AuthLoading />;
+  }
+
+  // If authenticated, the redirect will happen, but show loading just in case
+  if (isAuthenticated) {
+    return <AuthLoading message="Redirecting..." />;
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
@@ -16,22 +54,16 @@ export default function Home() {
           </p>
           <div className="flex gap-4 justify-center flex-wrap">
             <Link
-              href="/app"
-              className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              href="/signup"
+              className="inline-flex items-center px-8 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors text-lg"
             >
-              Open Marcus
+              Sign Up
             </Link>
             <Link
-              href="/guide"
-              className="inline-flex items-center px-6 py-3 bg-white text-zinc-900 font-medium rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
+              href="/login"
+              className="inline-flex items-center px-8 py-3 bg-white text-zinc-900 font-medium rounded-lg border-2 border-zinc-300 hover:bg-zinc-50 transition-colors text-lg"
             >
-              How it works
-            </Link>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center px-6 py-3 bg-white text-zinc-900 font-medium rounded-lg border border-zinc-300 hover:bg-zinc-50 transition-colors"
-            >
-              Dashboard
+              Log In
             </Link>
           </div>
         </div>

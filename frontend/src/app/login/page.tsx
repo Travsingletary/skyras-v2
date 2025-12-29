@@ -1,15 +1,39 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import AuthLoading from "@/components/AuthLoading";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Check if already authenticated and redirect to studio
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/user');
+        const data = await res.json();
+        if (data.authenticated && data.user) {
+          // Already authenticated, redirect to studio
+          router.push('/studio');
+        } else {
+          setCheckingAuth(false);
+        }
+      } catch (err) {
+        console.error('[Auth] Error checking auth state:', err);
+        setCheckingAuth(false);
+      }
+    };
+    
+    checkAuth();
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,8 +64,9 @@ export default function LoginPage() {
         throw new Error(data.error || "Login failed");
       }
 
-      // Redirect to studio after successful login
-      router.push("/studio");
+      // Redirect to next param or default to studio
+      const next = searchParams.get('next') || '/studio';
+      router.push(next);
       router.refresh();
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Login failed. Please try again.";
@@ -49,6 +74,11 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // Show loading while checking auth
+  if (checkingAuth) {
+    return <AuthLoading />;
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-6">

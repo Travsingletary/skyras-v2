@@ -1,15 +1,38 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import AuthLoading from "@/components/AuthLoading";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
+
+  // Check if already authenticated and redirect to studio
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/user');
+        const data = await res.json();
+        if (data.authenticated && data.user) {
+          // Already authenticated, redirect to studio
+          router.push('/studio');
+        } else {
+          setCheckingAuth(false);
+        }
+      } catch (err) {
+        console.error('[Auth] Error checking auth state:', err);
+        setCheckingAuth(false);
+      }
+    };
+    
+    checkAuth();
+  }, [router]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +72,11 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
+
+  // Show loading while checking auth
+  if (checkingAuth) {
+    return <AuthLoading />;
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 flex items-center justify-center p-6">

@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import FilePreview from "@/components/FilePreview";
 import WorkflowSuggestions from "@/components/WorkflowSuggestions";
 import OnboardingBanner from "@/components/OnboardingBanner";
+import AuthLoading from "@/components/AuthLoading";
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +52,9 @@ interface WorkflowSuggestion {
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [message, setMessage] = useState("Run a creative concept for SkySky");
+  const [authChecking, setAuthChecking] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [response, setResponse] = useState<ChatResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,28 +80,63 @@ export default function Home() {
   // We always call same-origin `/api/*` in production to avoid CORS issues.
   const apiBaseUrl = "same-origin";
 
-  // Check auth state on mount and when page becomes visible
+  // Check auth state on mount and redirect if not authenticated
+  // Use window focus/visibilitychange for cross-tab logout detection (no polling)
   useEffect(() => {
+    let isChecking = false; // Prevent concurrent checks
+
     const checkAuth = async () => {
+      // Prevent concurrent auth checks
+      if (isChecking) return;
+      isChecking = true;
+
       try {
         const res = await fetch('/api/auth/user');
         const data = await res.json();
-        if (data.user) {
+        if (data.authenticated && data.user) {
           setUser(data.user);
+          setAuthChecking(false);
         } else {
           setUser(null);
+          // Not authenticated, redirect to login with next param
+          const currentPath = '/studio';
+          router.push(`/login?next=${encodeURIComponent(currentPath)}`);
         }
       } catch (err) {
         console.error('[Auth] Error checking auth state:', err);
         setUser(null);
+        // On error, redirect to login with next param
+        const currentPath = '/studio';
+        router.push(`/login?next=${encodeURIComponent(currentPath)}`);
+      } finally {
+        isChecking = false;
       }
     };
-    
+
+    // Initial auth check on mount
     checkAuth();
-    // Check auth state periodically (every 30 seconds) to catch logout from other tabs
-    const interval = setInterval(checkAuth, 30000);
-    return () => clearInterval(interval);
-  }, []);
+
+    // Re-check auth on window focus (catches logout from other tabs)
+    const handleFocus = () => {
+      checkAuth();
+    };
+
+    // Re-check auth when page becomes visible (catches logout from other tabs)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkAuth();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [router]);
 
   // Note: User identity is now derived server-side from auth session (no client-side userId needed)
 
@@ -130,6 +168,11 @@ export default function Home() {
   useEffect(() => {
     fetchPlans();
   }, [user]); // Refetch plans when auth state changes
+
+  // Show loading while checking auth
+  if (authChecking) {
+    return <AuthLoading />;
+  }
 
   const handleLogout = async () => {
     try {
