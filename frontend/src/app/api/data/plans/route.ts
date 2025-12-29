@@ -4,6 +4,8 @@ import { getSupabaseClient } from "@/backend/supabaseClient";
 import { getAuthenticatedUserId, logAuthIdentity } from "@/lib/auth";
 import type { Workflow } from "@/types/database";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET /api/data/plans
  * 
