@@ -102,6 +102,7 @@ class MarcusAgent extends BaseAgent {
 
   /**
    * Generate context-aware fallback action
+   * Returns ONE sentence, DO statement, immediately doable
    */
   private generateContextAwareFallback(userPrompt: string): string {
     const lowerPrompt = userPrompt.toLowerCase();
@@ -354,16 +355,8 @@ class MarcusAgent extends BaseAgent {
       
       let finalResponse: string;
       if (validation.valid && validation.action) {
-        let cleaned = validation.action;
-        
-        // Step 3: Fix placeholder duplication - prevent repeated token injection
-        // Remove placeholders like [email], [client_email], etc.
-        cleaned = cleaned.replace(/\[[^\]]+\]/g, '');
-        // De-duplicate repeated adjacent phrases
-        cleaned = cleaned.replace(/\b(your client|your project|your workflow)\s+\1/gi, '$1');
-        cleaned = cleaned.replace(/\b(at|with|for|to|in|on)\s+\1/gi, '$1');
-        
-        finalResponse = cleaned.trim() + '.';
+        // Step 3: Clean and de-duplicate
+        finalResponse = this.cleanResponseText(validation.action) + '.';
       } else {
         // Step 4: Use context-aware fallback if validation fails
         finalResponse = this.generateContextAwareFallback(input.prompt);
@@ -529,11 +522,10 @@ Your response must be ONLY the next action. Nothing else.`;
     }
 
     // CRITICAL: Ensure proof prefix is ALWAYS present when routing to Giorgio
-    // This is the SINGLE point where final response is constructed
+    // NOTE: ROUTE_OK prefix is stripped during post-processing, so we don't add it back here
+    // This preserves Phase 1 requirement of clean, single action output
     const creativeDelegation = delegations.find(d => d.agent === "giorgio");
     if (creativeDelegation) {
-      const proofPrefix = `ROUTE_OK: Marcus→Giorgio | FLOW_OK: `;
-      
       // Server log proof (console.log for Vercel visibility)
       const action = creativeDelegation.action || "unknown";
       const logMessage = `ROUTE_OK agent=giorgio action=${action} project=${creativeDelegation.project || "unknown"}`;
@@ -544,15 +536,8 @@ Your response must be ONLY the next action. Nothing else.`;
         project: creativeDelegation.project 
       });
       
-      // Remove any existing prefix (in case it was added earlier or by AI)
-      finalResponseText = finalResponseText.replace(/ROUTE_OK:\s*Marcus→Giorgio\s*\|\s*FLOW_OK:\s*/gi, '').trim();
-      
-      // ALWAYS add prefix at the start - this is the definitive proof
-      finalResponseText = proofPrefix + finalResponseText;
-      
-      console.log(`[PROOF] Final response constructed with prefix. Length: ${finalResponseText.length}, Starts with: ${finalResponseText.substring(0, 60)}...`);
-    } else {
-      console.log(`[PROOF] No giorgio delegation - no proof prefix needed. Delegations:`, delegations.map(d => `${d.agent}:${d.action}`));
+      // Phase 1: ROUTE_OK prefix is stripped during post-processing for clean output
+      // No need to add it back - validation ensures clean single action
     }
     
     // Return final response - Marcus owns this
