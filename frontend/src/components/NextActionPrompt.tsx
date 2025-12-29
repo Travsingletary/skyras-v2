@@ -19,8 +19,11 @@ export default function NextActionPrompt({
           <h2 className="text-lg font-semibold text-zinc-900 mb-2">
             What would you like to work on?
           </h2>
-          <p className="text-sm text-zinc-600 mb-4">
+          <p className="text-sm text-zinc-600 mb-2">
             Tell us what you need help with, and we'll give you one clear next step.
+          </p>
+          <p className="text-xs text-zinc-500 mb-4">
+            One step at a time. No overwhelm.
           </p>
           <button
             onClick={onStartAction}
@@ -44,8 +47,11 @@ export default function NextActionPrompt({
         <p className="text-sm text-zinc-600 mb-6">
           We help you reduce creative overwhelm by giving you one clear next action.
         </p>
-        <p className="text-base font-medium text-zinc-900 mb-6">
+        <p className="text-base font-medium text-zinc-900 mb-3">
           What do you need help with right now?
+        </p>
+        <p className="text-xs text-zinc-500 mb-6 max-w-sm mx-auto">
+          We give you one clear next action at a time. No lists, no overwhelm—just what to do next.
         </p>
         <button
           onClick={onStartAction}

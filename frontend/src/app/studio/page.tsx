@@ -591,6 +591,9 @@ function StudioContent() {
               }}
               placeholder="Tell us what you're working on, and we'll give you one clear next step..."
             />
+            <p className="mt-2 text-xs text-zinc-500">
+              We focus on one step at a time to reduce overwhelm. After you complete this action, we'll give you the next one.
+            </p>
           </div>
 
           {/* File Upload - HIDDEN in Phase 1 (clarity first) */}
