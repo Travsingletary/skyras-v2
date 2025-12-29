@@ -161,10 +161,12 @@ class MarcusAgent extends BaseAgent {
    */
   private parseActionContract(response: string): string | null {
     // Look for "ACTION:" prefix (case-insensitive)
-    const actionMatch = response.match(/ACTION:\s*(.+)/i);
+    const actionMatch = response.match(/ACTION:\s*(.+?)(?:\n|$)/i);
     if (actionMatch && actionMatch[1]) {
-      // Extract the action statement, trim whitespace
+      // Extract the action statement, take only up to first newline or end
       let action = actionMatch[1].trim();
+      // Split on newlines and take first line only
+      action = action.split(/\n/)[0].trim();
       // Remove any trailing punctuation (we'll add period later)
       action = action.replace(/[.!?]+$/, '').trim();
       // Return if we have something
