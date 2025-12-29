@@ -287,7 +287,7 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
-    const shouldGenerateCreative = CREATIVE_KEYWORDS.test(input.prompt);
+    const shouldGenerateCreative = !FORCE_SINGLE_ACTION_MODE && CREATIVE_KEYWORDS.test(input.prompt);
     if (shouldGenerateCreative) {
       const project =
         (input.metadata?.project as string | undefined) ??
@@ -342,7 +342,7 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
-    const shouldPlanDistribution = DISTRIBUTION_KEYWORDS.test(input.prompt);
+    const shouldPlanDistribution = !FORCE_SINGLE_ACTION_MODE && DISTRIBUTION_KEYWORDS.test(input.prompt);
     if (shouldPlanDistribution) {
       const distributionPayload: DistributionPayload = {
         project:
@@ -364,7 +364,7 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
-    const shouldCatalog = CATALOG_KEYWORDS.test(input.prompt);
+    const shouldCatalog = !FORCE_SINGLE_ACTION_MODE && CATALOG_KEYWORDS.test(input.prompt);
     if (shouldCatalog) {
       const catalogPayload: CatalogPayload | null = (() => {
         const project =
