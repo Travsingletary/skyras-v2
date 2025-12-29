@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
       conversationId: finalConversationId,
       assistantMessageId: messageId,
       response: responseText, // ← Frontend expects this!
+      buildTag: 'phase1-action-v3-a835920', // Temporary: confirms Phase 1 post-processing is deployed
       data: {
         message: {
           id: messageId,
