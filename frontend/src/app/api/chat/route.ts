@@ -7,23 +7,32 @@ export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
   
   try {
-    // Derive user identity from auth session (server-side only)
-    const userId = await getAuthenticatedUserId(request);
-    logAuthIdentity('/api/chat', userId);
-
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
+    // Parse payload first (request body can only be read once)
     const payload = await request.json().catch((parseError) => {
       console.error('[/api/chat] JSON parse error:', parseError);
       return {};
     });
-    const { conversationId, message, files } = payload;
-    // Note: userId is ignored if provided in payload (derived from auth session only)
+    const { conversationId, message, files, userId: payloadUserId } = payload;
+
+    // Derive user identity from auth session (server-side only)
+    let userId = await getAuthenticatedUserId(request);
+    logAuthIdentity('/api/chat', userId);
+
+    // Fallback: If no Supabase auth, allow 'public' userId from payload
+    // This supports the access code gate flow until full auth is implemented
+    if (!userId) {
+      // Only allow 'public' as fallback (matches frontend behavior)
+      if (payloadUserId === 'public') {
+        userId = 'public';
+        console.log('[/api/chat] Using fallback userId: public (no Supabase auth session)');
+      } else {
+        return NextResponse.json(
+          { success: false, error: 'Authentication required' },
+          { status: 401 }
+        );
+      }
+    }
+    // Note: userId is derived from auth session, with fallback to 'public' if no auth
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(

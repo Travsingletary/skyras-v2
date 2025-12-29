@@ -23,7 +23,18 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      // Safely parse JSON response
+      let data;
+      try {
+        const rawText = await res.text();
+        if (!rawText) {
+          throw new Error("Empty response from server");
+        }
+        data = JSON.parse(rawText);
+      } catch (parseError) {
+        console.error("[Login] Failed to parse response:", parseError);
+        throw new Error("Invalid response from server. Please try again.");
+      }
 
       if (!res.ok) {
         throw new Error(data.error || "Login failed");
@@ -33,7 +44,8 @@ export default function LoginPage() {
       router.push("/studio");
       router.refresh();
     } catch (err) {
-      setError((err as Error).message);
+      const errorMessage = err instanceof Error ? err.message : "Login failed. Please try again.";
+      setError(errorMessage);
       setLoading(false);
     }
   };

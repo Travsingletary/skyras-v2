@@ -7,7 +7,17 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.e
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Safely parse request body
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      return NextResponse.json(
+        { error: 'Invalid request body. Expected JSON.' },
+        { status: 400 }
+      );
+    }
+
     const { email, password } = body;
 
     if (!email || !password) {
@@ -32,7 +42,9 @@ export async function POST(request: NextRequest) {
     }
 
     const cookieStore = await cookies();
-    const response = NextResponse.next();
+    
+    // Create response object for cookie handling
+    const response = new NextResponse(null, { status: 200 });
 
     const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       cookies: {
@@ -55,21 +67,34 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('[Auth] Signup error:', error.message);
-      return NextResponse.json(
+      // Create JSON response and copy cookies
+      const errorResponse = NextResponse.json(
         { error: error.message },
         { status: 400 }
       );
+      // Copy all cookies from the response object
+      response.cookies.getAll().forEach((cookie) => {
+        errorResponse.cookies.set(cookie.name, cookie.value);
+      });
+      return errorResponse;
     }
 
     if (!data.user) {
-      return NextResponse.json(
+      console.error('[Auth] Signup failed: No user data returned');
+      // Create JSON response and copy cookies
+      const errorResponse = NextResponse.json(
         { error: 'Sign up failed' },
         { status: 500 }
       );
+      // Copy all cookies from the response object
+      response.cookies.getAll().forEach((cookie) => {
+        errorResponse.cookies.set(cookie.name, cookie.value);
+      });
+      return errorResponse;
     }
 
-    // Return response with cookies set
-    return NextResponse.json(
+    // Create success JSON response and copy cookies
+    const successResponse = NextResponse.json(
       {
         success: true,
         user: {
@@ -77,14 +102,23 @@ export async function POST(request: NextRequest) {
           email: data.user.email,
         },
       },
-      {
-        headers: response.headers,
-      }
+      { status: 200 }
     );
+    
+    // Copy all cookies from the response object
+    response.cookies.getAll().forEach((cookie) => {
+      successResponse.cookies.set(cookie.name, cookie.value);
+    });
+    
+    console.log('[Auth] Signup successful:', { userId: data.user.id, email: data.user.email });
+    return successResponse;
   } catch (error) {
-    console.error('[Auth] Unexpected signup error:', error);
+    // Catch all errors and ensure we always return valid JSON
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[Auth] Unexpected signup error:', errorMessage);
+    
     return NextResponse.json(
-      { error: 'Sign up failed' },
+      { error: 'Sign up failed. Please try again.' },
       { status: 500 }
     );
   }
