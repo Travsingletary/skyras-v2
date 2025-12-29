@@ -280,26 +280,55 @@ class MarcusAgent extends BaseAgent {
       // Split into sentences
       const sentences = cleanedResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
       
-      // Find first sentence that starts with an action verb
-      const actionVerbs = /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut|draft|prepare|organize|list|prioritize|choose|select|pick|decide|focus|work|begin)/i;
-      const actionSentence = sentences.find(s => actionVerbs.test(s.trim()));
+      // Find first sentence that starts with a concrete action verb
+      // Allowed: concrete, immediately actionable verbs
+      const concreteVerbs = /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut|draft|prepare|organize|list|choose|select|pick|focus|work|begin|draft|compose|build|design|draw|sketch|record|film|shoot)/i;
+      // Denied: abstract, planning, thinking verbs
+      const abstractVerbs = /^(review|brainstorm|prioritize|decide|think|consider|plan|analyze|evaluate|assess|examine|explore|investigate|research|study|reflect|contemplate|ponder|meditate)/i;
+      
+      // Find first sentence with concrete verb, reject abstract verbs
+      let actionSentence = sentences.find(s => {
+        const trimmed = s.trim();
+        return concreteVerbs.test(trimmed) && !abstractVerbs.test(trimmed);
+      });
       
       let finalResponse: string;
       if (actionSentence) {
-        finalResponse = actionSentence.trim() + '.';
+        let cleaned = actionSentence.trim();
+        // Remove placeholders like [email], [client_email], etc.
+        cleaned = cleaned.replace(/\[[^\]]+\]/g, 'your client');
+        // Ensure it's specific (has details, not just generic)
+        if (cleaned.length < 20 || /^(write|create|make|do|start|begin)\s+(the|a|an|your)\s+\w+$/i.test(cleaned)) {
+          // Too vague, try to find a more specific sentence
+          const moreSpecific = sentences.find(s => {
+            const t = s.trim();
+            return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 30 && /(?:at|with|for|to|in|on|about|subject|title|name|file|folder|document|email|calendar|schedule|client|project)/i.test(t);
+          });
+          if (moreSpecific) {
+            cleaned = moreSpecific.trim().replace(/\[[^\]]+\]/g, 'your client');
+          }
+        }
+        finalResponse = cleaned + '.';
       } else if (sentences.length > 0) {
         // Fallback: use first sentence, but strip if it's too long or contains explanations
         let firstSentence = sentences[0].trim();
-        if (firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence)) {
-          // Try to find any sentence with an action verb
-          const anyAction = sentences.find(s => /(?:open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut)/i.test(s));
-          finalResponse = anyAction ? anyAction.trim() + '.' : firstSentence.substring(0, 100) + '.';
+        if (firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence) || abstractVerbs.test(firstSentence)) {
+          // Try to find any sentence with a concrete action verb
+          const anyAction = sentences.find(s => {
+            const t = s.trim();
+            return concreteVerbs.test(t) && !abstractVerbs.test(t);
+          });
+          if (anyAction) {
+            finalResponse = anyAction.trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
+          } else {
+            finalResponse = firstSentence.substring(0, 100) + '.';
+          }
         } else {
-          finalResponse = firstSentence + '.';
+          finalResponse = firstSentence.replace(/\[[^\]]+\]/g, 'your client') + '.';
         }
       } else {
         // Last resort: use cleaned response but limit length
-        finalResponse = cleanedResponse.substring(0, 100).trim() + '.';
+        finalResponse = cleanedResponse.substring(0, 100).trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
       }
       
       return {
@@ -385,25 +414,54 @@ Your response must be ONLY the next action. Nothing else.`;
         // Split into sentences
         const sentences = rawResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
         
-        // Find first sentence that starts with an action verb
-        const actionVerbs = /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut|draft|prepare|organize|list|prioritize|choose|select|pick|decide|focus|work|begin)/i;
-        const actionSentence = sentences.find(s => actionVerbs.test(s.trim()));
+        // Find first sentence that starts with a concrete action verb
+        // Allowed: concrete, immediately actionable verbs
+        const concreteVerbs = /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut|draft|prepare|organize|list|choose|select|pick|focus|work|begin|draft|compose|build|design|draw|sketch|record|film|shoot)/i;
+        // Denied: abstract, planning, thinking verbs
+        const abstractVerbs = /^(review|brainstorm|prioritize|decide|think|consider|plan|analyze|evaluate|assess|examine|explore|investigate|research|study|reflect|contemplate|ponder|meditate)/i;
+        
+        // Find first sentence with concrete verb, reject abstract verbs
+        let actionSentence = sentences.find(s => {
+          const trimmed = s.trim();
+          return concreteVerbs.test(trimmed) && !abstractVerbs.test(trimmed);
+        });
         
         if (actionSentence) {
-          finalResponseText = actionSentence.trim() + '.';
+          let cleaned = actionSentence.trim();
+          // Remove placeholders like [email], [client_email], etc.
+          cleaned = cleaned.replace(/\[[^\]]+\]/g, 'your client');
+          // Ensure it's specific (has details, not just generic)
+          if (cleaned.length < 20 || /^(write|create|make|do|start|begin)\s+(the|a|an|your)\s+\w+$/i.test(cleaned)) {
+            // Too vague, try to find a more specific sentence
+            const moreSpecific = sentences.find(s => {
+              const t = s.trim();
+              return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 30 && /(?:at|with|for|to|in|on|about|subject|title|name|file|folder|document|email|calendar|schedule|client|project)/i.test(t);
+            });
+            if (moreSpecific) {
+              cleaned = moreSpecific.trim().replace(/\[[^\]]+\]/g, 'your client');
+            }
+          }
+          finalResponseText = cleaned + '.';
         } else if (sentences.length > 0) {
           // Fallback: use first sentence, but strip if it's too long or contains explanations
           let firstSentence = sentences[0].trim();
-          if (firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence)) {
-            // Try to find any sentence with an action verb
-            const anyAction = sentences.find(s => /(?:open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut)/i.test(s));
-            finalResponseText = anyAction ? anyAction.trim() + '.' : firstSentence.substring(0, 100) + '.';
+          if (firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence) || abstractVerbs.test(firstSentence)) {
+            // Try to find any sentence with a concrete action verb
+            const anyAction = sentences.find(s => {
+              const t = s.trim();
+              return concreteVerbs.test(t) && !abstractVerbs.test(t);
+            });
+            if (anyAction) {
+              finalResponseText = anyAction.trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
+            } else {
+              finalResponseText = firstSentence.substring(0, 100) + '.';
+            }
           } else {
-            finalResponseText = firstSentence + '.';
+            finalResponseText = firstSentence.replace(/\[[^\]]+\]/g, 'your client') + '.';
           }
         } else {
           // Last resort: use raw response but limit length
-          finalResponseText = rawResponse.substring(0, 100).trim() + '.';
+          finalResponseText = rawResponse.substring(0, 100).trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
         }
       } catch (error) {
         context.logger.error("Failed to wrap delegation results", { error });
