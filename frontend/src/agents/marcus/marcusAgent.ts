@@ -18,6 +18,7 @@ import type {
 } from "./marcusActions";
 import { getMarcusPreferences, formatPreferencesContext } from "./marcusPreferences";
 import { MARCUS_SYSTEM_PROMPT } from "./marcusSystemPrompt";
+import { detectIntent, getIntentTemplate, INTENT_TEMPLATES } from "./intentTemplates";
 
 const SYSTEM_PROMPT = MARCUS_SYSTEM_PROMPT;
 const LICENSING_KEYWORDS = /(license|licensing|watermark|demo)/i;
@@ -121,13 +122,13 @@ class MarcusAgent extends BaseAgent {
       email: 'Write the email subject line you want to use (5–8 words).',
       blog: 'Write the headline for your blog post.',
       presentation: 'Write the exact title of your next slide (max 6 words).',
-      socialSchedule: 'Write: "Platform: ___ | Cadence: ___."',
+      socialSchedule: 'Write the platform you\'re planning content for.',
       socialCaption: 'Write the first line of your caption.',
       video: 'Write the logline for your video.',
       overwhelm: 'Write the name of your most urgent project and add its deadline in parentheses.',
-      nextTask: 'Write: "Last task: ___ | Next 10-min step: ___."',
-      organize: 'Write one task name in the format "verb + object" (e.g., "Draft intro paragraph").',
-      default: 'Write the name of the deliverable you need next.',
+      nextTask: 'Write the last task you worked on.',
+      organize: 'Write one task name as verb object.',
+      default: 'Write the exact name of the deliverable you need next (max 5 words).',
     };
   }
 
@@ -144,11 +145,11 @@ class MarcusAgent extends BaseAgent {
       return 'email';
     }
     
-    // Social media scheduling (check before social caption)
-    if ((lowerPrompt.includes('schedule') || lowerPrompt.includes('calendar') || 
-         lowerPrompt.includes('posting') || lowerPrompt.includes('publish')) &&
-        (lowerPrompt.includes('social') || lowerPrompt.includes('instagram') || 
-         lowerPrompt.includes('tiktok') || lowerPrompt.includes('twitter'))) {
+    // Content calendar (expanded keywords)
+    if (lowerPrompt.includes('content calendar') || lowerPrompt.includes('content plan') || 
+        lowerPrompt.includes('posting plan') || lowerPrompt.includes('content strategy') ||
+        (lowerPrompt.includes('schedule') && (lowerPrompt.includes('content') || lowerPrompt.includes('post'))) ||
+        (lowerPrompt.includes('calendar') && lowerPrompt.includes('content'))) {
       return 'socialSchedule';
     }
     
@@ -186,6 +187,21 @@ class MarcusAgent extends BaseAgent {
     if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
         lowerPrompt.includes('don\'t know where to start')) {
       return 'overwhelm';
+    }
+    
+    // Creative directions (expanded keywords)
+    if (lowerPrompt.includes('direction') || lowerPrompt.includes('directions') ||
+        lowerPrompt.includes('vibe') || lowerPrompt.includes('tone') ||
+        lowerPrompt.includes('style') || lowerPrompt.includes('concept') ||
+        lowerPrompt.includes('creative') || lowerPrompt.includes('explore') && lowerPrompt.includes('direction')) {
+      return 'socialCaption'; // Reuse socialCaption template slot for creative directions
+    }
+    
+    // Start idea (expanded keywords)
+    if (lowerPrompt.includes('where do i start') || lowerPrompt.includes('how do i start') ||
+        lowerPrompt.includes('starting point') || lowerPrompt.includes('don\'t know how to start') ||
+        lowerPrompt.includes('don\'t know where to start') || lowerPrompt.includes('idea but')) {
+      return 'nextTask';
     }
     
     // Don't know what next/stuck
@@ -539,25 +555,37 @@ class MarcusAgent extends BaseAgent {
       }
     }
 
-    // If no specific keywords matched, generate AI response for general chat
+    // If no specific keywords matched, check for intent templates or generate AI response
     const hasSpecificAction = shouldAuditLicensing || shouldGenerateCreative || shouldPlanDistribution || shouldCatalog || fetchedLinks;
     if (!hasSpecificAction) {
-      context.logger.info("No specific action keywords detected, generating AI response");
-      const userId = input.metadata?.userId as string | undefined;
+      // Phase 1: Check for narrow intent templates first
+      const detectedIntent = detectIntent(input.prompt);
+      const templateId = detectedIntent || 'default';
+      const template = getIntentTemplate(templateId as keyof typeof INTENT_TEMPLATES);
       
       // PHASE 1 CANONICAL TEMPLATES: No free-form generation, use fixed templates only
       // Route prompt to template category using lightweight keyword intent classification
       const templateResult = this.selectCanonicalTemplate(input.prompt);
       
+      // Instrumentation: Log template routing
+      const instrumentation = {
+        actionMode: 'TEMPLATE_V1',
+        router: 'PHASE1_LOCK',
+        templateId: templateResult.templateId,
+      };
+      
+      context.logger.info("Phase 1 template routing", instrumentation);
+      console.log(`[INSTRUMENTATION] actionMode=${instrumentation.actionMode} router=${instrumentation.router} templateId=${instrumentation.templateId}`);
+      
+      // Use template as response (single-field action)
       return {
         output: templateResult.template,
         delegations,
-        notes: notesPayload,
-        // PHASE 1 INSTRUMENTATION (temporary - remove after Phase 1 passes)
-        actionMode: 'TEMPLATE_V1',
-        templateId: templateResult.templateId,
-        selectedTemplate: templateResult.template,
-        router: 'PHASE1_LOCK',
+        notes: {
+          ...notesPayload,
+          instrumentation,
+          templateUsed: true,
+        },
       };
     }
 
