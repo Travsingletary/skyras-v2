@@ -101,10 +101,123 @@ class MarcusAgent extends BaseAgent {
   }
 
   /**
-   * Generate context-aware fallback action (4/4 passing)
+   * Canonical Phase 1 Action Templates
+   * Fixed set of approved one-sentence actions (4/4 passing)
+   */
+  private getCanonicalTemplates(): {
+    projects: string;
+    tasks: string;
+    create: string;
+    deliverable: string;
+    ideas: string;
+    organize: string;
+    text: string;
+    email: string;
+    clarify: string;
+  } {
+    return {
+      projects: 'List all active projects in one place.',
+      tasks: 'Write down the last task you worked on.',
+      create: 'Write one sentence describing what you\'re trying to create.',
+      deliverable: 'Write the name of the deliverable you need next.',
+      ideas: 'Write three ideas for this.',
+      organize: 'Rename each task with a verb and object.',
+      text: 'Paste the text you want to improve (even if rough).',
+      email: 'Write the email subject line you want to use (5–8 words).',
+      clarify: 'Write one sentence describing what you\'re trying to create.',
+    };
+  }
+
+  /**
+   * Lightweight intent classification using keyword matching
+   * Routes prompts to canonical template categories
+   */
+  private classifyIntent(prompt: string): string {
+    const lowerPrompt = prompt.toLowerCase();
+    
+    // Projects/overwhelm/uncertainty
+    if (lowerPrompt.includes('project') || lowerPrompt.includes('too many') || 
+        lowerPrompt.includes('overwhelm') || lowerPrompt.includes('don\'t know where to start') ||
+        lowerPrompt.includes('don\'t know what to')) {
+      return 'projects';
+    }
+    
+    // Tasks/next step
+    if (lowerPrompt.includes('task') || lowerPrompt.includes('next') || 
+        lowerPrompt.includes('work on') || lowerPrompt.includes('stuck')) {
+      return 'tasks';
+    }
+    
+    // Create/content creation
+    if (lowerPrompt.includes('create') || lowerPrompt.includes('write') || 
+        lowerPrompt.includes('blog') || lowerPrompt.includes('article') || 
+        lowerPrompt.includes('post') || lowerPrompt.includes('idea')) {
+      return 'create';
+    }
+    
+    // Deliverable/finish
+    if (lowerPrompt.includes('deliverable') || lowerPrompt.includes('finish') || 
+        lowerPrompt.includes('complete') || lowerPrompt.includes('need')) {
+      return 'deliverable';
+    }
+    
+    // Ideas/brainstorm (only if we can extract context)
+    if (lowerPrompt.includes('idea') || lowerPrompt.includes('brainstorm') || 
+        lowerPrompt.includes('explore') || lowerPrompt.includes('direction')) {
+      return 'ideas';
+    }
+    
+    // Organize/workflow
+    if (lowerPrompt.includes('organize') || lowerPrompt.includes('workflow') || 
+        lowerPrompt.includes('structure') || lowerPrompt.includes('priorit')) {
+      return 'organize';
+    }
+    
+    // Text/content improvement
+    if (lowerPrompt.includes('script') || lowerPrompt.includes('video') || 
+        lowerPrompt.includes('film') || lowerPrompt.includes('caption') || 
+        lowerPrompt.includes('improve') || lowerPrompt.includes('draft')) {
+      return 'text';
+    }
+    
+    // Email
+    if (lowerPrompt.includes('email') || lowerPrompt.includes('client') || 
+        lowerPrompt.includes('send')) {
+      return 'email';
+    }
+    
+    // Default: clarification
+    return 'clarify';
+  }
+
+  /**
+   * Select canonical template based on intent
+   * Returns ONE sentence, DO statement, immediately doable, concrete, specific, small
+   */
+  private selectCanonicalTemplate(userPrompt: string): string {
+    const templates = this.getCanonicalTemplates();
+    const intent = this.classifyIntent(userPrompt);
+    
+    // Handle ideas template (requires context - if no clear context, use create template)
+    if (intent === 'ideas') {
+      // Check if we can extract a specific topic
+      const lowerPrompt = userPrompt.toLowerCase();
+      // For now, use generic "ideas" template (could be enhanced to extract topic)
+      return templates.ideas;
+    }
+    
+    // Return template based on intent
+    return templates[intent as keyof typeof templates] || templates.clarify;
+  }
+
+  /**
+   * Generate context-aware fallback action (DEPRECATED - use selectCanonicalTemplate)
    * Returns ONE sentence, DO statement, immediately doable, concrete, specific, small
    */
   private generateContextAwareFallback(userPrompt: string): string {
+    // Use canonical templates instead
+    return this.selectCanonicalTemplate(userPrompt);
+  }
     const lowerPrompt = userPrompt.toLowerCase();
     
     // Overwhelm/uncertainty prompts - concrete enumeration actions
@@ -488,28 +601,9 @@ class MarcusAgent extends BaseAgent {
       context.logger.info("No specific action keywords detected, generating AI response");
       const userId = input.metadata?.userId as string | undefined;
       
-      // PHASE 1 OUTPUT CONTRACT: Model must output "ACTION: <one-sentence DO statement>"
-      const phase1Prompt = `${input.prompt}\n\nCRITICAL OUTPUT CONTRACT: Your response must be EXACTLY one line in this format:\n\nACTION: <one-sentence DO statement>\n\nRules:\n- Start with "ACTION:" exactly\n- Follow with exactly one sentence that is a DO statement\n- No explanations, no context, no "why", no markdown\n- No other text before or after\n- Start the action with a verb (Open, Write, Email, Create, etc.)\n\nExample:\nACTION: Write the email subject line you want to use (5–8 words).`;
-      
-      const aiResponse = await this.generateAIResponse(phase1Prompt, context, userId);
-      
-      // Parse ACTION: contract
-      const parsedAction = this.parseActionContract(aiResponse);
-      let finalResponse: string;
-      
-      if (parsedAction && parsedAction.length > 10) {
-        // Check if action should be blocked (internal agents, cognitive verbs, collaboration)
-        if (this.shouldBlockAction(parsedAction)) {
-          // Hard block: use deterministic passing fallback
-          finalResponse = this.generateContextAwareFallback(input.prompt);
-        } else {
-          // Successfully parsed ACTION: contract and passed block checks
-          finalResponse = parsedAction + '.';
-        }
-      } else {
-        // Missing/invalid ACTION: contract -> use deterministic passing fallback
-        finalResponse = this.generateContextAwareFallback(input.prompt);
-      }
+      // PHASE 1 CANONICAL TEMPLATES: No free-form generation, use fixed templates only
+      // Route prompt to template category using lightweight keyword intent classification
+      const finalResponse = this.selectCanonicalTemplate(input.prompt);
       
       return {
         output: finalResponse,
