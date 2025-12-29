@@ -564,10 +564,18 @@ class MarcusAgent extends BaseAgent {
       const templateResult = this.selectCanonicalTemplate(input.prompt);
       
       // Instrumentation: Log template routing
+      // Map template keys to semantic intent names for clarity
+      const templateIdMap: Record<string, string> = {
+        'socialSchedule': 'calendar',
+        'socialCaption': 'directions',
+        'nextTask': 'start_idea',
+      };
+      const semanticTemplateId = templateIdMap[templateResult.templateId] || templateResult.templateId;
+      
       const instrumentation = {
         actionMode: 'TEMPLATE_V1',
         router: 'PHASE1_LOCK',
-        templateId: templateResult.templateId,
+        templateId: semanticTemplateId,
       };
       
       context.logger.info("Phase 1 template routing", instrumentation);
