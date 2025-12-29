@@ -187,6 +187,13 @@ function generatePrompts(): Array<{ prompt: string; expectedCategory: string; ex
   return prompts;
 }
 
+// Failure reason enum
+enum FailureReason {
+  ROUTING_MISMATCH = 'ROUTING_MISMATCH',
+  SEMANTIC_CHECK_FAIL = 'SEMANTIC_CHECK_FAIL',
+  FORMAT_FAIL = 'FORMAT_FAIL',
+}
+
 interface TestResult {
   prompt: string;
   expectedCategory: string;
@@ -196,6 +203,7 @@ interface TestResult {
   latency: number;
   pass: boolean;
   failureReasons: string[];
+  failureReason?: FailureReason;
 }
 
 // Grade a response
@@ -204,35 +212,44 @@ async function gradeResponse(
   response: string,
   expectedTemplateId: string,
   actualTemplateId: string | null
-): Promise<{ pass: boolean; reasons: string[] }> {
+): Promise<{ pass: boolean; reasons: string[]; failureReason?: FailureReason }> {
   const reasons: string[] = [];
+  let failureReason: FailureReason | undefined;
 
-  // Check 1: One sentence
+  // Check 1: One sentence (FORMAT_FAIL)
   const sentences = response.split(/[.!?]+/).filter(s => s.trim().length > 0);
   if (sentences.length !== 1) {
     reasons.push(`Not one sentence (found ${sentences.length} sentences)`);
+    failureReason = FailureReason.FORMAT_FAIL;
   }
 
-  // Check 2: One action (starts with action verb)
+  // Check 2: One action (starts with action verb) (FORMAT_FAIL)
   const actionVerbs = /^(write|open|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut)/i;
   if (!actionVerbs.test(response.trim())) {
     reasons.push('Does not start with an action verb');
+    failureReason = FailureReason.FORMAT_FAIL;
   }
 
-  // Check 3: templateId matches expectedCategory
+  // Check 3: templateId matches expectedCategory (ROUTING_MISMATCH)
   if (actualTemplateId !== expectedTemplateId) {
     reasons.push(`TemplateId mismatch: expected "${expectedTemplateId}", got "${actualTemplateId}"`);
+    failureReason = FailureReason.ROUTING_MISMATCH;
   }
 
-  // Check 4: Response is semantically on-category (deterministic check)
-  const semanticCheck = checkSemanticRelevance(prompt, response, expectedTemplateId);
-  if (!semanticCheck.pass) {
-    reasons.push(`Semantic mismatch: ${semanticCheck.reason}`);
+  // Check 4: Response is semantically on-category (deterministic check) (SEMANTIC_CHECK_FAIL)
+  // Only check if routing matched (don't penalize twice)
+  if (actualTemplateId === expectedTemplateId) {
+    const semanticCheck = checkSemanticRelevance(prompt, response, expectedTemplateId);
+    if (!semanticCheck.pass) {
+      reasons.push(`Semantic mismatch: ${semanticCheck.reason}`);
+      failureReason = FailureReason.SEMANTIC_CHECK_FAIL;
+    }
   }
 
   return {
     pass: reasons.length === 0,
     reasons,
+    failureReason,
   };
 }
 
@@ -367,6 +384,7 @@ async function runTests(): Promise<TestResult[]> {
       latency,
       pass: grade.pass,
       failureReasons: grade.reasons,
+      failureReason: grade.failureReason,
     };
 
     results.push(result);

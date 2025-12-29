@@ -149,7 +149,8 @@ class MarcusAgent extends BaseAgent {
     if (lowerPrompt.includes('content calendar') || lowerPrompt.includes('content plan') || 
         lowerPrompt.includes('posting plan') || lowerPrompt.includes('content strategy') ||
         (lowerPrompt.includes('schedule') && (lowerPrompt.includes('content') || lowerPrompt.includes('post'))) ||
-        (lowerPrompt.includes('calendar') && lowerPrompt.includes('content'))) {
+        (lowerPrompt.includes('calendar') && lowerPrompt.includes('content')) ||
+        (lowerPrompt.includes('plan') && lowerPrompt.includes('content') && (lowerPrompt.includes('social') || lowerPrompt.includes('media') || lowerPrompt.includes('post')))) {
       return 'socialSchedule';
     }
     
@@ -185,7 +186,8 @@ class MarcusAgent extends BaseAgent {
     
     // Overwhelm/projects/too many
     if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
-        lowerPrompt.includes('don\'t know where to start')) {
+        lowerPrompt.includes('too much') || lowerPrompt.includes('swamped') ||
+        (lowerPrompt.includes('too much') && (lowerPrompt.includes('to do') || lowerPrompt.includes('on my plate')))) {
       return 'overwhelm';
     }
     
@@ -193,15 +195,19 @@ class MarcusAgent extends BaseAgent {
     if ((lowerPrompt.includes('direction') || lowerPrompt.includes('directions')) ||
         lowerPrompt.includes('vibe') || lowerPrompt.includes('tone') ||
         lowerPrompt.includes('style') || lowerPrompt.includes('concept') ||
-        (lowerPrompt.includes('creative') && (lowerPrompt.includes('direction') || lowerPrompt.includes('explore'))) ||
-        (lowerPrompt.includes('explore') && lowerPrompt.includes('direction'))) {
+        (lowerPrompt.includes('creative') && (lowerPrompt.includes('direction') || lowerPrompt.includes('explore') || lowerPrompt.includes('guidance'))) ||
+        (lowerPrompt.includes('explore') && lowerPrompt.includes('direction')) ||
+        lowerPrompt.includes('creative guidance')) {
       return 'socialCaption'; // Reuse socialCaption template slot for creative directions
     }
     
-    // Start idea (expanded keywords)
+    // Start idea (expanded keywords) - check before overwhelm
     if (lowerPrompt.includes('where do i start') || lowerPrompt.includes('how do i start') ||
         lowerPrompt.includes('starting point') || lowerPrompt.includes('don\'t know how to start') ||
-        lowerPrompt.includes('don\'t know where to start') || lowerPrompt.includes('idea but')) {
+        lowerPrompt.includes('don\'t know where to start') || lowerPrompt.includes('idea but') ||
+        lowerPrompt.includes('don\'t know where to begin') || lowerPrompt.includes('don\'t know how to get started') ||
+        (lowerPrompt.includes('concept') && lowerPrompt.includes('help starting')) ||
+        (lowerPrompt.includes('need help starting'))) {
       return 'nextTask';
     }
     
@@ -578,8 +584,8 @@ class MarcusAgent extends BaseAgent {
         templateId: semanticTemplateId,
       };
       
+      // Internal logging only (not in public response)
       context.logger.info("Phase 1 template routing", instrumentation);
-      console.log(`[INSTRUMENTATION] actionMode=${instrumentation.actionMode} router=${instrumentation.router} templateId=${instrumentation.templateId}`);
       
       // Use template as response (single-field action)
       return {
@@ -617,16 +623,30 @@ class MarcusAgent extends BaseAgent {
       // No need to add it back - validation ensures clean single action
     }
     
+    // Map template keys to semantic intent names for internal tracking
+    const templateIdMap: Record<string, string> = {
+      'socialSchedule': 'calendar',
+      'socialCaption': 'directions',
+      'nextTask': 'start_idea',
+    };
+    const semanticTemplateId = templateIdMap[templateResult.templateId] || templateResult.templateId;
+    
+    // Internal instrumentation (in notes only, not in public response)
+    const instrumentation = {
+      actionMode: 'TEMPLATE_V1',
+      templateId: semanticTemplateId,
+    };
+    
+    context.logger.info("Phase 1 template routing", instrumentation);
+    
     // Return final response - Marcus owns this
     return {
       output: finalResponseText,
       delegations,
-      notes: notesPayload,
-      // PHASE 1 INSTRUMENTATION (temporary - remove after Phase 1 passes)
-      actionMode: 'TEMPLATE_V1',
-      templateId: templateResult.templateId,
-      selectedTemplate: templateResult.template,
-      router: 'PHASE1_LOCK',
+      notes: {
+        ...notesPayload,
+        instrumentation,
+      },
     };
   }
 }
