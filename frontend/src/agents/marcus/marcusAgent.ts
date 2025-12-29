@@ -192,25 +192,29 @@ class MarcusAgent extends BaseAgent {
         lowerPrompt.includes('don\'t know where to begin') || lowerPrompt.includes('don\'t know how to get started') ||
         (lowerPrompt.includes('concept') && lowerPrompt.includes('help starting')) ||
         (lowerPrompt.includes('need help starting')) ||
-        (lowerPrompt.includes('don\'t know') && (lowerPrompt.includes('where to start') || lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started')))) {
+        (lowerPrompt.includes('don\'t know') && (lowerPrompt.includes('where to start') || lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started'))) ||
+        lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started')) {
       return 'nextTask';
     }
     
-    // Creative directions (expanded keywords) - check before overwhelm
+    // Creative directions (expanded keywords) - check before overwhelm, but after start_idea
     if ((lowerPrompt.includes('direction') || lowerPrompt.includes('directions')) ||
         lowerPrompt.includes('vibe') || lowerPrompt.includes('tone') ||
-        lowerPrompt.includes('style') || lowerPrompt.includes('concept') ||
+        lowerPrompt.includes('style') ||
         (lowerPrompt.includes('creative') && (lowerPrompt.includes('direction') || lowerPrompt.includes('explore') || lowerPrompt.includes('guidance'))) ||
         (lowerPrompt.includes('explore') && lowerPrompt.includes('direction')) ||
         lowerPrompt.includes('creative guidance')) {
-      return 'socialCaption'; // Reuse socialCaption template slot for creative directions
+      // Don't match if it's about starting (start_idea takes precedence)
+      if (!lowerPrompt.includes('help starting') && !lowerPrompt.includes('need help starting')) {
+        return 'socialCaption'; // Reuse socialCaption template slot for creative directions
+      }
     }
     
     // Overwhelm/projects/too many - check after start_idea to avoid conflicts
     if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
-        lowerPrompt.includes('too much') || lowerPrompt.includes('swamped') ||
         (lowerPrompt.includes('too much') && (lowerPrompt.includes('to do') || lowerPrompt.includes('on my plate'))) ||
-        (lowerPrompt.includes('swamped') && lowerPrompt.includes('project'))) {
+        lowerPrompt.includes('swamped') || lowerPrompt.includes('feel swamped') ||
+        (lowerPrompt.includes('too much') && !lowerPrompt.includes('how to'))) {
       return 'overwhelm';
     }
     
