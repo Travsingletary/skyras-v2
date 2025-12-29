@@ -167,7 +167,7 @@ export default function Home() {
               This is a private beta. You need an access code to use Marcus.
             </p>
             <Link
-              href="/app"
+              href="/login?next=/studio"
               className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
               Have an access code? Open Marcus →

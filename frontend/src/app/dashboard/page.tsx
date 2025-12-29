@@ -90,7 +90,7 @@ export default function Dashboard() {
       <div className="min-h-screen bg-zinc-50 px-6 py-12">
         <div className="max-w-4xl mx-auto">
           <Link
-            href="/app"
+            href="/login?next=/studio"
             className="text-blue-600 hover:text-blue-700 text-sm font-medium mb-6 inline-block"
           >
             ← Back to Marcus
@@ -99,7 +99,7 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold text-red-900 mb-2">Error</h2>
             <p className="text-red-700">{error}</p>
             <Link
-              href="/app"
+              href="/login?next=/studio"
               className="mt-4 inline-block text-blue-600 hover:text-blue-700 text-sm font-medium"
             >
               Start a conversation with Marcus to create your first workflow →
@@ -119,7 +119,7 @@ export default function Dashboard() {
             <p className="text-zinc-600">View and manage your saved workflows</p>
           </div>
           <Link
-            href="/app"
+            href="/login?next=/studio"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
             Chat with Marcus
@@ -130,7 +130,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-lg p-12 text-center border border-zinc-200">
             <p className="text-zinc-600 mb-4">You don't have any workflows yet.</p>
             <Link
-              href="/app"
+              href="/login?next=/studio"
               className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
             >
               Create Your First Workflow
@@ -301,7 +301,7 @@ export default function Dashboard() {
 
               <div className="mt-8 pt-6 border-t border-zinc-200">
                 <Link
-                  href="/app"
+                  href="/login?next=/studio"
                   className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Chat with Marcus to Adjust This Workflow
