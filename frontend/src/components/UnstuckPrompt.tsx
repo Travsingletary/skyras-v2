@@ -9,10 +9,10 @@ export default function UnstuckPrompt({ onLogin }: UnstuckPromptProps) {
     <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
       <div className="text-center">
         <h3 className="text-lg font-semibold text-zinc-900 mb-2">
-          Want to save this and get the next step when you come back?
+          Want to keep this organized and continue from here next time?
         </h3>
         <p className="text-sm text-zinc-600 mb-4">
-          Sign up to keep your progress and continue where you left off.
+          Sign up to save your progress and continue where you left off.
         </p>
         <button
           onClick={onLogin}

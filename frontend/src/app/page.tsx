@@ -121,13 +121,10 @@ export default function Home() {
       <div className="max-w-2xl mx-auto px-6 py-12">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-zinc-900 mb-2">
-            SkyRas
+            Let's assist you in creating.
           </h1>
           <p className="text-base text-zinc-600 mb-1">
             One clear next action. No overwhelm.
-          </p>
-          <p className="text-sm text-zinc-500">
-            Get unstuck right now—no signup required.
           </p>
         </div>
 
@@ -181,7 +178,7 @@ export default function Home() {
         <div className="rounded-lg border bg-white p-6 shadow-sm space-y-4">
           <div>
             <label className="text-base font-medium text-zinc-900 block mb-2">
-              What do you need help with?
+              What are you working on right now?
             </label>
             <textarea
               className="w-full rounded-lg border border-zinc-300 p-4 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -196,7 +193,7 @@ export default function Home() {
               placeholder="Tell us what you're working on, and we'll give you one clear next step..."
             />
             <p className="mt-2 text-xs text-zinc-500">
-              We focus on one step at a time to reduce overwhelm. After you complete this action, we'll give you the next one.
+              We focus on one step at a time so you can move forward with clarity.
             </p>
           </div>
 
@@ -221,7 +218,7 @@ export default function Home() {
             >
               Sign up
             </button>
-            {" "}to save your progress and continue in Studio.
+            {" "}to keep your progress organized and continue in Studio.
           </p>
         </div>
       </div>
