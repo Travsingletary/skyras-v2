@@ -184,14 +184,17 @@ class MarcusAgent extends BaseAgent {
       return 'presentation';
     }
     
-    // Overwhelm/projects/too many
-    if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
-        lowerPrompt.includes('too much') || lowerPrompt.includes('swamped') ||
-        (lowerPrompt.includes('too much') && (lowerPrompt.includes('to do') || lowerPrompt.includes('on my plate')))) {
-      return 'overwhelm';
+    // Start idea (expanded keywords) - check BEFORE overwhelm to avoid conflicts
+    if (lowerPrompt.includes('where do i start') || lowerPrompt.includes('how do i start') ||
+        lowerPrompt.includes('starting point') || lowerPrompt.includes('don\'t know how to start') ||
+        lowerPrompt.includes('don\'t know where to start') || lowerPrompt.includes('idea but') ||
+        lowerPrompt.includes('don\'t know where to begin') || lowerPrompt.includes('don\'t know how to get started') ||
+        (lowerPrompt.includes('concept') && lowerPrompt.includes('help starting')) ||
+        (lowerPrompt.includes('need help starting'))) {
+      return 'nextTask';
     }
     
-    // Creative directions (expanded keywords)
+    // Creative directions (expanded keywords) - check before overwhelm
     if ((lowerPrompt.includes('direction') || lowerPrompt.includes('directions')) ||
         lowerPrompt.includes('vibe') || lowerPrompt.includes('tone') ||
         lowerPrompt.includes('style') || lowerPrompt.includes('concept') ||
@@ -201,14 +204,12 @@ class MarcusAgent extends BaseAgent {
       return 'socialCaption'; // Reuse socialCaption template slot for creative directions
     }
     
-    // Start idea (expanded keywords) - check before overwhelm
-    if (lowerPrompt.includes('where do i start') || lowerPrompt.includes('how do i start') ||
-        lowerPrompt.includes('starting point') || lowerPrompt.includes('don\'t know how to start') ||
-        lowerPrompt.includes('don\'t know where to start') || lowerPrompt.includes('idea but') ||
-        lowerPrompt.includes('don\'t know where to begin') || lowerPrompt.includes('don\'t know how to get started') ||
-        (lowerPrompt.includes('concept') && lowerPrompt.includes('help starting')) ||
-        (lowerPrompt.includes('need help starting'))) {
-      return 'nextTask';
+    // Overwhelm/projects/too many - check after start_idea to avoid conflicts
+    if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
+        lowerPrompt.includes('too much') || lowerPrompt.includes('swamped') ||
+        (lowerPrompt.includes('too much') && (lowerPrompt.includes('to do') || lowerPrompt.includes('on my plate'))) ||
+        (lowerPrompt.includes('swamped') && lowerPrompt.includes('project'))) {
+      return 'overwhelm';
     }
     
     // Don't know what next/stuck
