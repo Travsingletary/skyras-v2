@@ -185,6 +185,14 @@ class MarcusAgent extends BaseAgent {
       // Rule d: Must contain no "and/then"
       if (/\b(and|then|next|after|before)\s+(?:then|next|after|before|and)/i.test(trimmed)) continue;
       
+      // Rule e: Disallow vague "first paragraph/scene/sentence" unless they include topic anchor
+      const hasVagueStart = /^(write|create|draft|start)\s+(?:the\s+)?(?:first|next)\s+(?:paragraph|scene|sentence|section)/i.test(trimmed);
+      if (hasVagueStart) {
+        // Require: quoted topic OR "about <topic>" OR "for <audience/project>"
+        const hasTopicAnchor = hasQuoted || /\babout\s+[\w\s]+/i.test(trimmed) || hasForClause;
+        if (!hasTopicAnchor) continue; // Reject vague action without topic anchor
+      }
+      
       // All rules passed
       return { valid: true, action: trimmed };
     }
