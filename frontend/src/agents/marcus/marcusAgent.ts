@@ -192,9 +192,9 @@ class MarcusAgent extends BaseAgent {
 
   /**
    * Select canonical template based on intent
-   * Returns ONE sentence, DO statement, immediately doable, concrete, specific, small
+   * Returns template info: { template, templateId }
    */
-  private selectCanonicalTemplate(userPrompt: string): string {
+  private selectCanonicalTemplate(userPrompt: string): { template: string; templateId: string } {
     const templates = this.getCanonicalTemplates();
     const intent = this.classifyIntent(userPrompt);
     
@@ -203,11 +203,13 @@ class MarcusAgent extends BaseAgent {
       // Check if we can extract a specific topic
       const lowerPrompt = userPrompt.toLowerCase();
       // For now, use generic "ideas" template (could be enhanced to extract topic)
-      return templates.ideas;
+      return { template: templates.ideas, templateId: 'ideas' };
     }
     
     // Return template based on intent
-    return templates[intent as keyof typeof templates] || templates.clarify;
+    const templateId = intent as keyof typeof templates;
+    const template = templates[templateId] || templates.clarify;
+    return { template, templateId: templateId || 'clarify' };
   }
 
   /**
@@ -216,7 +218,7 @@ class MarcusAgent extends BaseAgent {
    */
   private generateContextAwareFallback(userPrompt: string): string {
     // Use canonical templates instead
-    return this.selectCanonicalTemplate(userPrompt);
+    return this.selectCanonicalTemplate(userPrompt).template;
   }
 
   /**
@@ -539,18 +541,24 @@ class MarcusAgent extends BaseAgent {
       
       // PHASE 1 CANONICAL TEMPLATES: No free-form generation, use fixed templates only
       // Route prompt to template category using lightweight keyword intent classification
-      const finalResponse = this.selectCanonicalTemplate(input.prompt);
+      const templateResult = this.selectCanonicalTemplate(input.prompt);
       
       return {
-        output: finalResponse,
+        output: templateResult.template,
         delegations,
         notes: notesPayload,
+        // PHASE 1 INSTRUMENTATION (temporary - remove after Phase 1 passes)
+        actionMode: 'TEMPLATE_V1',
+        templateId: templateResult.templateId,
+        selectedTemplate: templateResult.template,
+        router: 'PHASE1_LOCK',
       };
     }
 
     // PHASE 1 CANONICAL TEMPLATES: Use template selection for all paths
     // No AI generation, no delegation wrapping, just template selection
-    const finalResponseText = this.selectCanonicalTemplate(input.prompt);
+    const templateResult = this.selectCanonicalTemplate(input.prompt);
+    const finalResponseText = templateResult.template;
 
     // CRITICAL: Ensure proof prefix is ALWAYS present when routing to Giorgio
     // NOTE: ROUTE_OK prefix is stripped during post-processing, so we don't add it back here
@@ -576,6 +584,11 @@ class MarcusAgent extends BaseAgent {
       output: finalResponseText,
       delegations,
       notes: notesPayload,
+      // PHASE 1 INSTRUMENTATION (temporary - remove after Phase 1 passes)
+      actionMode: 'TEMPLATE_V1',
+      templateId: templateResult.templateId,
+      selectedTemplate: templateResult.template,
+      router: 'PHASE1_LOCK',
     };
   }
 }

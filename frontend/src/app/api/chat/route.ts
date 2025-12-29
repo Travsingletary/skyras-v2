@@ -3,6 +3,10 @@ import { createMarcusAgent } from "@/agents/marcus";
 import { logAgentExecution, generateRequestId } from "@/lib/agentLogging";
 import { getAuthenticatedUserId, logAuthIdentity } from "@/lib/auth";
 
+// Force dynamic rendering and disable caching
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(request: NextRequest) {
   const requestId = generateRequestId();
   
