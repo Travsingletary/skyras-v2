@@ -102,92 +102,105 @@ class MarcusAgent extends BaseAgent {
 
   /**
    * Canonical Phase 1 Action Templates
-   * Fixed set of approved one-sentence actions (4/4 passing)
+   * Intent-specific deliverable templates (4/4 passing)
    */
   private getCanonicalTemplates(): {
-    projects: string;
-    tasks: string;
-    create: string;
-    deliverable: string;
-    ideas: string;
-    organize: string;
-    text: string;
     email: string;
-    clarify: string;
+    blog: string;
+    presentation: string;
+    socialSchedule: string;
+    socialCaption: string;
+    video: string;
+    overwhelm: string;
+    nextTask: string;
+    organize: string;
+    default: string;
   } {
     return {
-      projects: 'List all active projects in one place.',
-      tasks: 'Write down the last task you worked on.',
-      create: 'Write one sentence describing what you\'re trying to create.',
-      deliverable: 'Write the name of the deliverable you need next.',
-      ideas: 'Write three ideas for this.',
-      organize: 'Rename each task with a verb and object.',
-      text: 'Paste the text you want to improve (even if rough).',
       email: 'Write the email subject line you want to use (5–8 words).',
-      clarify: 'Write one sentence describing what you\'re trying to create.',
+      blog: 'Write the headline for your blog post.',
+      presentation: 'Write the title of the next slide you need to create.',
+      socialSchedule: 'Write: "Platform: __ | Cadence: __."',
+      socialCaption: 'Write the first line of your caption.',
+      video: 'Write the logline for your video.',
+      overwhelm: 'Write down the name of one active project.',
+      nextTask: 'Write down the last task you worked on.',
+      organize: 'Rename one task as "verb + object."',
+      default: 'Write the name of the deliverable you need next.',
     };
   }
 
   /**
    * Lightweight intent classification using keyword matching
-   * Routes prompts to canonical template categories
+   * Routes prompts to canonical template categories with deliverable specificity
    */
   private classifyIntent(prompt: string): string {
     const lowerPrompt = prompt.toLowerCase();
     
-    // Projects/overwhelm/uncertainty
-    if (lowerPrompt.includes('project') || lowerPrompt.includes('too many') || 
-        lowerPrompt.includes('overwhelm') || lowerPrompt.includes('don\'t know where to start') ||
-        lowerPrompt.includes('don\'t know what to')) {
-      return 'projects';
-    }
-    
-    // Tasks/next step
-    if (lowerPrompt.includes('task') || lowerPrompt.includes('next') || 
-        lowerPrompt.includes('work on') || lowerPrompt.includes('stuck')) {
-      return 'tasks';
-    }
-    
-    // Create/content creation
-    if (lowerPrompt.includes('create') || lowerPrompt.includes('write') || 
-        lowerPrompt.includes('blog') || lowerPrompt.includes('article') || 
-        lowerPrompt.includes('post') || lowerPrompt.includes('idea')) {
-      return 'create';
-    }
-    
-    // Deliverable/finish
-    if (lowerPrompt.includes('deliverable') || lowerPrompt.includes('finish') || 
-        lowerPrompt.includes('complete') || lowerPrompt.includes('need')) {
-      return 'deliverable';
-    }
-    
-    // Ideas/brainstorm (only if we can extract context)
-    if (lowerPrompt.includes('idea') || lowerPrompt.includes('brainstorm') || 
-        lowerPrompt.includes('explore') || lowerPrompt.includes('direction')) {
-      return 'ideas';
-    }
-    
-    // Organize/workflow
-    if (lowerPrompt.includes('organize') || lowerPrompt.includes('workflow') || 
-        lowerPrompt.includes('structure') || lowerPrompt.includes('priorit')) {
-      return 'organize';
-    }
-    
-    // Text/content improvement
-    if (lowerPrompt.includes('script') || lowerPrompt.includes('video') || 
-        lowerPrompt.includes('film') || lowerPrompt.includes('caption') || 
-        lowerPrompt.includes('improve') || lowerPrompt.includes('draft')) {
-      return 'text';
-    }
-    
-    // Email
+    // Email (highest priority - check first)
     if (lowerPrompt.includes('email') || lowerPrompt.includes('client') || 
         lowerPrompt.includes('send')) {
       return 'email';
     }
     
-    // Default: clarification
-    return 'clarify';
+    // Social media scheduling (check before social caption)
+    if ((lowerPrompt.includes('schedule') || lowerPrompt.includes('calendar') || 
+         lowerPrompt.includes('posting') || lowerPrompt.includes('publish')) &&
+        (lowerPrompt.includes('social') || lowerPrompt.includes('instagram') || 
+         lowerPrompt.includes('tiktok') || lowerPrompt.includes('twitter'))) {
+      return 'socialSchedule';
+    }
+    
+    // Social media caption/hook/script
+    if ((lowerPrompt.includes('social') || lowerPrompt.includes('instagram') || 
+         lowerPrompt.includes('tiktok') || lowerPrompt.includes('twitter')) &&
+        (lowerPrompt.includes('caption') || lowerPrompt.includes('hook') || 
+         lowerPrompt.includes('script'))) {
+      return 'socialCaption';
+    }
+    
+    // Video/script (check before general blog/article)
+    if (lowerPrompt.includes('video') || lowerPrompt.includes('film')) {
+      return 'video';
+    }
+    
+    // Script (video scripts)
+    if (lowerPrompt.includes('script') && !lowerPrompt.includes('caption')) {
+      return 'video';
+    }
+    
+    // Blog/article/post
+    if (lowerPrompt.includes('blog') || lowerPrompt.includes('article') || 
+        (lowerPrompt.includes('post') && !lowerPrompt.includes('social'))) {
+      return 'blog';
+    }
+    
+    // Presentation/slides/deck
+    if (lowerPrompt.includes('presentation') || lowerPrompt.includes('slides') || 
+        lowerPrompt.includes('deck')) {
+      return 'presentation';
+    }
+    
+    // Overwhelm/projects/too many
+    if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
+        lowerPrompt.includes('don\'t know where to start')) {
+      return 'overwhelm';
+    }
+    
+    // Don't know what next/stuck
+    if (lowerPrompt.includes('don\'t know what to') || lowerPrompt.includes('stuck') ||
+        lowerPrompt.includes('what should i')) {
+      return 'nextTask';
+    }
+    
+    // Organize/tasks/workflow
+    if (lowerPrompt.includes('organize') || lowerPrompt.includes('workflow') || 
+        (lowerPrompt.includes('task') && !lowerPrompt.includes('last'))) {
+      return 'organize';
+    }
+    
+    // Default: deliverable
+    return 'default';
   }
 
   /**
@@ -198,18 +211,10 @@ class MarcusAgent extends BaseAgent {
     const templates = this.getCanonicalTemplates();
     const intent = this.classifyIntent(userPrompt);
     
-    // Handle ideas template (requires context - if no clear context, use create template)
-    if (intent === 'ideas') {
-      // Check if we can extract a specific topic
-      const lowerPrompt = userPrompt.toLowerCase();
-      // For now, use generic "ideas" template (could be enhanced to extract topic)
-      return { template: templates.ideas, templateId: 'ideas' };
-    }
-    
     // Return template based on intent
     const templateId = intent as keyof typeof templates;
-    const template = templates[templateId] || templates.clarify;
-    return { template, templateId: templateId || 'clarify' };
+    const template = templates[templateId] || templates.default;
+    return { template, templateId: templateId || 'default' };
   }
 
   /**
