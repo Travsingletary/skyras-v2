@@ -79,7 +79,6 @@ export async function GET(request: NextRequest) {
           email: data.user.email,
           emailConfirmedAt: data.user.email_confirmed_at,
         });
-        console.log('[Auth] TEMPORARY: exchangeCodeForSession succeeded (token_hash format)');
       }
     } else if (code && type) {
       // Older format: code + type
@@ -105,7 +104,6 @@ export async function GET(request: NextRequest) {
           email: data.user.email,
           emailConfirmedAt: data.user.email_confirmed_at,
         });
-        console.log('[Auth] TEMPORARY: exchangeCodeForSession succeeded (code format)');
       }
     } else {
       // If no token_hash/code, try to get the current session (might already be set)
