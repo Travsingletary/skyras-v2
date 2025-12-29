@@ -150,7 +150,8 @@ class MarcusAgent extends BaseAgent {
         lowerPrompt.includes('posting plan') || lowerPrompt.includes('content strategy') ||
         (lowerPrompt.includes('schedule') && (lowerPrompt.includes('content') || lowerPrompt.includes('post'))) ||
         (lowerPrompt.includes('calendar') && lowerPrompt.includes('content')) ||
-        (lowerPrompt.includes('plan') && lowerPrompt.includes('content') && (lowerPrompt.includes('social') || lowerPrompt.includes('media') || lowerPrompt.includes('post')))) {
+        (lowerPrompt.includes('plan') && lowerPrompt.includes('content') && (lowerPrompt.includes('social') || lowerPrompt.includes('media') || lowerPrompt.includes('post'))) ||
+        (lowerPrompt.includes('plan') && (lowerPrompt.includes('social') || lowerPrompt.includes('media')) && lowerPrompt.includes('content'))) {
       return 'socialSchedule';
     }
     
@@ -190,7 +191,8 @@ class MarcusAgent extends BaseAgent {
         lowerPrompt.includes('don\'t know where to start') || lowerPrompt.includes('idea but') ||
         lowerPrompt.includes('don\'t know where to begin') || lowerPrompt.includes('don\'t know how to get started') ||
         (lowerPrompt.includes('concept') && lowerPrompt.includes('help starting')) ||
-        (lowerPrompt.includes('need help starting'))) {
+        (lowerPrompt.includes('need help starting')) ||
+        (lowerPrompt.includes('don\'t know') && (lowerPrompt.includes('where to start') || lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started')))) {
       return 'nextTask';
     }
     
