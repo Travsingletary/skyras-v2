@@ -272,18 +272,34 @@ class MarcusAgent extends BaseAgent {
       
       const aiResponse = await this.generateAIResponse(phase1Prompt, context, userId);
       
-      // Post-process to extract single action if response is too long
-      let finalResponse = aiResponse;
-      if (aiResponse.length > 200 || aiResponse.includes('WHY') || aiResponse.includes('**WHY')) {
-        // Try to extract the first sentence that starts with an action verb
-        const sentences = aiResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
-        const actionSentence = sentences.find(s => /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut)/i.test(s.trim()));
-        if (actionSentence) {
-          finalResponse = actionSentence.trim() + '.';
+      // PHASE 1 POST-PROCESSING: Extract single action sentence only
+      // Remove "WHY This Matters" sections and all explanations
+      let cleanedResponse = aiResponse.replace(/\*\*WHY.*?\*\*/gi, '').replace(/WHY.*?Matters?:?/gi, '');
+      cleanedResponse = cleanedResponse.replace(/\*\*.*?\*\*/g, ''); // Remove bold formatting
+      
+      // Split into sentences
+      const sentences = cleanedResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      
+      // Find first sentence that starts with an action verb
+      const actionVerbs = /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut|draft|prepare|organize|list|prioritize|choose|select|pick|decide|focus|work|begin)/i;
+      const actionSentence = sentences.find(s => actionVerbs.test(s.trim()));
+      
+      let finalResponse: string;
+      if (actionSentence) {
+        finalResponse = actionSentence.trim() + '.';
+      } else if (sentences.length > 0) {
+        // Fallback: use first sentence, but strip if it's too long or contains explanations
+        let firstSentence = sentences[0].trim();
+        if (firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence)) {
+          // Try to find any sentence with an action verb
+          const anyAction = sentences.find(s => /(?:open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut)/i.test(s));
+          finalResponse = anyAction ? anyAction.trim() + '.' : firstSentence.substring(0, 100) + '.';
         } else {
-          // Fallback: use first sentence
-          finalResponse = sentences[0]?.trim() + '.' || aiResponse;
+          finalResponse = firstSentence + '.';
         }
+      } else {
+        // Last resort: use cleaned response but limit length
+        finalResponse = cleanedResponse.substring(0, 100).trim() + '.';
       }
       
       return {
@@ -359,11 +375,35 @@ Your response must be ONLY the next action. Nothing else.`;
         });
 
         const textContent = message.content.find((block) => block.type === "text");
-        if (textContent && textContent.type === "text") {
-          finalResponseText = textContent.text;
+        let rawResponse = textContent && textContent.type === "text" ? textContent.text : outputLines.join('\n');
+        
+        // PHASE 1 POST-PROCESSING: Extract single action sentence only
+        // Remove "WHY This Matters" sections and all explanations
+        rawResponse = rawResponse.replace(/\*\*WHY.*?\*\*/gi, '').replace(/WHY.*?Matters?:?/gi, '');
+        rawResponse = rawResponse.replace(/\*\*.*?\*\*/g, ''); // Remove bold formatting
+        
+        // Split into sentences
+        const sentences = rawResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        
+        // Find first sentence that starts with an action verb
+        const actionVerbs = /^(open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut|draft|prepare|organize|list|prioritize|choose|select|pick|decide|focus|work|begin)/i;
+        const actionSentence = sentences.find(s => actionVerbs.test(s.trim()));
+        
+        if (actionSentence) {
+          finalResponseText = actionSentence.trim() + '.';
+        } else if (sentences.length > 0) {
+          // Fallback: use first sentence, but strip if it's too long or contains explanations
+          let firstSentence = sentences[0].trim();
+          if (firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence)) {
+            // Try to find any sentence with an action verb
+            const anyAction = sentences.find(s => /(?:open|write|email|create|send|call|schedule|block|set|add|remove|delete|update|edit|start|finish|complete|submit|post|publish|draft|save|upload|download|go|click|type|fill|do|make|take|get|put|move|copy|paste|cut)/i.test(s));
+            finalResponseText = anyAction ? anyAction.trim() + '.' : firstSentence.substring(0, 100) + '.';
+          } else {
+            finalResponseText = firstSentence + '.';
+          }
         } else {
-          // Fallback to outputLines if AI wrapping failed
-          finalResponseText = outputLines.join('\n');
+          // Last resort: use raw response but limit length
+          finalResponseText = rawResponse.substring(0, 100).trim() + '.';
         }
       } catch (error) {
         context.logger.error("Failed to wrap delegation results", { error });
