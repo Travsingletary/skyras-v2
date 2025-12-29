@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import FilePreview from "@/components/FilePreview";
-import WorkflowSuggestions from "@/components/WorkflowSuggestions";
-import OnboardingBanner from "@/components/OnboardingBanner";
 import AuthLoading from "@/components/AuthLoading";
+import NextActionPrompt from "@/components/NextActionPrompt";
 
 export const dynamic = 'force-dynamic';
 
@@ -53,7 +51,7 @@ interface WorkflowSuggestion {
 function StudioContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [message, setMessage] = useState("Run a creative concept for SkySky");
+  const [message, setMessage] = useState("");
   const [authChecking, setAuthChecking] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [response, setResponse] = useState<ChatResponse | null>(null);
@@ -461,10 +459,9 @@ function StudioContent() {
       <div className="mx-auto max-w-4xl space-y-6">
         <header className="flex items-start justify-between">
           <div className="space-y-2">
-            <h1 className="text-2xl font-semibold">SkyRas v2 · Agent Console</h1>
+            <h1 className="text-2xl font-semibold">SkyRas Studio</h1>
             <p className="text-sm text-zinc-600">
-              Marcus will delegate to Giorgio (creative), Cassidy (compliance), Jamal (distribution), and Letitia (cataloging)
-              based on your request.
+              One clear next action. No overwhelm.
             </p>
           </div>
           <div className="flex gap-3">
@@ -496,7 +493,8 @@ function StudioContent() {
                 </Link>
               </>
             )}
-            <Link
+            {/* Workflows and Analytics - HIDDEN in Phase 1 (organization/inspiration layered after clarity) */}
+            {/* <Link
               href="/workflows"
               className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition-colors"
             >
@@ -507,26 +505,26 @@ function StudioContent() {
               className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
             >
               📊 Analytics
-            </Link>
+            </Link> */}
           </div>
         </header>
 
-        {/* Onboarding Banner (first-run only) */}
-        {isFirstRun && (
-          <OnboardingBanner onRunDemo={handleRunDemo} loading={demoLoading} />
+        {/* Next Action Prompt - Show when no active plan or first run */}
+        {(!plansLoading && plans.length === 0) && (
+          <NextActionPrompt 
+            onStartAction={() => {
+              // Focus on the message input to guide user
+              const textarea = document.querySelector('textarea');
+              if (textarea) {
+                textarea.focus();
+              }
+            }}
+            loading={false}
+            hasWorkflows={plans.length > 0}
+          />
         )}
 
-        {/* Connection Status */}
-        <div className="rounded-lg border bg-white p-3 shadow-sm">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-zinc-600">
-              API: <span className="font-mono text-zinc-900">{apiBaseUrl}</span>
-            </span>
-            <span className="text-zinc-600">
-              Status: <span className="font-mono text-zinc-900">{user ? `Authenticated (${user.email})` : 'Not authenticated'}</span>
-            </span>
-          </div>
-        </div>
+        {/* Connection Status - HIDDEN in Phase 1 (technical details not needed for clarity) */}
 
         {/* Error Display */}
         {error && (
@@ -544,43 +542,30 @@ function StudioContent() {
           </div>
         )}
 
-        {/* Uploaded Files Preview */}
-        {uploadedFiles.length > 0 && (
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <FilePreview files={uploadedFiles} onRemove={handleRemoveUploadedFile} />
-          </div>
-        )}
+        {/* Uploaded Files Preview - HIDDEN in Phase 1 (file complexity removed for clarity) */}
 
-        {/* Workflow Suggestions */}
-        {workflowSuggestions.length > 0 && (
+        {/* Workflow Suggestions - HIDDEN in Phase 1 (clarity first) */}
+        {/* {workflowSuggestions.length > 0 && (
           <div className="rounded-lg border bg-white p-4 shadow-sm">
             <WorkflowSuggestions
               suggestions={workflowSuggestions}
               onCreateWorkflow={handleCreateWorkflow}
             />
           </div>
-        )}
+        )} */}
 
-        {/* Messages List */}
+        {/* Messages List - Simplified: Show only recent conversation */}
         {messages.length > 0 && (
           <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
-            <h2 className="text-lg font-semibold">Messages</h2>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {messages.map((msg) => (
+            <h2 className="text-base font-semibold">Conversation</h2>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {messages.slice(-4).map((msg) => (
                 <div
                   key={msg.id}
-                  className={`rounded p-3 ${
-                    msg.sender === "user" ? "bg-blue-50 ml-8" : "bg-zinc-50 mr-8"
+                  className={`rounded-lg p-3 ${
+                    msg.sender === "user" ? "bg-blue-50" : "bg-zinc-50"
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-zinc-600">
-                      {msg.sender === "user" ? "You" : "Assistant"}
-                    </span>
-                    <span className="text-xs text-zinc-500">
-                      {msg.timestamp.toLocaleTimeString()}
-                    </span>
-                  </div>
                   <p className="text-sm text-zinc-900 whitespace-pre-wrap">{msg.content}</p>
                 </div>
               ))}
@@ -588,24 +573,28 @@ function StudioContent() {
           </div>
         )}
 
-        {/* Chat Input */}
-        <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
-          <label className="text-sm font-medium text-zinc-700">Message to Marcus</label>
-          <textarea
-            className="w-full rounded border border-zinc-200 p-2 text-sm"
-            rows={3}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                handleSend();
-              }
-            }}
-            placeholder="Type your message... (Cmd/Ctrl+Enter to send)"
-          />
+        {/* Chat Input - Simplified for Phase 1 */}
+        <div className="rounded-lg border bg-white p-6 shadow-sm space-y-4">
+          <div>
+            <label className="text-base font-medium text-zinc-900 block mb-2">
+              What do you need help with?
+            </label>
+            <textarea
+              className="w-full rounded-lg border border-zinc-300 p-4 text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              rows={4}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  handleSend();
+                }
+              }}
+              placeholder="Tell us what you're working on, and we'll give you one clear next step..."
+            />
+          </div>
 
-          {/* File Upload */}
-          <div className="space-y-2">
+          {/* File Upload - HIDDEN in Phase 1 (clarity first) */}
+          {/* <div className="space-y-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -620,139 +609,105 @@ function StudioContent() {
             >
               📎 Attach Files
             </label>
-
-            {/* Pending Files */}
-            {pendingFiles.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {pendingFiles.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between rounded bg-zinc-50 px-2 py-1 text-xs"
-                  >
-                    <span className="text-zinc-700">{file.name}</span>
-                    <button
-                      onClick={() => removeFile(index)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          </div> */}
 
           <button
             onClick={handleSend}
-            disabled={loading || (!message.trim() && pendingFiles.length === 0)}
-            className="inline-flex items-center rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={loading || !message.trim()}
+            className="w-full inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-sm"
           >
-            {loading ? "Sending..." : "Send"}
+            {loading ? "Getting your next action..." : "Get My Next Action"}
           </button>
         </div>
 
-        {response && (
-          <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Response</h2>
-              <span className={`text-xs px-2 py-1 rounded ${response.success ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                {response.success ? "success" : "error"}
-              </span>
+        {/* Response Display - Simplified: Focus on next action */}
+        {response && response.data?.output && (
+          <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6 shadow-sm">
+            <h2 className="text-base font-semibold text-zinc-900 mb-3">Your Next Action</h2>
+            <div className="bg-white rounded-lg p-4 border border-green-100">
+              <p className="text-sm text-zinc-900 whitespace-pre-wrap leading-relaxed">
+                {response.data.output}
+              </p>
             </div>
-            {response.error && <p className="text-sm text-red-600">{response.error}</p>}
-            {response.data?.output && <pre className="whitespace-pre-wrap text-sm text-zinc-800">{response.data.output}</pre>}
-
-            {response.data?.delegations && response.data.delegations.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold">Delegations</h3>
-                <ul className="mt-1 space-y-1 text-sm text-zinc-700">
-                  {response.data.delegations.map((d, idx) => (
-                    <li key={idx} className="rounded border border-zinc-200 px-2 py-1">
-                      <span className="font-medium">{d.agent}</span>: {d.task} ({d.status})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {response.data?.notes && (
-              <details className="text-sm" open>
-                <summary className="cursor-pointer font-semibold">Notes</summary>
-                <pre className="mt-2 whitespace-pre-wrap text-xs text-zinc-700">{JSON.stringify(response.data.notes, null, 2)}</pre>
-              </details>
-            )}
           </div>
         )}
 
-        {/* Plans Section */}
-        <div className="rounded-lg border bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold">Plans</h3>
-            {plansLoading && <span className="text-xs text-zinc-500">Loading...</span>}
+        {/* Error Display - Simplified */}
+        {response && response.error && (
+          <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4 shadow-sm">
+            <p className="text-sm text-red-700">{response.error}</p>
           </div>
-          
-          {!plansLoading && plans.length === 0 ? (
-            <div className="text-center py-8 text-sm text-zinc-500">
-              <p>No plans found.</p>
-              <p className="mt-1 text-xs">Plans will appear here when workflows are created.</p>
+        )}
+
+        {/* Technical Details - HIDDEN in Phase 1 (notes, delegations, etc.) */}
+        {/* {response && response.data?.notes && (
+          <details className="text-sm" open>
+            <summary className="cursor-pointer font-semibold">Notes</summary>
+            <pre className="mt-2 whitespace-pre-wrap text-xs text-zinc-700">{JSON.stringify(response.data.notes, null, 2)}</pre>
+          </details>
+        )} */}
+
+        {/* Next Action Display - Show only the most recent/active plan */}
+        {!plansLoading && plans.length > 0 && (
+          <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-6 shadow-sm">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="text-base font-semibold text-zinc-900 mb-1">Your Next Action</h3>
+                <p className="text-sm text-zinc-600">Here's what to do next:</p>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {plans.map((plan) => (
-                <div key={plan.id} className="rounded border border-zinc-200 p-3 hover:bg-zinc-50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-sm font-medium text-zinc-900">{plan.name}</h4>
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          plan.status === 'active' ? 'bg-blue-100 text-blue-700' :
-                          plan.status === 'completed' ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {plan.status}
-                        </span>
-                        <span className="text-xs text-zinc-500">{plan.type}</span>
-                      </div>
-                      {plan.plan && (
-                        <p className="text-xs text-zinc-600 mt-1 line-clamp-2">
-                          {plan.plan.length > 200 ? `${plan.plan.substring(0, 200)}...` : plan.plan}
-                        </p>
-                      )}
-                      {plan.summary && !plan.plan && (
-                        <p className="text-xs text-zinc-600 mt-1">{plan.summary}</p>
-                      )}
-                    </div>
+            {(() => {
+              // Show the most recent active plan, or most recent if none active
+              const activePlan = plans.find(p => p.status === 'active') || plans[0];
+              return (
+                <div className="bg-white rounded-lg p-4 border border-blue-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h4 className="text-sm font-medium text-zinc-900">{activePlan.name}</h4>
+                    {activePlan.status === 'active' && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                        Active
+                      </span>
+                    )}
                   </div>
-                  <div className="mt-2 text-xs text-zinc-400">
-                    {new Date(plan.created_at).toLocaleDateString()}
-                  </div>
+                  {activePlan.summary && (
+                    <p className="text-sm text-zinc-700 mb-2">{activePlan.summary}</p>
+                  )}
+                  {activePlan.plan && (
+                    <p className="text-sm text-zinc-700 whitespace-pre-wrap">
+                      {activePlan.plan.length > 500 ? `${activePlan.plan.substring(0, 500)}...` : activePlan.plan}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Plans List - HIDDEN in Phase 1 (show only next action, not full list) */}
+        {/* {!plansLoading && plans.length > 1 && (
+          <div className="rounded-lg border bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-semibold mb-3">All Plans</h3>
+            <div className="space-y-2">
+              {plans.slice(1).map((plan) => (
+                <div key={plan.id} className="rounded border border-zinc-200 p-3">
+                  <h4 className="text-sm font-medium text-zinc-900">{plan.name}</h4>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )} */}
 
-        <div className="grid gap-3 md:grid-cols-2">
+        {/* Test URLs and Tips - HIDDEN in Phase 1 (exploration features) */}
+        {/* <div className="grid gap-3 md:grid-cols-2">
           <div className="rounded-lg border bg-white p-4 shadow-sm">
             <h3 className="text-sm font-semibold">Test URLs</h3>
-            <ul className="mt-2 space-y-1 text-sm text-blue-700">
-              <li><a href="/api/test/marcus">/api/test/marcus</a></li>
-              <li><a href="/api/agents/compliance/scan">/api/agents/compliance/scan</a></li>
-              <li><a href="/api/agents/giorgio/test">/api/agents/giorgio/test</a></li>
-              <li><a href="/api/agents/jamal/test">/api/agents/jamal/test</a></li>
-              <li><a href="/api/agents/letitia/test">/api/agents/letitia/test</a></li>
-            </ul>
+            ...
           </div>
           <div className="rounded-lg border bg-white p-4 shadow-sm">
             <h3 className="text-sm font-semibold">Tips</h3>
-            <ul className="mt-2 space-y-1 text-sm text-zinc-700">
-              <li>Include project + files to trigger Cassidy for licensing.</li>
-              <li>Use creative keywords (idea, script, prompt) to trigger Giorgio.</li>
-              <li>Mention posting/schedule/rollout to trigger Jamal.</li>
-              <li>Send asset name/tags to trigger Letitia cataloging.</li>
-            </ul>
+            ...
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   );
