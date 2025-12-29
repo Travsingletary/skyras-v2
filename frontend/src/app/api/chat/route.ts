@@ -92,12 +92,11 @@ export async function POST(request: NextRequest) {
     const messageId = `msg_${Date.now()}`;
 
     // Return in format expected by frontend
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       conversationId: finalConversationId,
       assistantMessageId: messageId,
       response: responseText, // ← Frontend expects this!
-      buildTag: 'phase1-action-v3-a835920', // Temporary: confirms Phase 1 post-processing is deployed
       data: {
         message: {
           id: messageId,
@@ -109,7 +108,20 @@ export async function POST(request: NextRequest) {
         delegations: result.delegations || [],
         notes: result.notes || {},
       },
+      // PHASE 1 INSTRUMENTATION (temporary - remove after Phase 1 passes)
+      actionMode: (result as any).actionMode || 'UNKNOWN',
+      templateId: (result as any).templateId || null,
+      selectedTemplate: (result as any).selectedTemplate || null,
+      router: (result as any).router || 'UNKNOWN',
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
     });
+    
+    return response;
   } catch (error) {
     console.error('[/api/chat] Unexpected error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
