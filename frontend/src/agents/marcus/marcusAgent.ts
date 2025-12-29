@@ -308,27 +308,44 @@ class MarcusAgent extends BaseAgent {
             cleaned = moreSpecific.trim().replace(/\[[^\]]+\]/g, 'your client');
           }
         }
+        // Final filter: reject if it starts with abstract verb
+        if (abstractVerbs.test(cleaned)) {
+          // Find any other concrete verb sentence
+          const alternative = sentences.find(s => {
+            const t = s.trim();
+            return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 15;
+          });
+          if (alternative) {
+            cleaned = alternative.trim().replace(/\[[^\]]+\]/g, 'your client');
+          }
+        }
         finalResponse = cleaned + '.';
       } else if (sentences.length > 0) {
-        // Fallback: use first sentence, but strip if it's too long or contains explanations
-        let firstSentence = sentences[0].trim();
-        if (firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence) || abstractVerbs.test(firstSentence)) {
-          // Try to find any sentence with a concrete action verb
-          const anyAction = sentences.find(s => {
-            const t = s.trim();
-            return concreteVerbs.test(t) && !abstractVerbs.test(t);
-          });
-          if (anyAction) {
-            finalResponse = anyAction.trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
-          } else {
-            finalResponse = firstSentence.substring(0, 100) + '.';
-          }
+        // Fallback: find ANY sentence with concrete verb, reject abstract verbs
+        const anyConcrete = sentences.find(s => {
+          const t = s.trim();
+          return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 15;
+        });
+        if (anyConcrete) {
+          finalResponse = anyConcrete.trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
         } else {
-          finalResponse = firstSentence.replace(/\[[^\]]+\]/g, 'your client') + '.';
+          // Last resort: use first sentence only if it's not abstract
+          let firstSentence = sentences[0].trim();
+          if (abstractVerbs.test(firstSentence) || firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence)) {
+            // Reject abstract verbs - return a generic fallback
+            finalResponse = 'Open your notes app and write down your next action.';
+          } else {
+            finalResponse = firstSentence.replace(/\[[^\]]+\]/g, 'your client') + '.';
+          }
         }
       } else {
-        // Last resort: use cleaned response but limit length
-        finalResponse = cleanedResponse.substring(0, 100).trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
+        // Last resort: use cleaned response but limit length and reject abstract verbs
+        let fallback = cleanedResponse.substring(0, 100).trim().replace(/\[[^\]]+\]/g, 'your client');
+        if (abstractVerbs.test(fallback)) {
+          finalResponse = 'Open your notes app and write down your next action.';
+        } else {
+          finalResponse = fallback + '.';
+        }
       }
       
       return {
@@ -441,27 +458,44 @@ Your response must be ONLY the next action. Nothing else.`;
               cleaned = moreSpecific.trim().replace(/\[[^\]]+\]/g, 'your client');
             }
           }
+          // Final filter: reject if it starts with abstract verb
+          if (abstractVerbs.test(cleaned)) {
+            // Find any other concrete verb sentence
+            const alternative = sentences.find(s => {
+              const t = s.trim();
+              return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 15;
+            });
+            if (alternative) {
+              cleaned = alternative.trim().replace(/\[[^\]]+\]/g, 'your client');
+            }
+          }
           finalResponseText = cleaned + '.';
         } else if (sentences.length > 0) {
-          // Fallback: use first sentence, but strip if it's too long or contains explanations
-          let firstSentence = sentences[0].trim();
-          if (firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence) || abstractVerbs.test(firstSentence)) {
-            // Try to find any sentence with a concrete action verb
-            const anyAction = sentences.find(s => {
-              const t = s.trim();
-              return concreteVerbs.test(t) && !abstractVerbs.test(t);
-            });
-            if (anyAction) {
-              finalResponseText = anyAction.trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
-            } else {
-              finalResponseText = firstSentence.substring(0, 100) + '.';
-            }
+          // Fallback: find ANY sentence with concrete verb, reject abstract verbs
+          const anyConcrete = sentences.find(s => {
+            const t = s.trim();
+            return concreteVerbs.test(t) && !abstractVerbs.test(t) && t.length > 15;
+          });
+          if (anyConcrete) {
+            finalResponseText = anyConcrete.trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
           } else {
-            finalResponseText = firstSentence.replace(/\[[^\]]+\]/g, 'your client') + '.';
+            // Last resort: use first sentence only if it's not abstract
+            let firstSentence = sentences[0].trim();
+            if (abstractVerbs.test(firstSentence) || firstSentence.length > 150 || /(?:why|because|matters|important|crucial|key|essential)/i.test(firstSentence)) {
+              // Reject abstract verbs - return a generic fallback
+              finalResponseText = 'Open your notes app and write down your next action.';
+            } else {
+              finalResponseText = firstSentence.replace(/\[[^\]]+\]/g, 'your client') + '.';
+            }
           }
         } else {
-          // Last resort: use raw response but limit length
-          finalResponseText = rawResponse.substring(0, 100).trim().replace(/\[[^\]]+\]/g, 'your client') + '.';
+          // Last resort: use raw response but limit length and reject abstract verbs
+          let fallback = rawResponse.substring(0, 100).trim().replace(/\[[^\]]+\]/g, 'your client');
+          if (abstractVerbs.test(fallback)) {
+            finalResponseText = 'Open your notes app and write down your next action.';
+          } else {
+            finalResponseText = fallback + '.';
+          }
         }
       } catch (error) {
         context.logger.error("Failed to wrap delegation results", { error });
