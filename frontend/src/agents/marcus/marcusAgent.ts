@@ -123,7 +123,7 @@ class MarcusAgent extends BaseAgent {
       blog: 'Write the headline for your blog post.',
       presentation: 'Write the exact title for the slide you are working on.',
       socialSchedule: 'Write the platform name where you will post content.',
-      socialCaption: 'Write the main color name you want to use.',
+      socialCaption: 'Write the exact color name you want to use for your project.',
       video: 'Write the logline for your video.',
       overwhelm: 'Write the name of your most urgent project and add its deadline in parentheses.',
       nextTask: 'Write the project name you want to work on.',
