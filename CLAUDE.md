@@ -13,49 +13,51 @@
 - Explain your OBSERVATIONS clearly, then provide REASONING to identify the exact issue. Add console logs when needed to gather more information.
 
 
-The system implements a specialized multi-agent AI orchestration platform for creative content generation and management, centered around five core business domains:
+The system implements a sophisticated multi-agent orchestration platform for content creation and management, organized into six core business domains:
 
-## AI Agent Orchestration System (85/100)
-Central coordination system managing specialized AI agents:
-- Giorgio: Creative content generation agent
-- Cassidy: Compliance validation agent  
-- Jamal: Distribution management agent
-- Letitia: Content cataloging agent
-- Marcus: Overall workflow orchestration
+1. Agent Orchestration System (85/100)
+- Atlas serves as primary decision-maker and traffic controller
+- Implements agent delegation and state management
+- Maintains conversation context and priority management
+- Located in: frontend/src/app/api/agents/atlas/route.ts
 
-Implements real-time agent delegation, task coordination and asynchronous workflow execution with full state tracking.
+2. Multi-Agent Workflow System (90/100)
+- Orchestrates sequential task execution across specialized agents
+- Manages dependencies between creative tasks
+- Controls workflow state transitions
+- Located in: frontend/src/app/api/workflows/[id]/execute/route.ts
 
-## Voice Processing Pipeline (80/100)
-Bidirectional voice communication system mapping specific voices to different AI agents:
-- Speech-to-text with noise handling
-- Text-to-speech with agent voice mapping
-- Voice queue management
-- Custom text optimization for TTS
+3. Content Generation Pipeline (80/100)
+- Multi-modal content generation workflow
+- Provider selection and fallback logic
+- Generation cost tracking and quota management
+- Located in: frontend/src/app/api/tools/generateImage/route.ts
 
-## Workflow Management (85/100)
-Complex task orchestration system handling:
-- Task dependency resolution
-- Real-time execution monitoring
-- Priority-based scheduling
-- Status-based progression
-- Agent-specific assignment rules
+4. File Processing Pipeline (75/100)
+- Intelligent file type detection and routing
+- Automated workflow suggestions
+- Processing record management
+- Located in: frontend/src/app/api/upload/route.ts
 
-## Media Generation Control (75/100) 
-Custom video generation pipeline supporting:
-- Aspect ratio optimization
-- Multi-model content generation
-- Queue management
-- Failure recovery
-- Runway ML integration
+5. Agent Compliance System (85/100)
+- Content licensing validation
+- Policy enforcement and scanning
+- Violation tracking and reporting
+- Located in: frontend/src/app/api/agents/compliance/scan/route.ts
 
-## Compliance Scanning (70/100)
-Automated validation system for:
-- Licensing verification
-- Project compliance rules
-- Multi-file batch processing
-- Regulatory requirement checking
+6. Task Management System (80/100)
+- Task delegation and execution orchestration
+- Dependency management and scheduling
+- State transition control
+- Located in: frontend/src/app/api/workflows/tasks/[taskId]/route.ts
 
-The core business value centers on the orchestration of specialized AI agents working together to handle content creation, compliance, distribution and cataloging through sophisticated task delegation and workflow management.
+The system uses a "Single Mouthpiece" pattern where Atlas coordinates specialized worker agents (Giorgio, Jamal, Letitia, Cassidy) while maintaining unified interaction patterns.
+
+Core integration points:
+- Agent coordination and task routing
+- Workflow generation and execution
+- Content processing and validation
+- Multi-modal asset generation
 
 $END$
 

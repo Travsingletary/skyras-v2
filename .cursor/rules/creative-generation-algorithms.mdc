@@ -1,46 +1,65 @@
 ---
-description: Documents the core creative content generation algorithms and pipelines for AI-driven content creation
+description: Documents creative content generation algorithms, AI integration patterns, and multi-modal content pipelines
 ---
 
 
 # creative-generation-algorithms
 
-Core creative generation system implements a multi-stage pipeline for AI-driven content creation:
+## Core Generation Pipeline (Importance: 90/100)
 
-## Content Generation Orchestrator (Importance: 85/100)
-Location: frontend/src/app/api/tools/generateVideo/route.ts
+Content generation system orchestrates multi-modal creative workflows through specialized AI agents and providers:
 
-- Multi-model content generation pipeline using gen3a_turbo
-- Aspect ratio optimization for different content types  
-- Queue management for long-running generation tasks
-- Integration with Runway ML for specialized content generation
-- Failure recovery and retry mechanisms
+1. Creative Brief Processing
+- Parses creative requirements into structured generation tasks
+- Maps business goals to specific content types
+- Generates technical specifications for each creative asset
+- Routes to appropriate specialized generation agents
 
-## Creative Agent (Giorgio) System (Importance: 90/100)
-Location: frontend/src/agents/giorgio/giorgioActions.ts
+2. Multi-Modal Generation Orchestration
+- Coordinates parallel generation across content types
+- Manages dependencies between generated assets
+- Enforces style consistency across modalities
+- Handles provider fallbacks and retries
 
-- Domain-specific creative task generation:
-  - Script generation with scene breakdowns
-  - Character development and personality mapping
-  - Brand concept generation with structured elements
-- Creative asset pipeline for different content types
-- Platform-specific creative adaptation logic
+Location: frontend/src/app/api/tools/generateContent/route.ts
 
-## Multi-Agent Creative Collaboration (Importance: 80/100)
-Location: frontend/src/lib/agentProcessor.ts
+## Provider Integration System (Importance: 85/100)
 
-- Creative task delegation between specialized agents
-- Context propagation with file metadata integration 
-- Real-time creative execution orchestration
-- Creative workflow dependency resolution
+Implements provider abstraction and routing for content generation:
 
-## Content Type-Specific Generation (Importance: 75/100)
-- Custom video generation pipeline with specialized parameters
-- Multi-modal content synchronization (video, audio, images)
-- Scene-based content organization
-- Platform-optimized creative adaptation
+1. Image Generation Router
+- Prioritized fallback between Runway and Stable Diffusion
+- Provider-specific prompt engineering
+- Style consistency enforcement
+- Cost and quota management
 
-The system uniquely combines specialized AI agents for creative tasks, maintaining brand consistency and creative vision across generated content while enabling multi-stage refinement through agent collaboration.
+2. Video Generation Pipeline 
+- Scene composition and sequencing
+- Asset integration and timing
+- Provider-specific format handling
+- Quality validation and regeneration
+
+Location: 
+- frontend/src/backend/imageProviders/router.ts
+- frontend/src/backend/videoProviders/router.ts
+
+## Creative Agent System (Importance: 85/100)
+
+Giorgio creative agent implements specialized generation logic:
+
+1. Creative Task Analysis
+- Decomposes requirements into generation steps
+- Maps creative goals to technical parameters
+- Validates generation feasibility
+- Estimates resource requirements
+
+2. Generation Orchestration
+- Manages multi-stage creative workflows
+- Coordinates between generation services
+- Validates creative output quality
+- Handles regeneration and refinement
+
+Location: frontend/src/agents/giorgio/giorgioAgent.ts
 
 $END$
 

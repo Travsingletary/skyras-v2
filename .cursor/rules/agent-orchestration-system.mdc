@@ -1,54 +1,51 @@
 ---
-description: Documentation for agent orchestration system defining roles, workflows, and communication between specialized AI agents
+description: Documentation for agent-based workflow orchestration, delegation patterns, and multi-agent communication flows
 ---
 
 
 # agent-orchestration-system
 
-The agent orchestration system implements a sophisticated multi-agent workflow with specialized AI agents:
+Agent Orchestration Core (Importance: 90/100)
+- Atlas serves as central coordinator for specialized agent team
+- Task delegation via keyword/context analysis to specialized agents:
+  - Marcus: Project management and task breakdown
+  - Giorgio: Creative content generation
+  - Cassidy: Compliance and licensing
+  - Jamal: Content distribution
+  - Letitia: Asset cataloging and management
+- Single-priority focus with strict task ordering
+- Maintains conversation context across agent handoffs
 
-## Core Agents and Roles (Importance: 90/100)
-- Marcus: Central orchestrator and decision maker
-- Giorgio: Creative content generation specialist 
-- Cassidy: Compliance validation and checking
-- Jamal: Content distribution management
-- Letitia: Content cataloging and organization
+Task Delegation System (Importance: 85/100)
+/frontend/src/lib/autoExecute.ts
+- Automated workflow creation from agent delegations 
+- Task dependency resolution for parallel execution
+- Intelligent routing based on agent specializations
+- Context preservation during handoffs
+- Fallback delegation patterns for agent unavailability
 
-## Delegation System (Importance: 85/100)
-Location: frontend/lib/delegationHandler.ts
-- Cross-agent task delegation based on agent capabilities
-- Parent-child task relationship tracking
-- Delegation chain monitoring
-- Task context propagation with metadata
+Agent Communication Flows (Importance: 80/100)
+/frontend/src/agents/marcus/marcusAgent.ts
+- "Single Mouthpiece" pattern with Atlas as primary coordinator
+- Contextual intelligence for routing decisions
+- Task queue management per agent
+- State synchronization between agents
+- Bounded context maintenance during delegation
 
-## Task Dependencies (Importance: 80/100)
-Location: frontend/lib/taskDependencies.ts
-- Complex workflow dependency resolution
-- Cycle detection in task dependencies
-- Task readiness calculation
-- Parallel task execution constraints
+Workflow Orchestration (Importance: 85/100)
+/frontend/src/app/api/workflows/[id]/execute/route.ts
+- Sequential task execution across agent network
+- Dependency management between agent tasks
+- State transitions and completion tracking
+- Parallel execution coordination
+- Workflow suggestion generation
 
-## Agent Communication Flow (Importance: 85/100)
-Location: frontend/lib/agentProcessor.ts
-- Task context enrichment between agents
-- File metadata integration
-- Response formatting and standardization
-- Inter-agent messaging protocols
-
-## Marcus Decision System (Importance: 90/100)
-Location: frontend/agents/marcus/marcusAgent.ts
-- Task routing based on content analysis
-- User preference integration
-- Context-aware response generation
-- Project-specific execution strategies
-
-Key Integration Points:
-1. Creative task delegation to Giorgio
-2. Compliance verification routing to Cassidy
-3. Distribution planning through Jamal
-4. Content organization via Letitia
-
-The system's uniqueness lies in its specialized agent roles and sophisticated task orchestration, enabling complex creative workflows through coordinated agent interactions.
+Primary Implementation Patterns:
+1. Centralized coordination through Atlas
+2. Specialized agent roles with clear boundaries
+3. Context-aware task routing
+4. Single-priority task management
+5. Automated workflow generation
 
 $END$
 

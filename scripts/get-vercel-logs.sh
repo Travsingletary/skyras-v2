@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Script to help get Vercel function logs
+# Usage: ./scripts/get-vercel-logs.sh
+
+echo "=== Vercel Logs Retrieval Guide ==="
+echo ""
+echo "To get Vercel function logs:"
+echo ""
+echo "1. Go to: https://vercel.com/travis-singletarys-projects/skyras-v2"
+echo "2. Click on the latest deployment"
+echo "3. Go to 'Functions' tab"
+echo "4. Click on the function you want to view:"
+echo "   - /auth/callback"
+echo "   - /api/auth/login"
+echo "5. Click 'Logs' tab"
+echo "6. Filter for recent logs (last 5-10 minutes)"
+echo ""
+echo "For /auth/callback, look for:"
+echo "  - [Auth] Callback received params:"
+echo "  - [Auth] TEMPORARY: exchangeCodeForSession succeeded"
+echo "  - [Auth] Email confirmed successfully"
+echo ""
+echo "For /api/auth/login, look for:"
+echo "  - [Auth] Login successful:"
+echo "  - emailConfirmed: true"
+echo "  - emailConfirmedAt: ..."
+echo "  - refreshedEmailConfirmed: true"
+echo ""
+echo "Copy the full log output and paste it here."

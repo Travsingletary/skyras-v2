@@ -1,51 +1,61 @@
 ---
-description: Specification for workflow engine components including task dependencies, state management, and execution orchestration
+description: Defines core workflow engine functionality for task orchestration, dependencies, and automated execution across AI agents
 ---
 
 
 # workflow-engine
 
-## Core Engine Components (Importance: 90/100)
+Core workflow engine components orchestrate task execution, manage dependencies, and automate workflows across specialized AI agents:
 
-1. Task Dependency Resolution
-- Complex workflow dependency resolution system
-- Cycle detection in task dependencies
-- Task readiness calculation based on parent/child relationships
-- Dependency chain tracking with state validation
-Location: frontend/src/lib/taskDependencies.ts
+## Task Dependency System
+Importance Score: 90/100
 
-2. Auto-Execution Orchestration (Importance: 85/100)
-- Intelligent workflow creation from agent delegations
-- Multi-agent task routing based on capabilities
-- Parallel execution management with dependency constraints
-- State machine implementation for task progression
-Location: frontend/src/lib/autoExecute.ts
+Located in `frontend/lib/taskDependencies.ts`:
+- Manages complex task relationship graphs
+- Resolves circular dependencies through topological sorting
+- Tracks task readiness through prerequisite completion
+- Maintains execution order based on dependencies
+- Handles parallel execution of independent task branches
 
-3. Agent Task Processing (Importance: 85/100)
-- Multi-agent orchestration system with specialized roles:
-  * Giorgio: Creative content generation
-  * Cassidy: Compliance checking
-  * Jamal: Distribution management
-  * Letitia: Content cataloging
-- Real-time task delegation and coordination
-- State tracking across asynchronous workflow execution
-Location: frontend/src/app/studio/page.tsx
+## Auto-Execution Engine
+Importance Score: 85/100
 
-4. Workflow State Management (Importance: 80/100)
-- Priority-based task scheduling system
-- Status-based workflow progression logic
-- Agent-specific task assignment rules
-- Real-time execution monitoring
-Location: frontend/src/app/workflows/[id]/page.tsx
+Located in `frontend/lib/autoExecute.ts`:
+- Orchestrates automated task delegation across agents
+- Implements task queueing and prioritization
+- Manages parallel execution based on agent availability
+- Handles task completion notifications and state updates
+- Maintains workflow context across multiple agents
 
-5. Delegation Handler (Importance: 75/100)
-- Cross-agent task delegation system 
-- Delegation chain tracking
-- Parent-child task relationship management
-- Task context propagation
-Location: frontend/src/lib/delegationHandler.ts
+## State Machine Implementation
+Importance Score: 80/100
 
-The workflow engine represents a sophisticated orchestration system focused on managing complex task dependencies between specialized AI agents while maintaining state consistency and proper execution order across asynchronous operations.
+Located in `frontend/lib/workflow/stateMachine.ts`:
+- Defines workflow states: PENDING, RUNNING, PAUSED, COMPLETED, FAILED
+- Manages state transitions with validation rules
+- Implements rollback capabilities for failed states
+- Tracks partial completion states for complex workflows
+- Maintains audit trail of state changes
+
+## Task Distribution System
+Importance Score: 85/100
+
+Located in `frontend/lib/workflow/taskDistributor.ts`:
+- Routes tasks to specialized agents (Giorgio, Jamal, Letitia, Cassidy)
+- Implements load balancing across available agents
+- Manages agent-specific task queues
+- Handles task timeout and retry logic
+- Maintains agent availability status
+
+## Workflow Templates
+Importance Score: 75/100
+
+Located in `frontend/lib/workflow/templates/`:
+- Defines reusable workflow patterns for common tasks
+- Implements template substitution for dynamic workflows
+- Manages template versioning and compatibility
+- Provides customization points for workflow adaptation
+- Maintains template validation rules
 
 $END$
 

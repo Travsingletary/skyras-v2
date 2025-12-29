@@ -1,50 +1,55 @@
 ---
-description: Rules and configurations for processing different types of content, media files, and workflows within the system
+description: Rules and documentation for handling multi-modal content processing, file analysis, and workflow generation
 ---
 
 
 # content-processing-pipeline
 
-The content processing pipeline implements specialized handling for multi-modal content across different file types and workflows.
+## File Processing System
+Importance Score: 85/100
 
-Core Components:
+Multi-modal content ingestion pipeline with intelligent routing:
 
-1. File Type Detection & Routing (Importance: 85/100)
-- Sophisticated content type analysis system that examines file metadata and contents
-- Business-specific routing rules that delegate files to specialized AI agents:
-  * Video files -> Giorgio for creative enhancement
-  * Audio files -> Letitia for cataloging
-  * Images -> Cassidy for compliance checking
-  * Text -> Jamal for distribution planning
+1. File Type Analysis
+- Automated content type detection using metadata and content analysis
+- Format-specific processing rules for media types (video, audio, images, text)
+- Asset relationship mapping for multi-part content
+- Watermark and licensing detection integration
 
-2. Workflow Suggestion Engine (Importance: 80/100)
-- Analyzes incoming content characteristics to generate optimal processing workflows
-- Maps content attributes to specialized agent capabilities
-- Generates dependency chains for multi-stage content processing
-- Implements business rules for content enhancement opportunities
+2. Workflow Generation
+- Automated workflow suggestion based on file characteristics
+- Content-type specific processing templates
+- Dependency chain generation for multi-asset processing
+- Integration with specialized agent selection
 
-3. Processing Rules System (Importance: 75/100)
-- Maintains provider-specific processing requirements for different content types:
-  * Video: Aspect ratio optimization, thumbnail generation
-  * Audio: Background noise reduction, voice enhancement
-  * Images: Style consistency checks, brand alignment
-  * Text: Tone analysis, platform-specific formatting
+3. Processing Rules Engine
+- Content-specific validation requirements
+- Format-specific transformation rules
+- Quality threshold enforcement
+- Compliance check integration
 
-4. Processing Queue Management (Importance: 70/100)
-- Prioritizes content processing based on:
-  * Content type urgency rules
-  * Dependencies between processing stages
-  * Agent availability and specialization
-  * Project deadline requirements
+Key File Paths:
+- frontend/src/app/api/upload/route.ts
+- frontend/src/lib/fileProcessing.ts
+- frontend/src/lib/autoExecute.ts
 
-5. Automated Content Enhancement (Importance: 85/100)
-- Implements specialized enhancement workflows:
-  * Educational content adaptation
-  * Brand consistency enforcement
-  * Platform-specific optimization
-  * Compliance validation
+Core Processing Workflows:
+1. Creative Content
+- Script processing with scene detection
+- Asset bundle organization
+- Multi-format output generation
 
-The system's unique value lies in its intelligent content routing and specialized processing rules that align with business-specific creative and educational requirements.
+2. Educational Content
+- Curriculum alignment checking
+- Age-appropriate content validation
+- Learning objective mapping
+
+3. Marketing Content
+- Brand guideline compliance
+- Platform-specific format adaptation
+- Distribution channel requirements
+
+The system implements sophisticated content routing with automatic workflow generation based on file analysis and content characteristics, maintaining strict processing rules for different content types and use cases.
 
 $END$
 
