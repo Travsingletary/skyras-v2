@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import FilePreview from "@/components/FilePreview";
@@ -50,7 +50,7 @@ interface WorkflowSuggestion {
   agents: string[];
 }
 
-export default function Home() {
+function StudioContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState("Run a creative concept for SkySky");
@@ -755,5 +755,13 @@ export default function Home() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<AuthLoading />}>
+      <StudioContent />
+    </Suspense>
   );
 }
