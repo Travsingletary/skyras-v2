@@ -140,6 +140,12 @@ Must provide:
    - Verify no mock data returns
    - Confirm external APIs are actually called
 
+4. **Use real email addresses for email confirmation testing**
+   - ⚠️ **Do not use fake emails** (e.g., `test@test.com`, `user@example.com`) for email confirmation flows
+   - Fake emails will bounce and cannot be confirmed, blocking E2E verification
+   - Use a real email address you can access (e.g., Gmail, Outlook) for testing
+   - See `INCIDENT_CLOSED_EMAIL_CONFIRMATION.md` for details on why this matters
+
 ### Before Claiming PARTIAL
 
 1. **Identify what works**
