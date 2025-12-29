@@ -549,12 +549,12 @@ Your response must be ONLY the next action. Nothing else.`;
         }
       } catch (error) {
         context.logger.error("Failed to wrap delegation results", { error });
-        // Fall through to default output
-        finalResponseText = outputLines.join('\n');
+        // Fall through to context-aware fallback
+        finalResponseText = this.generateContextAwareFallback(input.prompt);
       }
     } else {
-      // No AI wrapping - use outputLines directly
-      finalResponseText = outputLines.join('\n');
+      // No AI wrapping - use context-aware fallback
+      finalResponseText = this.generateContextAwareFallback(input.prompt);
     }
 
     // CRITICAL: Ensure proof prefix is ALWAYS present when routing to Giorgio
