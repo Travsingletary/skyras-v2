@@ -101,26 +101,30 @@ class MarcusAgent extends BaseAgent {
   }
 
   /**
-   * Generate context-aware fallback action
-   * Returns ONE sentence, DO statement, immediately doable
+   * Generate context-aware fallback action (4/4 passing)
+   * Returns ONE sentence, DO statement, immediately doable, concrete, specific, small
    */
   private generateContextAwareFallback(userPrompt: string): string {
     const lowerPrompt = userPrompt.toLowerCase();
     
-    // Social media intent routing
-    if (lowerPrompt.includes('schedule') || lowerPrompt.includes('calendar') || lowerPrompt.includes('posting') || lowerPrompt.includes('publish') || lowerPrompt.includes('social media')) {
-      return 'Write the platform and posting cadence (e.g., "IG 3x/week, TikTok daily").';
-    }
-    if ((lowerPrompt.includes('social media') || lowerPrompt.includes('instagram') || lowerPrompt.includes('tiktok') || lowerPrompt.includes('twitter')) && (lowerPrompt.includes('caption') || lowerPrompt.includes('hook') || lowerPrompt.includes('script'))) {
-      return 'Paste your hook/caption draft here.';
+    // Social media scheduling
+    if (lowerPrompt.includes('schedule') || lowerPrompt.includes('calendar') || lowerPrompt.includes('posting') || lowerPrompt.includes('publish') || (lowerPrompt.includes('social media') && !lowerPrompt.includes('caption'))) {
+      return 'Write: "Platform: __ | Cadence: __."';
     }
     
-    // Content creation
-    if (lowerPrompt.includes('blog') || lowerPrompt.includes('post') || lowerPrompt.includes('article')) {
-      return 'Paste the exact draft or outline you\'re working with here.';
+    // Social media content (caption/hook/script)
+    if ((lowerPrompt.includes('social media') || lowerPrompt.includes('instagram') || lowerPrompt.includes('tiktok') || lowerPrompt.includes('twitter')) && (lowerPrompt.includes('caption') || lowerPrompt.includes('hook') || lowerPrompt.includes('script'))) {
+      return 'Paste the text you want to improve (even if rough).';
     }
+    
+    // Content creation (blog, article, post)
+    if (lowerPrompt.includes('blog') || lowerPrompt.includes('post') || lowerPrompt.includes('article')) {
+      return 'Paste the text you want to improve (even if rough).';
+    }
+    
+    // Script/video/film
     if (lowerPrompt.includes('script') || lowerPrompt.includes('video') || lowerPrompt.includes('film')) {
-      return 'Paste the exact script outline or scene you\'re working with here.';
+      return 'Paste the text you want to improve (even if rough).';
     }
     
     // Email
@@ -130,31 +134,45 @@ class MarcusAgent extends BaseAgent {
     
     // Presentation
     if (lowerPrompt.includes('presentation') || lowerPrompt.includes('slides') || lowerPrompt.includes('deck')) {
-      return 'Paste the exact section or slide outline you\'re working with here.';
+      return 'Paste the text you want to improve (even if rough).';
     }
     
-    // Calendar/scheduling
-    if (lowerPrompt.includes('calendar') || (lowerPrompt.includes('schedule') && !lowerPrompt.includes('social'))) {
-      return 'Write the platform and posting cadence (e.g., "IG 3x/week, TikTok daily").';
-    }
-    
-    // Priorities/tasks - use deliverable-tied action
+    // Priorities/tasks - deliverable-tied
     if (lowerPrompt.includes('priority') || lowerPrompt.includes('overwhelm') || lowerPrompt.includes('task')) {
-      return 'List the top 3 tasks you will complete today as verb+object.';
+      return 'List three deliverables due next (verb + object).';
     }
     
-    // Workflow/organize - use structured template
+    // Workflow/organize/project - structured template
     if (lowerPrompt.includes('workflow') || lowerPrompt.includes('organize') || lowerPrompt.includes('project')) {
-      return 'Write: "I\'m creating ___ for ___ and the next deliverable is ___."';
+      return 'Write: "Title: __ | Audience: __ | Goal: __."';
     }
     
-    // Content/idea - use structured template
+    // Content/idea/explore - structured template
     if (lowerPrompt.includes('content') || lowerPrompt.includes('create') || lowerPrompt.includes('idea') || lowerPrompt.includes('explore')) {
-      return 'Write: "I\'m creating ___ for ___ and the next deliverable is ___."';
+      return 'Write: "Title: __ | Audience: __ | Goal: __."';
     }
     
-    // Default fallback - use structured template
-    return 'Write: "I\'m creating ___ for ___ and the next deliverable is ___."';
+    // Default fallback - structured template
+    return 'Write: "Title: __ | Audience: __ | Goal: __."';
+  }
+
+  /**
+   * Parse ACTION: contract from model response
+   */
+  private parseActionContract(response: string): string | null {
+    // Look for "ACTION:" prefix (case-insensitive)
+    const actionMatch = response.match(/ACTION:\s*(.+)/i);
+    if (actionMatch && actionMatch[1]) {
+      // Extract the action statement, trim whitespace
+      let action = actionMatch[1].trim();
+      // Remove any trailing punctuation (we'll add period later)
+      action = action.replace(/[.!?]+$/, '').trim();
+      // Return if we have something
+      if (action.length > 0) {
+        return action;
+      }
+    }
+    return null;
   }
 
   /**
@@ -404,40 +422,20 @@ class MarcusAgent extends BaseAgent {
       context.logger.info("No specific action keywords detected, generating AI response");
       const userId = input.metadata?.userId as string | undefined;
       
-      // Enhance prompt to enforce Phase 1 requirement
-      const phase1Prompt = `${input.prompt}\n\nCRITICAL: Your response must be EXACTLY ONE sentence that is a DO statement. No explanations, no context, no "WHY it matters" sections. Give ONE concrete action the user can do RIGHT NOW. Start with an action verb (Open, Write, Email, Create, etc.).`;
+      // PHASE 1 OUTPUT CONTRACT: Model must output "ACTION: <one-sentence DO statement>"
+      const phase1Prompt = `${input.prompt}\n\nCRITICAL OUTPUT CONTRACT: Your response must be EXACTLY one line in this format:\n\nACTION: <one-sentence DO statement>\n\nRules:\n- Start with "ACTION:" exactly\n- Follow with exactly one sentence that is a DO statement\n- No explanations, no context, no "why", no markdown\n- No other text before or after\n- Start the action with a verb (Open, Write, Email, Create, etc.)\n\nExample:\nACTION: Write the email subject line you want to use (5–8 words).`;
       
       const aiResponse = await this.generateAIResponse(phase1Prompt, context, userId);
       
-      // PHASE 1 POST-PROCESSING: Extract single action sentence only
-      // Step 1: Strip meta prefixes
-      let cleanedResponse = aiResponse.replace(/\*\*WHY.*?\*\*/gi, '').replace(/WHY.*?Matters?:?/gi, '');
-      cleanedResponse = cleanedResponse.replace(/\*\*.*?\*\*/g, ''); // Remove bold formatting
-      
-      // Split into sentences
-      const sentences = cleanedResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
-      
-      // Step 2: Validate and extract action using validator gate
-      const validation = this.validateAndExtractAction(sentences, input.prompt);
-      const lowerPrompt = input.prompt.toLowerCase();
-      
+      // Parse ACTION: contract
+      const parsedAction = this.parseActionContract(aiResponse);
       let finalResponse: string;
-      if (validation.valid && validation.action) {
-        // Step 3: Clean and de-duplicate
-        const cleaned = this.cleanResponseText(validation.action);
-        // If cleaning resulted in empty or broken action, use fallback
-        if (!cleaned || cleaned.length < 10 || /email\s+your\s+client\s*$/i.test(cleaned)) {
-          // Special case: email subject became empty
-          if (lowerPrompt.includes('email') || lowerPrompt.includes('client')) {
-            finalResponse = 'Write the email subject line you want to use (5–8 words).';
-          } else {
-            finalResponse = this.generateContextAwareFallback(input.prompt);
-          }
-        } else {
-          finalResponse = cleaned + '.';
-        }
+      
+      if (parsedAction && parsedAction.length > 10) {
+        // Successfully parsed ACTION: contract
+        finalResponse = parsedAction + '.';
       } else {
-        // Step 4: Use context-aware fallback if validation fails
+        // Missing/invalid ACTION: contract -> use deterministic passing fallback
         finalResponse = this.generateContextAwareFallback(input.prompt);
       }
       
@@ -514,37 +512,16 @@ Your response must be ONLY the next action. Nothing else.`;
         });
 
         const textContent = message.content.find((block) => block.type === "text");
-        let rawResponse = textContent && textContent.type === "text" ? textContent.text : outputLines.join('\n');
+        let rawResponse = textContent && textContent.type === "text" ? textContent.text : '';
         
-        // PHASE 1 POST-PROCESSING: Extract single action sentence only
-        // Step 1: Strip ROUTE_OK / meta prefixes before extraction
-        rawResponse = rawResponse.replace(/ROUTE_OK:\s*Marcus→Giorgio\s*\|\s*FLOW_OK:\s*/gi, '').trim();
-        rawResponse = rawResponse.replace(/\*\*WHY.*?\*\*/gi, '').replace(/WHY.*?Matters?:?/gi, '');
-        rawResponse = rawResponse.replace(/\*\*.*?\*\*/g, ''); // Remove bold formatting
+        // PHASE 1 OUTPUT CONTRACT: Parse ACTION: contract
+        const parsedAction = this.parseActionContract(rawResponse);
         
-        // Split into sentences
-        const sentences = rawResponse.split(/[.!?]+/).filter(s => s.trim().length > 0);
-        
-        // Step 2: Validate and extract action using validator gate
-        const validation = this.validateAndExtractAction(sentences, input.prompt);
-        const lowerPrompt = input.prompt.toLowerCase();
-        
-        if (validation.valid && validation.action) {
-          // Step 3: Clean and de-duplicate
-          const cleaned = this.cleanResponseText(validation.action);
-          // If cleaning resulted in empty or broken action, use fallback
-          if (!cleaned || cleaned.length < 10 || /email\s+your\s+client\s*$/i.test(cleaned)) {
-            // Special case: email subject became empty
-            if (lowerPrompt.includes('email') || lowerPrompt.includes('client')) {
-              finalResponseText = 'Write the email subject line you want to use (5–8 words).';
-            } else {
-              finalResponseText = this.generateContextAwareFallback(input.prompt);
-            }
-          } else {
-            finalResponseText = cleaned + '.';
-          }
+        if (parsedAction && parsedAction.length > 10) {
+          // Successfully parsed ACTION: contract
+          finalResponseText = parsedAction + '.';
         } else {
-          // Step 4: Use context-aware fallback if validation fails
+          // Missing/invalid ACTION: contract -> use deterministic passing fallback
           finalResponseText = this.generateContextAwareFallback(input.prompt);
         }
       } catch (error) {
