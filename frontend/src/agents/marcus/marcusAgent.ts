@@ -151,7 +151,8 @@ class MarcusAgent extends BaseAgent {
         (lowerPrompt.includes('schedule') && (lowerPrompt.includes('content') || lowerPrompt.includes('post'))) ||
         (lowerPrompt.includes('calendar') && lowerPrompt.includes('content')) ||
         (lowerPrompt.includes('plan') && lowerPrompt.includes('content') && (lowerPrompt.includes('social') || lowerPrompt.includes('media') || lowerPrompt.includes('post'))) ||
-        (lowerPrompt.includes('plan') && (lowerPrompt.includes('social') || lowerPrompt.includes('media')) && lowerPrompt.includes('content'))) {
+        (lowerPrompt.includes('plan') && (lowerPrompt.includes('social') || lowerPrompt.includes('media')) && lowerPrompt.includes('content')) ||
+        (lowerPrompt.includes('plan content') && (lowerPrompt.includes('social') || lowerPrompt.includes('media')))) {
       return 'socialSchedule';
     }
     
@@ -193,7 +194,8 @@ class MarcusAgent extends BaseAgent {
         (lowerPrompt.includes('concept') && lowerPrompt.includes('help starting')) ||
         (lowerPrompt.includes('need help starting')) ||
         (lowerPrompt.includes('don\'t know') && (lowerPrompt.includes('where to start') || lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started'))) ||
-        lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started')) {
+        lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started') ||
+        (lowerPrompt.includes('concept') && lowerPrompt.includes('need help') && lowerPrompt.includes('starting'))) {
       return 'nextTask';
     }
     
@@ -205,17 +207,21 @@ class MarcusAgent extends BaseAgent {
         (lowerPrompt.includes('explore') && lowerPrompt.includes('direction')) ||
         lowerPrompt.includes('creative guidance')) {
       // Don't match if it's about starting (start_idea takes precedence)
-      if (!lowerPrompt.includes('help starting') && !lowerPrompt.includes('need help starting')) {
+      if (!lowerPrompt.includes('help starting') && !lowerPrompt.includes('need help starting') && !(lowerPrompt.includes('concept') && lowerPrompt.includes('help starting'))) {
         return 'socialCaption'; // Reuse socialCaption template slot for creative directions
       }
     }
     
     // Overwhelm/projects/too many - check after start_idea to avoid conflicts
-    if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
-        (lowerPrompt.includes('too much') && (lowerPrompt.includes('to do') || lowerPrompt.includes('on my plate'))) ||
-        lowerPrompt.includes('swamped') || lowerPrompt.includes('feel swamped') ||
-        (lowerPrompt.includes('too much') && !lowerPrompt.includes('how to'))) {
-      return 'overwhelm';
+    // Don't match if it's about starting (start_idea takes precedence)
+    if (!lowerPrompt.includes('where to start') && !lowerPrompt.includes('how to start') && 
+        !lowerPrompt.includes('where to begin') && !lowerPrompt.includes('how to get started')) {
+      if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
+          (lowerPrompt.includes('too much') && (lowerPrompt.includes('to do') || lowerPrompt.includes('on my plate'))) ||
+          lowerPrompt.includes('swamped') || lowerPrompt.includes('feel swamped') ||
+          (lowerPrompt.includes('too much') && !lowerPrompt.includes('how to'))) {
+        return 'overwhelm';
+      }
     }
     
     // Don't know what next/stuck
