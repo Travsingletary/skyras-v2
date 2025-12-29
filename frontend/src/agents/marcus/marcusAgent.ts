@@ -190,10 +190,11 @@ class MarcusAgent extends BaseAgent {
     }
     
     // Creative directions (expanded keywords)
-    if (lowerPrompt.includes('direction') || lowerPrompt.includes('directions') ||
+    if ((lowerPrompt.includes('direction') || lowerPrompt.includes('directions')) ||
         lowerPrompt.includes('vibe') || lowerPrompt.includes('tone') ||
         lowerPrompt.includes('style') || lowerPrompt.includes('concept') ||
-        lowerPrompt.includes('creative') || lowerPrompt.includes('explore') && lowerPrompt.includes('direction')) {
+        (lowerPrompt.includes('creative') && (lowerPrompt.includes('direction') || lowerPrompt.includes('explore'))) ||
+        (lowerPrompt.includes('explore') && lowerPrompt.includes('direction'))) {
       return 'socialCaption'; // Reuse socialCaption template slot for creative directions
     }
     
