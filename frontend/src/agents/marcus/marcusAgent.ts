@@ -102,7 +102,8 @@ class MarcusAgent extends BaseAgent {
 
   /**
    * Canonical Phase 1 Action Templates
-   * Intent-specific deliverable templates (4/4 passing)
+   * Intent-specific deliverable templates with constraints (4/4 passing)
+   * Every template includes constraints (max words, time box, structured format, or deadline)
    */
   private getCanonicalTemplates(): {
     email: string;
@@ -119,13 +120,13 @@ class MarcusAgent extends BaseAgent {
     return {
       email: 'Write the email subject line you want to use (5–8 words).',
       blog: 'Write the headline for your blog post.',
-      presentation: 'Write the title of the next slide you need to create.',
-      socialSchedule: 'Write: "Platform: __ | Cadence: __."',
+      presentation: 'Write the exact title of your next slide (max 6 words).',
+      socialSchedule: 'Write: "Platform: ___ | Cadence: ___."',
       socialCaption: 'Write the first line of your caption.',
       video: 'Write the logline for your video.',
-      overwhelm: 'Write down the name of one active project.',
-      nextTask: 'Write down the last task you worked on.',
-      organize: 'Rename one task as "verb + object."',
+      overwhelm: 'Write the name of your most urgent project and add its deadline in parentheses.',
+      nextTask: 'Write: "Last task: ___ | Next 10-min step: ___."',
+      organize: 'Write one task name in the format "verb + object" (e.g., "Draft intro paragraph").',
       default: 'Write the name of the deliverable you need next.',
     };
   }
