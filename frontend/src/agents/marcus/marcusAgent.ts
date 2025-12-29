@@ -306,7 +306,16 @@ class MarcusAgent extends BaseAgent {
           ? `I routed this to: ${routingHeaders.join(', ')}\n\n`
           : '';
         
-        const wrapperPrompt = `${routingHeader}${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented. Format agent outputs as readable sections, not raw JSON.`;
+        const wrapperPrompt = `${routingHeader}${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step.
+
+CRITICAL: The next step must be:
+- CONCRETE: Specific action, not abstract (e.g., "Write the first sentence" not "Start writing")
+- SPECIFIC: Clear what to do, not general (e.g., "Email john@example.com with subject 'Project Update'" not "Reach out to your contact")
+- SMALL: One step, not multiple (e.g., "Create a new folder called 'drafts'" not "Set up your workspace, organize files, and start writing")
+- IMMEDIATELY ACTIONABLE: Can do it now, not later (e.g., "Open your notes app and write down 3 ideas" not "Plan your content strategy for next quarter")
+
+Format: Start with a DO statement (e.g., 'Open your...', 'Write...', 'Email...', 'Create...').
+Do NOT give advice, reflection, or multi-step plans. Give ONE concrete action the user can do right now. Keep it direct and action-oriented. Format agent outputs as readable sections, not raw JSON.`;
 
         // Add wrapper prompt as latest user message
         conversationMessages.push({
