@@ -209,7 +209,9 @@ class MarcusAgent extends BaseAgent {
         (lowerPrompt.includes('explore') && lowerPrompt.includes('direction')) ||
         lowerPrompt.includes('creative guidance')) {
       // Don't match if it's about starting (start_idea takes precedence)
-      if (!lowerPrompt.includes('help starting') && !lowerPrompt.includes('need help starting') && !(lowerPrompt.includes('concept') && lowerPrompt.includes('help starting'))) {
+      if (!lowerPrompt.includes('help starting') && !lowerPrompt.includes('need help starting') && 
+          !(lowerPrompt.includes('concept') && lowerPrompt.includes('help starting')) &&
+          !(lowerPrompt.includes('concept') && lowerPrompt.includes('need help') && lowerPrompt.includes('start'))) {
         return 'socialCaption'; // Reuse socialCaption template slot for creative directions
       }
     }
