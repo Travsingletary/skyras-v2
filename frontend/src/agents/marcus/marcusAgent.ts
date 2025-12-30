@@ -187,7 +187,9 @@ class MarcusAgent extends BaseAgent {
     }
     
     // Start idea (expanded keywords) - check BEFORE overwhelm to avoid conflicts
-    if (lowerPrompt.includes('where do i start') || lowerPrompt.includes('how do i start') ||
+    // But don't match if "too many" is present (overwhelm takes precedence)
+    const hasTooMany = lowerPrompt.includes('too many');
+    if (!hasTooMany && (lowerPrompt.includes('where do i start') || lowerPrompt.includes('how do i start') ||
         lowerPrompt.includes('starting point') || lowerPrompt.includes('don\'t know how to start') ||
         lowerPrompt.includes('don\'t know where to start') || lowerPrompt.includes('idea but') ||
         lowerPrompt.includes('don\'t know where to begin') || lowerPrompt.includes('don\'t know how to get started') ||
@@ -197,7 +199,8 @@ class MarcusAgent extends BaseAgent {
         lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started') ||
         (lowerPrompt.includes('concept') && lowerPrompt.includes('need help') && lowerPrompt.includes('starting')) ||
         (lowerPrompt.includes('don\'t know') && lowerPrompt.includes('where to begin')) ||
-        (lowerPrompt.includes('don\'t know') && lowerPrompt.includes('how to get started'))) {
+        (lowerPrompt.includes('don\'t know') && lowerPrompt.includes('how to get started')) ||
+        (lowerPrompt.includes('concept') && lowerPrompt.includes('need help') && lowerPrompt.includes('start')))) {
       return 'nextTask';
     }
     
@@ -217,13 +220,18 @@ class MarcusAgent extends BaseAgent {
     }
     
     // Overwhelm/projects/too many - check after start_idea to avoid conflicts
-    // Don't match if it's about starting (start_idea takes precedence)
-    if (!lowerPrompt.includes('where to start') && !lowerPrompt.includes('how to start') && 
-        !lowerPrompt.includes('where to begin') && !lowerPrompt.includes('how to get started') &&
-        !lowerPrompt.includes('don\'t know where to start') && !lowerPrompt.includes('don\'t know how to start') &&
-        !lowerPrompt.includes('don\'t know where to begin') && !lowerPrompt.includes('don\'t know how to get started')) {
-      if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
-          (lowerPrompt.includes('too much') && (lowerPrompt.includes('to do') || lowerPrompt.includes('on my plate'))) ||
+    // But "too many" takes precedence even if "don't know where to start" is present
+    if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm')) {
+      return 'overwhelm';
+    }
+    // Other overwhelm patterns - but not if it's about starting (unless "too many" was already matched above)
+    const isAboutStarting = lowerPrompt.includes('where to start') || lowerPrompt.includes('how to start') || 
+        lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started') ||
+        lowerPrompt.includes('don\'t know where to start') || lowerPrompt.includes('don\'t know how to start') ||
+        lowerPrompt.includes('don\'t know where to begin') || lowerPrompt.includes('don\'t know how to get started');
+    
+    if (!isAboutStarting) {
+      if ((lowerPrompt.includes('too much') && (lowerPrompt.includes('to do') || lowerPrompt.includes('on my plate'))) ||
           lowerPrompt.includes('swamped') || lowerPrompt.includes('feel swamped') ||
           (lowerPrompt.includes('too much') && !lowerPrompt.includes('how to'))) {
         return 'overwhelm';
