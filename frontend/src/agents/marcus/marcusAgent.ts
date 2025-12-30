@@ -195,7 +195,9 @@ class MarcusAgent extends BaseAgent {
         (lowerPrompt.includes('need help starting')) ||
         (lowerPrompt.includes('don\'t know') && (lowerPrompt.includes('where to start') || lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started'))) ||
         lowerPrompt.includes('where to begin') || lowerPrompt.includes('how to get started') ||
-        (lowerPrompt.includes('concept') && lowerPrompt.includes('need help') && lowerPrompt.includes('starting'))) {
+        (lowerPrompt.includes('concept') && lowerPrompt.includes('need help') && lowerPrompt.includes('starting')) ||
+        (lowerPrompt.includes('don\'t know') && lowerPrompt.includes('where to begin')) ||
+        (lowerPrompt.includes('don\'t know') && lowerPrompt.includes('how to get started'))) {
       return 'nextTask';
     }
     
@@ -215,7 +217,9 @@ class MarcusAgent extends BaseAgent {
     // Overwhelm/projects/too many - check after start_idea to avoid conflicts
     // Don't match if it's about starting (start_idea takes precedence)
     if (!lowerPrompt.includes('where to start') && !lowerPrompt.includes('how to start') && 
-        !lowerPrompt.includes('where to begin') && !lowerPrompt.includes('how to get started')) {
+        !lowerPrompt.includes('where to begin') && !lowerPrompt.includes('how to get started') &&
+        !lowerPrompt.includes('don\'t know where to start') && !lowerPrompt.includes('don\'t know how to start') &&
+        !lowerPrompt.includes('don\'t know where to begin') && !lowerPrompt.includes('don\'t know how to get started')) {
       if (lowerPrompt.includes('too many') || lowerPrompt.includes('overwhelm') || 
           (lowerPrompt.includes('too much') && (lowerPrompt.includes('to do') || lowerPrompt.includes('on my plate'))) ||
           lowerPrompt.includes('swamped') || lowerPrompt.includes('feel swamped') ||
