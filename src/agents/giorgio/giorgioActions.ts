@@ -1,5 +1,6 @@
 import { AgentRunResult, AgentExecutionContext } from "@/agents/core/BaseAgent";
 import { Anthropic } from "@anthropic-ai/sdk";
+import { hasNanoBanana, nanoBananaGenerateText } from "@/lib/nanoBanana";
 
 export interface CreativeInput {
   project: string;
@@ -54,7 +55,21 @@ async function generateWithAI(
 ): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    return "AI generation requires ANTHROPIC_API_KEY. Falling back to template response.";
+    if (!hasNanoBanana()) {
+      return "AI generation requires ANTHROPIC_API_KEY or NANO_BANANA_API_KEY. Falling back to template response.";
+    }
+
+    try {
+      return await nanoBananaGenerateText({
+        systemPrompt,
+        prompt,
+        temperature: 0.6,
+        maxOutputTokens: 1024,
+      });
+    } catch (error) {
+      context.logger.error("Nano Banana generation failed", { error });
+      return `AI generation failed: ${(error as Error).message}`;
+    }
   }
 
   try {
