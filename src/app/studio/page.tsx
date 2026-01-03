@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import FilePreview from "@/components/FilePreview";
-import WorkflowSuggestions from "@/components/WorkflowSuggestions";
 
 export const dynamic = 'force-dynamic';
 
@@ -47,8 +47,18 @@ interface WorkflowSuggestion {
   agents: string[];
 }
 
+interface WorkflowSummary {
+  id: string;
+  name: string;
+  type: string;
+  status: 'active' | 'completed' | 'cancelled' | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export default function Home() {
-  const [message, setMessage] = useState("Run a creative concept for SkySky");
+  const router = useRouter();
+  const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [response, setResponse] = useState<ChatResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,10 +68,26 @@ export default function Home() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [workflowSuggestions, setWorkflowSuggestions] = useState<WorkflowSuggestion[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [currentProject, setCurrentProject] = useState<string>("SkySky");
+  const [currentWorkflow, setCurrentWorkflow] = useState<WorkflowSummary | null>(null);
+  const [stateLoading, setStateLoading] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Do not use NEXT_PUBLIC_API_BASE_URL for internal Next.js API routes.
   // We always call same-origin `/api/*` in production to avoid CORS issues.
   const apiBaseUrl = "same-origin";
+
+  const refreshWorkflow = async (workflowId: string) => {
+    const res = await fetch(`/api/workflows/${workflowId}`);
+    const data = await res.json();
+    if (data?.success && data?.data?.workflow) {
+      setCurrentWorkflow(data.data.workflow as WorkflowSummary);
+      try {
+        localStorage.setItem("currentWorkflowId", data.data.workflow.id);
+      } catch {
+        // Ignore storage errors
+      }
+    }
+  };
 
   // Initialize userId from localStorage
   useEffect(() => {
@@ -74,6 +100,21 @@ export default function Home() {
       localStorage.setItem("userId", storedUserId);
     }
     setUserId(storedUserId);
+
+    // Restore last workflow if present
+    const storedWorkflowId = localStorage.getItem("currentWorkflowId");
+    if (storedWorkflowId) {
+      refreshWorkflow(storedWorkflowId).catch(() => {
+        // If it fails, clear it; we don't want stale state.
+        try {
+          localStorage.removeItem("currentWorkflowId");
+        } catch {
+          // ignore
+        }
+      }).finally(() => setStateLoading(false));
+    } else {
+      setStateLoading(false);
+    }
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -119,13 +160,22 @@ export default function Home() {
 
       const data = await res.json();
       console.log('[Workflow] Created:', data);
+      const createdWorkflow: WorkflowSummary | undefined = data?.data?.workflow;
+      if (createdWorkflow?.id) {
+        setCurrentWorkflow(createdWorkflow);
+        try {
+          localStorage.setItem("currentWorkflowId", createdWorkflow.id);
+        } catch {
+          // ignore
+        }
+      }
 
       // Show success message
       setMessages((prev) => [
         ...prev,
         {
           id: `msg_${Date.now()}`,
-          content: `✓ Workflow "${suggestion.title}" created successfully`,
+          content: `Workflow created: ${suggestion.title}. Next: run it.`,
           sender: 'agent',
           timestamp: new Date(),
         },
@@ -139,6 +189,49 @@ export default function Home() {
       console.error('[Workflow] Error:', err);
       setError(`Failed to create workflow: ${(err as Error).message}`);
     }
+  };
+
+  const getRecommendedAction = (): { title: string; detail: string; onProceed: () => void; disabled?: boolean } => {
+    if (workflowSuggestions.length > 0) {
+      const top = workflowSuggestions[0];
+      return {
+        title: `Create workflow: ${top.title}`,
+        detail: top.description,
+        onProceed: () => handleCreateWorkflow(top),
+        disabled: loading,
+      };
+    }
+
+    if (currentWorkflow?.id) {
+      return {
+        title: `Proceed to workflow run`,
+        detail: `Open “${currentWorkflow.name}” and run the pending tasks.`,
+        onProceed: () => router.push(`/workflows/${currentWorkflow.id}`),
+      };
+    }
+
+    return {
+      title: `Open workflows`,
+      detail: `Create or resume a workflow.`,
+      onProceed: () => router.push('/workflows'),
+    };
+  };
+
+  const getMarcusStatement = (): string => {
+    if (stateLoading) return "Marcus: Loading your workspace state.";
+    if (error) return "Marcus: Something failed. Clear the error, then proceed.";
+
+    if (workflowSuggestions.length > 0) {
+      const top = workflowSuggestions[0];
+      return `Marcus: Upload reviewed. Best next move is to create “${top.title}”.`;
+    }
+
+    if (currentWorkflow?.id) {
+      const status = String(currentWorkflow.status || "active").toUpperCase();
+      return `Marcus: Current workflow is “${currentWorkflow.name}” (${status}). Next: run it.`;
+    }
+
+    return "Marcus: No active workflow yet. Next: create one.";
   };
 
   const handleSend = async () => {
@@ -269,15 +362,24 @@ export default function Home() {
     }
   };
 
+  const recommended = getRecommendedAction();
+  const latestResult = (() => {
+    const fromApi = response?.data?.output;
+    if (typeof fromApi === "string" && fromApi.trim().length) return fromApi.trim();
+    const lastAgent = [...messages].reverse().find((m) => m.sender === "agent");
+    return lastAgent?.content?.trim() || "";
+  })();
+  const latestResultPreview =
+    latestResult.length > 220 ? `${latestResult.slice(0, 220).trim()}…` : latestResult;
+
   return (
     <div className="min-h-screen bg-zinc-50 p-6 text-zinc-900">
       <div className="mx-auto max-w-4xl space-y-6">
-        <header className="flex items-start justify-between">
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold">SkyRas v2 · Agent Console</h1>
+        <header className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold">SkyRas v2 · Studio</h1>
             <p className="text-sm text-zinc-600">
-              Marcus will delegate to Giorgio (creative), Cassidy (compliance), Jamal (distribution), and Letitia (cataloging)
-              based on your request.
+              State-first view. One next action. One button.
             </p>
           </div>
           <div className="flex gap-3">
@@ -296,15 +398,38 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Connection Status */}
-        <div className="rounded-lg border bg-white p-3 shadow-sm">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-zinc-600">
-              API: <span className="font-mono text-zinc-900">{apiBaseUrl}</span>
-            </span>
-            <span className="text-zinc-600">
-              User ID: <span className="font-mono text-zinc-900">{userId || "loading..."}</span>
-            </span>
+        {/* State Summary */}
+        <div className="rounded-lg border bg-white p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="text-xs text-zinc-500">Project</div>
+              <div className="text-sm font-semibold text-zinc-900">{currentProject}</div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-zinc-500">Workflow</div>
+              <div className="text-sm font-semibold text-zinc-900">
+                {currentWorkflow ? currentWorkflow.name : "None"}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-zinc-500">Status</div>
+              <div className="text-sm font-semibold text-zinc-900">
+                {currentWorkflow ? String(currentWorkflow.status).toUpperCase() : "READY"}
+              </div>
+            </div>
+            <div className="space-y-1 min-w-[14rem] flex-1">
+              <div className="text-xs text-zinc-500">Latest result</div>
+              <div className="text-sm text-zinc-900">
+                {latestResultPreview || "—"}
+              </div>
+            </div>
+            <div className="space-y-1 text-right">
+              <div className="text-xs text-zinc-500">Session</div>
+              <div className="text-xs text-zinc-600">
+                API <span className="font-mono text-zinc-900">{apiBaseUrl}</span> ·{" "}
+                User <span className="font-mono text-zinc-900">{userId || "loading..."}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -324,6 +449,25 @@ export default function Home() {
           </div>
         )}
 
+        {/* Marcus Statement + Next Action */}
+        <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
+          <div className="text-sm font-semibold text-zinc-900">{getMarcusStatement()}</div>
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+            <div className="text-xs text-zinc-500">Recommended next action</div>
+            <div className="mt-1 text-sm font-semibold text-zinc-900">{recommended.title}</div>
+            <div className="mt-1 text-sm text-zinc-700">{recommended.detail}</div>
+            <div className="mt-3">
+              <button
+                onClick={recommended.onProceed}
+                disabled={Boolean(recommended.disabled)}
+                className="inline-flex items-center rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                Proceed
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Uploaded Files Preview */}
         {uploadedFiles.length > 0 && (
           <div className="rounded-lg border bg-white p-4 shadow-sm">
@@ -331,160 +475,113 @@ export default function Home() {
           </div>
         )}
 
-        {/* Workflow Suggestions */}
-        {workflowSuggestions.length > 0 && (
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <WorkflowSuggestions
-              suggestions={workflowSuggestions}
-              onCreateWorkflow={handleCreateWorkflow}
-            />
-          </div>
-        )}
+        {/* Manual controls (secondary) */}
+        <details className="rounded-lg border bg-white p-4 shadow-sm">
+          <summary className="cursor-pointer text-sm font-semibold text-zinc-900">
+            Manual controls (optional)
+          </summary>
 
-        {/* Messages List */}
-        {messages.length > 0 && (
-          <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
-            <h2 className="text-lg font-semibold">Messages</h2>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {messages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`rounded p-3 ${
-                    msg.sender === "user" ? "bg-blue-50 ml-8" : "bg-zinc-50 mr-8"
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-zinc-600">
-                      {msg.sender === "user" ? "You" : "Assistant"}
-                    </span>
-                    <span className="text-xs text-zinc-500">
-                      {msg.timestamp.toLocaleTimeString()}
-                    </span>
-                  </div>
-                  <p className="text-sm text-zinc-900 whitespace-pre-wrap">{msg.content}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Chat Input */}
-        <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
-          <label className="text-sm font-medium text-zinc-700">Message to Marcus</label>
-          <textarea
-            className="w-full rounded border border-zinc-200 p-2 text-sm"
-            rows={3}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                handleSend();
-              }
-            }}
-            placeholder="Type your message... (Cmd/Ctrl+Enter to send)"
-          />
-
-          {/* File Upload */}
-          <div className="space-y-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-              id="file-input"
-            />
-            <label
-              htmlFor="file-input"
-              className="inline-flex items-center rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 cursor-pointer"
-            >
-              📎 Attach Files
-            </label>
-
-            {/* Pending Files */}
-            {pendingFiles.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {pendingFiles.map((file, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between rounded bg-zinc-50 px-2 py-1 text-xs"
-                  >
-                    <span className="text-zinc-700">{file.name}</span>
-                    <button
-                      onClick={() => removeFile(index)}
-                      className="text-red-600 hover:text-red-800"
+          <div className="mt-4 space-y-4">
+            {/* Messages List */}
+            {messages.length > 0 && (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-zinc-900">Timeline</div>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`rounded p-3 ${
+                        msg.sender === "user" ? "bg-blue-50 ml-8" : "bg-zinc-50 mr-8"
+                      }`}
                     >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={handleSend}
-            disabled={loading || (!message.trim() && pendingFiles.length === 0)}
-            className="inline-flex items-center rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loading ? "Sending..." : "Send"}
-          </button>
-        </div>
-
-        {response && (
-          <div className="rounded-lg border bg-white p-4 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Response</h2>
-              <span className={`text-xs px-2 py-1 rounded ${response.success ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                {response.success ? "success" : "error"}
-              </span>
-            </div>
-            {response.error && <p className="text-sm text-red-600">{response.error}</p>}
-            {response.data?.output && <pre className="whitespace-pre-wrap text-sm text-zinc-800">{response.data.output}</pre>}
-
-            {response.data?.delegations && response.data.delegations.length > 0 && (
-              <div>
-                <h3 className="text-sm font-semibold">Delegations</h3>
-                <ul className="mt-1 space-y-1 text-sm text-zinc-700">
-                  {response.data.delegations.map((d, idx) => (
-                    <li key={idx} className="rounded border border-zinc-200 px-2 py-1">
-                      <span className="font-medium">{d.agent}</span>: {d.task} ({d.status})
-                    </li>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium text-zinc-600">
+                          {msg.sender === "user" ? "You" : "Marcus"}
+                        </span>
+                        <span className="text-xs text-zinc-500">
+                          {msg.timestamp.toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-zinc-900 whitespace-pre-wrap">{msg.content}</p>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
 
-            {response.data?.notes && (
-              <details className="text-sm" open>
-                <summary className="cursor-pointer font-semibold">Notes</summary>
-                <pre className="mt-2 whitespace-pre-wrap text-xs text-zinc-700">{JSON.stringify(response.data.notes, null, 2)}</pre>
+            {/* Input */}
+            <div className="space-y-3">
+              <div className="text-sm font-semibold text-zinc-900">Direct command (advanced)</div>
+              <textarea
+                className="w-full rounded border border-zinc-200 p-2 text-sm"
+                rows={3}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    handleSend();
+                  }
+                }}
+                placeholder="Optional: send a direct instruction to Marcus."
+              />
+
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="file-input"
+                />
+                <label
+                  htmlFor="file-input"
+                  className="inline-flex items-center rounded border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50 cursor-pointer"
+                >
+                  📎 Attach files
+                </label>
+
+                <button
+                  onClick={handleSend}
+                  disabled={loading || (!message.trim() && pendingFiles.length === 0)}
+                  className="inline-flex items-center rounded bg-black px-4 py-2 text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Sending..." : "Send"}
+                </button>
+              </div>
+
+              {/* Pending Files */}
+              {pendingFiles.length > 0 && (
+                <div className="space-y-1">
+                  {pendingFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between rounded bg-zinc-50 px-2 py-1 text-xs"
+                    >
+                      <span className="text-zinc-700">{file.name}</span>
+                      <button
+                        onClick={() => removeFile(index)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Raw response (optional) */}
+            {response && (
+              <details className="text-sm">
+                <summary className="cursor-pointer font-semibold">Raw response</summary>
+                <pre className="mt-2 whitespace-pre-wrap text-xs text-zinc-700">
+                  {JSON.stringify(response, null, 2)}
+                </pre>
               </details>
             )}
           </div>
-        )}
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold">Test URLs</h3>
-            <ul className="mt-2 space-y-1 text-sm text-blue-700">
-              <li><a href="/api/test/marcus">/api/test/marcus</a></li>
-              <li><a href="/api/agents/compliance/scan">/api/agents/compliance/scan</a></li>
-              <li><a href="/api/agents/giorgio/test">/api/agents/giorgio/test</a></li>
-              <li><a href="/api/agents/jamal/test">/api/agents/jamal/test</a></li>
-              <li><a href="/api/agents/letitia/test">/api/agents/letitia/test</a></li>
-            </ul>
-          </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <h3 className="text-sm font-semibold">Tips</h3>
-            <ul className="mt-2 space-y-1 text-sm text-zinc-700">
-              <li>Include project + files to trigger Cassidy for licensing.</li>
-              <li>Use creative keywords (idea, script, prompt) to trigger Giorgio.</li>
-              <li>Mention posting/schedule/rollout to trigger Jamal.</li>
-              <li>Send asset name/tags to trigger Letitia cataloging.</li>
-            </ul>
-          </div>
-        </div>
+        </details>
       </div>
     </div>
   );
