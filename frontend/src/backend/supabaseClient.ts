@@ -138,7 +138,7 @@ export function getSupabaseClient(): SupabaseClientLike {
   if (cachedClient) return cachedClient;
 
   const url = process.env.SUPABASE_URL;
-  // Support both old and new variable names (consistent with getSupabaseStorageClient)
+  // Prefer SUPABASE_SERVICE_ROLE_KEY (SUPABASE_SECRET_KEY supported for backwards compatibility)
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
   const anonKey = process.env.SUPABASE_ANON_KEY;
   const key = serviceKey || anonKey;
@@ -196,7 +196,7 @@ export function getSupabaseStorageClient(): SupabaseClient | null {
   // Initialize independently for storage operations
   // This ensures storage operations work even if getSupabaseClient() hasn't been called
   const url = process.env.SUPABASE_URL;
-  // Support both old and new variable names
+  // Prefer SUPABASE_SERVICE_ROLE_KEY (SUPABASE_SECRET_KEY supported for backwards compatibility)
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
   const anonKey = process.env.SUPABASE_ANON_KEY;
 
@@ -210,7 +210,7 @@ export function getSupabaseStorageClient(): SupabaseClient | null {
   const key = serviceKey || anonKey;
 
   if (!key) {
-    console.error('[Supabase Storage] Neither SUPABASE_SERVICE_ROLE_KEY/SUPABASE_SECRET_KEY nor SUPABASE_ANON_KEY is configured');
+    console.error('[Supabase Storage] Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY is configured');
     return null;
   }
 

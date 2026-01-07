@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseClient, getSupabaseStorageClient } from "@/backend/supabaseClient";
 import { executeCreate, executeEdit } from "@/backend/imageProviders/router";
+import { applyRateLimit } from '@/lib/withRateLimit';
+import { RATE_LIMITS } from '@/lib/rateLimit';
 
 // Normalize supported actions
 export type GenerateImageAction = "create" | "edit";
@@ -111,6 +113,12 @@ async function logImageGeneration(params: {
 }
 
 export async function POST(req: NextRequest) {
+  // Apply rate limiting: 10 requests per 5 minutes
+  const rateLimitResult = applyRateLimit(req, RATE_LIMITS.AI_GENERATION);
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
+  }
+
   try {
     const body = (await req.json()) as GenerateImageRequest;
 

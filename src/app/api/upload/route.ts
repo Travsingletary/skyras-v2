@@ -14,20 +14,12 @@ import { createAutoProcessingRecords, generateWorkflowSuggestions } from '@/lib/
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:16',message:'Upload POST entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-  
   try {
     // Log environment variable status (without exposing values)
     const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
     const hasAnonKey = !!process.env.SUPABASE_ANON_KEY;
     const hasUrl = !!process.env.SUPABASE_URL;
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:19',message:'Env vars in API route',data:{hasUrl,hasServiceKey,hasAnonKey,serviceKeyLength:process.env.SUPABASE_SERVICE_ROLE_KEY?.length||0,anonKeyLength:process.env.SUPABASE_ANON_KEY?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
+
     console.log('[Upload] Environment check:', {
       hasUrl,
       hasServiceKey,
@@ -38,10 +30,7 @@ export async function POST(request: NextRequest) {
     
     // Check if storage is configured
     const storageConfigured = await isStorageConfigured();
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:32',message:'Storage configured check',data:{storageConfigured},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
+
     if (!storageConfigured) {
       console.warn('[Upload] Supabase storage not configured - uploads will fail');
       return NextResponse.json(
@@ -142,25 +131,13 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     for (const file of files) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:144',message:'Processing file',data:{fileName:file.name,fileSize:file.size,fileType:file.type,userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
-      
       try {
         // Convert File to Buffer
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:151',message:'Before saveFile call',data:{bufferSize:buffer.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
-
         // Save file to Supabase Storage
         const savedFile = await saveFile(buffer, file.name, userId);
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:155',message:'saveFile success',data:{hasSavedFile:!!savedFile,fileId:savedFile?.fileId,path:savedFile?.path},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
 
         // Get file extension
         const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
@@ -198,10 +175,6 @@ export async function POST(request: NextRequest) {
           processingCount, // Number of auto-created processing jobs
         });
       } catch (error) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api/upload/route.ts:176',message:'saveFile error',data:{fileName:file.name,errorMessage:(error as Error)?.message,errorName:(error as Error)?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-        // #endregion
-        
         console.error(`Error saving file ${file.name}:`, error);
         fileValidationErrors.push(
           `Failed to save file "${file.name}": ${(error as Error).message}`

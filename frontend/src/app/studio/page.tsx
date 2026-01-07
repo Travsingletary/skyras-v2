@@ -544,15 +544,15 @@ function StudioContent() {
 
         {/* Uploaded Files Preview - HIDDEN in Phase 1 (file complexity removed for clarity) */}
 
-        {/* Workflow Suggestions - HIDDEN in Phase 1 (clarity first) */}
-        {/* {workflowSuggestions.length > 0 && (
+        {/* Workflow Suggestions - Re-enabled in Phase 2A */}
+        {workflowSuggestions.length > 0 && (
           <div className="rounded-lg border bg-white p-4 shadow-sm">
             <WorkflowSuggestions
               suggestions={workflowSuggestions}
               onCreateWorkflow={handleCreateWorkflow}
             />
           </div>
-        )} */}
+        )}
 
         {/* Messages List - Simplified: Show only recent conversation */}
         {messages.length > 0 && (
@@ -596,8 +596,8 @@ function StudioContent() {
             </p>
           </div>
 
-          {/* File Upload - HIDDEN in Phase 1 (clarity first) */}
-          {/* <div className="space-y-2">
+          {/* File Upload - Re-enabled in Phase 2A */}
+          <div className="space-y-2">
             <input
               ref={fileInputRef}
               type="file"
@@ -612,7 +612,7 @@ function StudioContent() {
             >
               📎 Attach Files
             </label>
-          </div> */}
+          </div>
 
           <button
             onClick={handleSend}

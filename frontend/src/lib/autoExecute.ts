@@ -47,8 +47,26 @@ function normalizeAgentName(delegationAgent: string): AgentName {
 /**
  * Extract workflow type from delegations
  */
-function determineWorkflowType(delegations: AgentDelegation[]): 'creative' | 'distribution' | 'licensing' | 'cataloging' | 'custom' {
+function determineWorkflowType(delegations: AgentDelegation[]): 'creative' | 'distribution' | 'licensing' | 'cataloging' | 'custom' | 'nanobanana-kling' {
   const agents = delegations.map(d => normalizeAgentName(d.agent));
+  
+  // Check if this is a NanoBanana + Kling workflow
+  const hasNanoBanana = delegations.some(d => 
+    d.metadata?.action === 'generateNanoBananaCharacterSheet' ||
+    d.metadata?.action === 'generateNanoBananaStoryboard' ||
+    d.metadata?.action === 'upscaleNanoBananaFrame'
+  );
+  const hasKling = delegations.some(d => 
+    d.metadata?.action === 'generateKlingVideo'
+  );
+  const hasMusic = delegations.some(d =>
+    d.metadata?.action === 'generateMusicFromLyrics' ||
+    d.metadata?.action === 'generateLyricsFromStory'
+  );
+  
+  if (hasNanoBanana && hasKling && hasMusic) {
+    return 'nanobanana-kling';
+  }
   
   if (agents.includes('cassidy')) return 'licensing';
   if (agents.includes('giorgio')) return 'creative';

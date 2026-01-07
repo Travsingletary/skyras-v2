@@ -11,10 +11,18 @@ import {
 import { filesDb } from '@/lib/database';
 import { createAutoProcessingRecords, generateWorkflowSuggestions } from '@/lib/fileProcessing';
 import { getAuthenticatedUserId, logAuthIdentity } from '@/lib/auth';
+import { applyRateLimit, addRateLimitHeaders } from '@/lib/withRateLimit';
+import { RATE_LIMITS } from '@/lib/rateLimit';
 
 export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting: 5 uploads per 5 minutes
+  const rateLimitResult = applyRateLimit(request, RATE_LIMITS.FILE_UPLOAD);
+  if (!rateLimitResult.success) {
+    return rateLimitResult.response;
+  }
+
   try {
     // Derive user identity from auth session (server-side only)
     const userId = await getAuthenticatedUserId(request);
@@ -133,6 +141,8 @@ export async function POST(request: NextRequest) {
         const fileExtension = file.name.substring(file.name.lastIndexOf('.'));
 
         // Save file metadata to database
+        // Note: is_public defaults to false, but since we're using a public bucket,
+        // we should set it to true so the public URL can be used directly
         const fileRecord = await filesDb.create({
           user_id: userId,
           project_id: projectId || undefined,
@@ -145,6 +155,7 @@ export async function POST(request: NextRequest) {
           processing_status: 'pending',
           processing_results: {},
           metadata: {},
+          is_public: true, // Set to true since bucket is public
         });
 
         // Auto-create processing records based on file type

@@ -1,5 +1,21 @@
 import { AgentRunResult } from "@/agents/core/BaseAgent";
 
+/**
+ * IMPORTANT LIMITATION: Jamal's publishing system is NOT FUNCTIONAL
+ *
+ * This module creates posting plans and drafts but DOES NOT actually publish
+ * to any social media platforms. All platform API integrations (Instagram,
+ * TikTok, LinkedIn, Twitter, Facebook, YouTube) are NOT implemented.
+ *
+ * Current capabilities:
+ * - ✅ Generate posting plans with schedules
+ * - ✅ Create content drafts
+ * - ❌ Actual posting to platforms (NOT IMPLEMENTED)
+ * - ❌ Platform API integrations (NOT IMPLEMENTED)
+ *
+ * See docs/AGENT_CAPABILITIES.md for details.
+ */
+
 export interface PostingPlanInput {
   project: string;
   campaignName?: string;
@@ -48,10 +64,11 @@ export async function generatePostingPlan(_: unknown, input: PostingPlanInput): 
   };
 
   return {
-    output: `Posting plan drafted for ${input.project} across ${platforms.join(", ")} with ${slots} slots.`,
+    output: `Posting plan drafted for ${input.project} across ${platforms.join(", ")} with ${slots} slots.\n\n⚠️ NOTE: This is a draft plan only. Actual publishing to social media platforms is not yet implemented.`,
     notes: {
       plan,
       metadata: baseMetadata(input.project),
+      warning: "Platform publishing APIs not implemented - this is a planning tool only",
     },
   };
 }

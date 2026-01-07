@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { workflowsDb, workflowTasksDb, filesDb } from '@/lib/database';
 import { simulateTaskProcessing, type AgentName } from '@/lib/agentProcessor';
+import {
+  saveManifest,
+  isQnapAvailable,
+  getManifest,
+} from '@/backend/storage/qnapStorage';
 
 export async function POST(
   request: NextRequest,
@@ -18,6 +23,33 @@ export async function POST(
         { success: false, error: 'Workflow not found' },
         { status: 404 }
       );
+    }
+
+    // Create or update manifest on QNAP if available
+    if (workflow.project_id) {
+      try {
+        const qnapAvailable = await isQnapAvailable();
+        if (qnapAvailable) {
+          // Check if manifest already exists
+          let existingManifest = await getManifest(workflow.project_id, workflowId);
+          
+          if (!existingManifest) {
+            // Create initial manifest
+            await saveManifest(workflow.project_id, workflowId, {
+              workflowId,
+              project: workflow.project_id,
+              workflowName: workflow.name,
+              workflowType: workflow.type,
+              createdAt: workflow.created_at,
+              updatedAt: workflow.updated_at,
+              status: workflow.status,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[WorkflowExecute] Failed to create/update manifest:', error);
+        // Don't fail workflow execution if manifest creation fails
+      }
     }
 
     // Get all pending tasks
@@ -93,6 +125,26 @@ export async function POST(
     // Update workflow status if all tasks are done
     if (allCompleted) {
       await workflowsDb.update(workflowId, { status: 'completed' });
+      
+      // Update manifest status if QNAP is available
+      if (workflow.project_id) {
+        try {
+          const qnapAvailable = await isQnapAvailable();
+          if (qnapAvailable) {
+            const manifest = await getManifest(workflow.project_id, workflowId);
+            if (manifest) {
+              await saveManifest(workflow.project_id, workflowId, {
+                ...manifest,
+                status: 'completed',
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          }
+        } catch (error) {
+          console.error('[WorkflowExecute] Failed to update manifest status:', error);
+          // Don't fail if manifest update fails
+        }
+      }
     }
 
     return NextResponse.json({

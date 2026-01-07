@@ -1,4 +1,8 @@
 {
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "installCommand": "cd frontend && npm install",
+  "devCommand": "cd frontend && npm run dev",
+  "outputDirectory": "frontend/.next",
   "crons": [
     {
       "path": "/api/cron/morning-meeting",

@@ -82,21 +82,13 @@ export async function saveFile(
   userId: string,
   fileId?: string
 ): Promise<{ fileId: string; path: string; url: string; originalName: string }> {
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileStorage.supabase.ts:79',message:'saveFile entry',data:{originalName,userId,fileId,bufferSize:buffer.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-  // #endregion
-  
   const supabase = getSupabaseStorageClient();
 
   if (!supabase) {
     const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
     const hasAnonKey = !!process.env.SUPABASE_ANON_KEY;
     const hasUrl = !!process.env.SUPABASE_URL;
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileStorage.supabase.ts:88',message:'Client null',data:{hasUrl,hasServiceKey,hasAnonKey},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
-    
+
     console.error('[Storage] Supabase client not initialized:', {
       hasUrl,
       hasServiceKey,
@@ -114,10 +106,6 @@ export async function saveFile(
   const id = fileId || generateFileId();
   const storagePath = getStoragePath(userId, id, originalName);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileStorage.supabase.ts:107',message:'Before upload',data:{bucket:STORAGE_BUCKET,path:storagePath,size:buffer.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
-  // #endregion
-
   console.log('[Storage] Attempting upload:', {
     bucket: STORAGE_BUCKET,
     path: storagePath,
@@ -132,10 +120,6 @@ export async function saveFile(
       contentType: getContentType(originalName),
       upsert: false, // Don't overwrite existing files
     });
-
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fileStorage.supabase.ts:123',message:'Upload result',data:{hasError:!!error,errorMessage:error?.message,statusCode:(error as any)?.statusCode,hasData:!!data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-  // #endregion
 
   if (error) {
     console.error('[Storage] Upload error:', {

@@ -185,24 +185,13 @@ export function getSupabaseClient(): SupabaseClientLike {
 }
 
 export function getSupabaseStorageClient(): SupabaseClient | null {
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseClient.ts:187',message:'getSupabaseStorageClient entry',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,E'})}).catch(()=>{});
-  // #endregion
-  
   // For storage operations, we need a client with proper permissions
   // Prefer service role key for uploads, fallback to anon key
   const url = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const anonKey = process.env.SUPABASE_ANON_KEY;
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseClient.ts:194',message:'Env vars check',data:{hasUrl:!!url,hasServiceKey:!!serviceKey,hasAnonKey:!!anonKey,serviceKeyLength:serviceKey?.length||0,anonKeyLength:anonKey?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
-  
+
   if (!url) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseClient.ts:198',message:'Missing SUPABASE_URL',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     console.error('[Supabase Storage] SUPABASE_URL not configured');
     return null;
   }
@@ -210,19 +199,12 @@ export function getSupabaseStorageClient(): SupabaseClient | null {
   // Use service role key if available (has full permissions)
   // Otherwise use anon key (relies on RLS policies)
   const key = serviceKey || anonKey;
-  
+
   if (!key) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseClient.ts:206',message:'No keys available',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     console.error('[Supabase Storage] Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY is configured');
     return null;
   }
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseClient.ts:210',message:'Key selection',data:{usingServiceKey:!!serviceKey,usingAnonKey:!serviceKey&&!!anonKey},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-  // #endregion
-  
+
   // Log which key we're using (but not the actual key value)
   if (serviceKey) {
     console.log('[Supabase Storage] Using SERVICE_ROLE_KEY (full permissions)');
@@ -238,10 +220,6 @@ export function getSupabaseStorageClient(): SupabaseClient | null {
       autoRefreshToken: false,
     },
   });
-  
-  // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/9cfbb0b0-8eff-4990-9d74-321dfceaf911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabaseClient.ts:224',message:'Client created',data:{clientExists:!!client},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-  // #endregion
-  
+
   return client;
 }

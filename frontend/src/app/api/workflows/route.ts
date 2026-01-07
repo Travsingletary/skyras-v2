@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { workflowsDb, workflowTasksDb } from '@/lib/database';
 import { getAuthenticatedUserId, logAuthIdentity } from '@/lib/auth';
 import type { WorkflowInsert, WorkflowTaskInsert } from '@/types/database';
+import {
+  saveManifest,
+  isQnapAvailable,
+} from '@/backend/storage/qnapStorage';
 
 // GET /api/workflows - List workflows for authenticated user
 export async function GET(request: NextRequest) {
@@ -103,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate type
-    const validTypes = ['licensing', 'creative', 'distribution', 'cataloging', 'custom'];
+    const validTypes = ['licensing', 'creative', 'distribution', 'cataloging', 'custom', 'nanobanana-kling'];
     if (!validTypes.includes(type)) {
       return NextResponse.json(
         {
@@ -130,6 +134,27 @@ export async function POST(request: NextRequest) {
     };
 
     const workflow = await workflowsDb.create(workflowData);
+
+    // Create initial manifest on QNAP if available
+    if (projectId) {
+      try {
+        const qnapAvailable = await isQnapAvailable();
+        if (qnapAvailable) {
+          await saveManifest(projectId, workflow.id, {
+            workflowId: workflow.id,
+            project: projectId,
+            workflowName: name,
+            workflowType: type,
+            createdAt: workflow.created_at,
+            updatedAt: workflow.updated_at,
+            status: workflow.status,
+          });
+        }
+      } catch (error) {
+        console.error('[WorkflowCreate] Failed to create manifest:', error);
+        // Don't fail workflow creation if manifest creation fails
+      }
+    }
 
     // Create tasks if provided
     let createdTasks = [];

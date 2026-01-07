@@ -63,13 +63,19 @@ export default function SignupPage() {
         throw new Error(data.error || "Sign up failed");
       }
 
-      // Redirect to studio after successful signup
-      router.push("/studio");
-      router.refresh();
+      // Show success message briefly before redirect
+      if (data.success) {
+        // Redirect to studio after successful signup
+        setTimeout(() => {
+          router.push("/studio");
+          router.refresh();
+        }, 500);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Sign up failed. Please try again.";
       setError(errorMessage);
       setLoading(false);
+      console.error("[Signup] Error:", err);
     }
   };
 
@@ -85,8 +91,8 @@ export default function SignupPage() {
           <h1 className="text-2xl font-semibold text-zinc-900 mb-6">Sign Up</h1>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-              {error}
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700" role="alert">
+              <strong>Error:</strong> {error}
             </div>
           )}
 

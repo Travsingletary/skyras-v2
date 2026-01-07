@@ -12,6 +12,12 @@ import {
   generateSocialHook,
   generateSoraPrompt,
   generateScriptOutline,
+  generateNanoBananaCharacterSheet,
+  generateNanoBananaStoryboard,
+  upscaleNanoBananaFrame,
+  generateKlingVideo,
+  generateLyricsFromStory,
+  generateMusicFromLyrics,
   type CreativeInput,
 } from "./giorgioActions";
 
@@ -35,7 +41,13 @@ type GiorgioAction =
   | "generateSocialHook"
   | "generateShotIdeas"
   | "generateBrandConcept"
-  | "generateCoverArtPrompt";
+  | "generateCoverArtPrompt"
+  | "generateNanoBananaCharacterSheet"
+  | "generateNanoBananaStoryboard"
+  | "upscaleNanoBananaFrame"
+  | "generateKlingVideo"
+  | "generateLyricsFromStory"
+  | "generateMusicFromLyrics";
 
 export class GiorgioAgent extends BaseAgent {
   constructor() {
@@ -54,7 +66,13 @@ export class GiorgioAgent extends BaseAgent {
       throw new Error("Giorgio actions require payload metadata");
     }
 
-    context.logger.info(`Giorgio running action ${action}`, { project: payload.project });
+    // Extract workflowId from metadata if available
+    const workflowId = input.metadata?.workflowId as string | undefined;
+
+    context.logger.info(`Giorgio running action ${action}`, { project: payload.project, workflowId });
+
+    // Add workflowId to payload for actions that need it
+    const payloadWithWorkflow = { ...payload, workflowId };
 
     switch (action) {
       case "generateSoraPrompt":
@@ -73,6 +91,18 @@ export class GiorgioAgent extends BaseAgent {
         return generateBrandConcept(context, payload);
       case "generateCoverArtPrompt":
         return generateCoverArtPrompt(context, payload);
+      case "generateNanoBananaCharacterSheet":
+        return generateNanoBananaCharacterSheet(context, payloadWithWorkflow);
+      case "generateNanoBananaStoryboard":
+        return generateNanoBananaStoryboard(context, payloadWithWorkflow);
+      case "upscaleNanoBananaFrame":
+        return upscaleNanoBananaFrame(context, payloadWithWorkflow);
+      case "generateKlingVideo":
+        return generateKlingVideo(context, payloadWithWorkflow);
+      case "generateLyricsFromStory":
+        return generateLyricsFromStory(context, payloadWithWorkflow);
+      case "generateMusicFromLyrics":
+        return generateMusicFromLyrics(context, payloadWithWorkflow);
       default:
         throw new Error(`Unsupported Giorgio action: ${String(action)}`);
     }

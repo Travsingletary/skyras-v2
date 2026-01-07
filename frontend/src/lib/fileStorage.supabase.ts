@@ -85,7 +85,7 @@ export async function saveFile(
   const supabase = getSupabaseStorageClient();
 
   if (!supabase) {
-    throw new Error('Supabase client not initialized. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY/SUPABASE_SECRET_KEY environment variables.');
+    throw new Error('Supabase client not initialized. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables.');
   }
 
   const id = fileId || generateFileId();
