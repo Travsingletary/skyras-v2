@@ -1,7 +1,7 @@
 {
-  "buildCommand": "bash -c 'cd frontend && npm run build'",
+  "buildCommand": "bash install.sh && cd frontend && npm run build",
   "outputDirectory": "frontend/.next",
-  "installCommand": "bash -c 'cd frontend && npm install'",
+  "installCommand": "bash install.sh",
   "crons": [
     {
       "path": "/api/cron/morning-meeting",
