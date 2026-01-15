@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { referenceLibraryDb, filesDb } from '@/lib/database';
+import { referenceLibraryDb } from '@/lib/database';
+import { uploadFilesDirect } from '@/lib/directUpload';
 import type { ReferenceLibrary } from '@/types/database';
 
 interface ReferencesViewProps {
@@ -78,32 +79,29 @@ export function ReferencesView({ projectId, userId, onUpdate }: ReferencesViewPr
 
     setUploading(true);
     try {
-      // Upload files to storage
-      const formData = new FormData();
-      files.forEach((file) => {
-        formData.append('files', file);
-      });
-      formData.append('projectId', projectId);
+      // Use direct upload to bypass Vercel function payload limits
+      const { successful, failed } = await uploadFilesDirect(
+        files,
+        userId,
+        {
+          projectId,
+          onFileComplete: (index, result) => {
+            console.log(`[References] File ${index + 1}/${files.length} uploaded:`, result?.name);
+          },
+        }
+      );
 
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!uploadRes.ok) {
-        const errorText = await uploadRes.text();
-        throw new Error(`Upload failed: ${errorText}`);
+      if (failed.length > 0) {
+        const failedNames = failed.map((f) => f.file.name).join(', ');
+        console.error(`[References] ${failed.length} file(s) failed:`, failed);
+        alert(`Some files failed to upload: ${failedNames}`);
       }
 
-      const uploadData = await uploadRes.json();
-      
-      if (!uploadData.success || !uploadData.data?.files) {
-        throw new Error('Upload response missing file data');
-      }
+      // Create reference entries for each successfully uploaded file
+      for (const fileData of successful) {
+        if (!fileData) continue;
 
-      // Create reference entries for each uploaded file
-      for (const fileData of uploadData.data.files) {
-        // Get file type from file name
+        // Get file type from file name/type
         const fileType = fileData.type?.startsWith('image/') ? 'image' :
                         fileData.type?.startsWith('video/') ? 'video' :
                         fileData.type?.startsWith('application/') ? 'document' : 'other';
@@ -129,6 +127,10 @@ export function ReferencesView({ projectId, userId, onUpdate }: ReferencesViewPr
       // Clear file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
+      }
+
+      if (successful.length > 0) {
+        console.log(`[References] Successfully uploaded ${successful.length} file(s)`);
       }
     } catch (err) {
       console.error('Failed to upload files:', err);
