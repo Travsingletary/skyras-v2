@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export const dynamic = 'force-dynamic';
@@ -31,11 +32,17 @@ interface Workflow {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
   const [userId, setUserId] = useState<string>("");
+
+  // Redirect to /projects (dashboard is deprecated)
+  useEffect(() => {
+    router.replace('/projects');
+  }, [router]);
 
   useEffect(() => {
     // SSR-safe: Only access localStorage in browser
