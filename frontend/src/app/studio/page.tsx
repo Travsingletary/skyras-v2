@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthLoading from "@/components/AuthLoading";
 import NextActionPrompt from "@/components/NextActionPrompt";
+import WorkflowSuggestions from "@/components/WorkflowSuggestions";
 import { uploadFilesDirect } from "@/lib/directUpload";
 
 export const dynamic = 'force-dynamic';
