@@ -91,12 +91,15 @@ export async function POST(request: NextRequest) {
     const finalConversationId = conversationId || `conv_${userId}_${Date.now()}`;
     const messageId = `msg_${Date.now()}`;
 
-    // Return in format expected by frontend
+    // Return in SIMPLIFIED, UNIFIED format - all frontends extract from 'message' field
     const response = NextResponse.json({
       success: true,
       conversationId: finalConversationId,
+      message: responseText, // ← UNIFIED: All pages extract from here
+      messageId: messageId,
+      // Keep legacy fields for backward compatibility during transition
+      response: responseText,
       assistantMessageId: messageId,
-      response: responseText, // ← Frontend expects this!
       data: {
         message: {
           id: messageId,

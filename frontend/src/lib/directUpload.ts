@@ -1,14 +1,16 @@
 /**
  * Direct Upload Helper - Upload files directly to Supabase Storage
  *
- * This bypasses the backend for file uploads, avoiding Railway's request size limits
+ * This bypasses the backend for file uploads, avoiding Vercel's request size limits
  * and improving upload performance.
  *
  * Flow:
- * 1. Request signed URL from backend (/api/uploads/sign)
- * 2. Upload file directly to Supabase Storage using signed URL
+ * 1. Request signed upload token from backend (/api/uploads/sign)
+ * 2. Upload file directly to Supabase Storage using uploadToSignedUrl
  * 3. Confirm upload with backend (/api/uploads/confirm) to save metadata
  */
+
+import { getSupabaseFrontendClient } from '@/lib/supabaseClient';
 
 interface SignedUploadResponse {
   success: boolean;
@@ -77,34 +79,51 @@ export async function uploadFileDirect(
 
   const { signedUrl, path, fileId, token } = signData.data;
 
-  // Step 2: Upload directly to Supabase Storage
-  const uploadResponse = await fetch(signedUrl, {
-    method: 'PUT',
-    body: file,
-    headers: {
-      'Content-Type': file.type,
-      // Include token if provided by signed URL
-      ...(token && { 'x-upsert': 'true' }),
-    },
-  });
+  // Step 2: Upload directly to Supabase Storage using uploadToSignedUrl
+  try {
+    const supabase = getSupabaseFrontendClient();
 
-  if (!uploadResponse.ok) {
-    const errorText = await uploadResponse.text();
-    let errorMessage = `Upload failed: ${uploadResponse.status} - ${errorText}`;
-    
-    // Handle Supabase Storage size limits
-    if (uploadResponse.status === 400 || uploadResponse.status === 413) {
-      try {
-        const errorJson = JSON.parse(errorText);
-        if (errorJson.statusCode === '413' || errorJson.error === 'Payload too large') {
-          errorMessage = `File is too large for Supabase Storage. Maximum size is typically 50MB on free tier. Please compress the file or upgrade your Supabase plan for larger files.`;
-        }
-      } catch {
-        // If parsing fails, use original error message
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('user-uploads')
+      .uploadToSignedUrl(path, token, file, {
+        contentType: file.type,
+        cacheControl: '3600',
+      });
+
+    if (uploadError) {
+      let errorMessage = `Upload failed: ${uploadError.message}`;
+      
+      // Handle Supabase Storage size limits
+      if (uploadError.message?.includes('413') || uploadError.message?.includes('too large') || uploadError.message?.includes('Payload too large')) {
+        errorMessage = `File is too large for Supabase Storage. Maximum size is typically 50MB on free tier. Please compress the file or upgrade your Supabase plan for larger files.`;
       }
+      
+      throw new Error(errorMessage);
     }
+  } catch (clientError) {
+    // Fallback: If Supabase client not available, try direct fetch
+    // This shouldn't happen in production but provides resilience
+    console.warn('[DirectUpload] Supabase client unavailable, using fetch fallback:', clientError);
     
-    throw new Error(errorMessage);
+    const uploadResponse = await fetch(signedUrl, {
+      method: 'PUT',
+      body: file,
+      headers: {
+        'Content-Type': file.type,
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      let errorMessage = `Upload failed: ${uploadResponse.status} - ${errorText}`;
+      
+      if (uploadResponse.status === 413) {
+        errorMessage = `File is too large for Supabase Storage. Maximum size is typically 50MB on free tier. Please compress the file or upgrade your Supabase plan for larger files.`;
+      }
+      
+      throw new Error(errorMessage);
+    }
   }
 
   // Call progress callback

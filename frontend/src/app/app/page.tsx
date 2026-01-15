@@ -644,10 +644,10 @@ export default function Home() {
       // Agent outputs are formatted as reports within Marcus's response
       // No separate agent messages are created
 
-      // Always show Marcus's response, even if empty
-      const responseText = data.response || "[No response from Marcus]";
+      // Extract response from unified 'message' field (fallback to legacy)
+      const responseText = data.message || data.response || data.data?.output || data.data?.message?.content || "[No response from Marcus]";
       const assistantMessage: Message = {
-        id: data.assistantMessageId || `msg_${Date.now()}`,
+        id: data.messageId || data.assistantMessageId || `msg_${Date.now()}`,
         role: "assistant",
         content: responseText,
         agentName: "Marcus",

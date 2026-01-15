@@ -449,13 +449,16 @@ function StudioContent() {
         setConversationId(data.conversationId);
       }
 
-      // Append assistant message if present
-      if (data.data?.message) {
+      // Extract response text from unified 'message' field (fallback to legacy fields)
+      const responseText = data.message || data.response || data.data?.message?.content || data.data?.output || 'No response';
+      
+      // Append assistant message
+      if (responseText && responseText !== 'No response') {
         const assistantMessage: Message = {
-          id: data.data.message.id || `msg_${Date.now()}`,
-          content: data.data.message.content,
+          id: data.messageId || data.assistantMessageId || data.data?.message?.id || `msg_${Date.now()}`,
+          content: responseText,
           sender: "agent",
-          timestamp: new Date(data.data.message.timestamp || Date.now()),
+          timestamp: new Date(data.data?.message?.timestamp || Date.now()),
         };
         setMessages((prev) => [...prev, assistantMessage]);
       }

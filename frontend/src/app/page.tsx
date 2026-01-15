@@ -88,8 +88,8 @@ export default function Home() {
 
       const data = await res.json();
       
-      // Extract next action from response
-      const actionText = data.data?.output || data.response || data.data?.message?.content || 'No response';
+      // Extract response from unified 'message' field (fallback to legacy)
+      const actionText = data.message || data.response || data.data?.output || data.data?.message?.content || 'No response';
       setNextAction(actionText);
 
       // Append assistant message
