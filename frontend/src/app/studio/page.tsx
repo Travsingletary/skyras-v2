@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthLoading from "@/components/AuthLoading";
 import NextActionPrompt from "@/components/NextActionPrompt";
+import { uploadFilesDirect } from "@/lib/directUpload";
 
 export const dynamic = 'force-dynamic';
 
@@ -357,45 +358,49 @@ function StudioContent() {
       };
       setMessages((prev) => [...prev, userMessage]);
 
-      // Upload files if any
+      // Upload files if any (using direct upload to bypass Vercel limits)
       const fileIds: string[] = [];
-      if (pendingFiles.length > 0) {
-        console.log(`[Upload] Starting upload of ${pendingFiles.length} file(s)...`);
+      if (pendingFiles.length > 0 && user) {
+        console.log(`[Upload] Starting direct upload of ${pendingFiles.length} file(s)...`);
         try {
-          const formData = new FormData();
-          pendingFiles.forEach((file) => {
-            formData.append("files", file);
-          });
-          // userId is derived server-side from auth session
+          // Use direct upload to bypass Vercel function payload limits
+          const { successful, failed } = await uploadFilesDirect(
+            pendingFiles,
+            user.id,
+            {
+              onFileComplete: (index, result) => {
+                console.log(`[Upload] File ${index + 1}/${pendingFiles.length} complete:`, result?.name);
+              },
+            }
+          );
 
-          const uploadRes = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          });
+          // Collect successful file IDs
+          if (successful.length > 0) {
+            fileIds.push(...successful.filter(f => f?.id).map((f) => f!.id));
+            console.log(`[Upload] ${successful.length} file(s) uploaded successfully`);
 
-          if (!uploadRes.ok) {
-            const uploadError = await uploadRes.text();
-            throw new Error(`Upload failed: ${uploadError}`);
+            // Store uploaded files data for preview
+            setUploadedFiles((prev) => [...prev, ...successful.map(f => ({
+              id: f.id,
+              name: f.name,
+              url: f.url,
+              type: f.type,
+              size: f.size,
+              processingCount: f.processingCount,
+            }))]);
           }
 
-          const uploadData = await uploadRes.json();
-          console.log("[Upload] Success:", uploadData);
+          // Show errors for failed uploads
+          if (failed.length > 0) {
+            const failedNames = failed.map((f) => f.file.name).join(', ');
+            console.error(`[Upload] ${failed.length} file(s) failed:`, failed);
+            setError(`Some files failed to upload: ${failedNames}`);
 
-          // Extract file IDs for chat
-          if (uploadData.success && uploadData.data?.fileIds) {
-            fileIds.push(...uploadData.data.fileIds);
-          } else if (uploadData.fileIds) {
-            fileIds.push(...uploadData.fileIds);
-          }
-
-          // Store uploaded files data for preview
-          if (uploadData.success && uploadData.data?.files) {
-            setUploadedFiles((prev) => [...prev, ...uploadData.data.files]);
-          }
-
-          // Store workflow suggestions
-          if (uploadData.success && uploadData.data?.workflowSuggestions) {
-            setWorkflowSuggestions(uploadData.data.workflowSuggestions);
+            // Continue anyway if at least one file succeeded
+            if (successful.length === 0) {
+              setLoading(false);
+              return;
+            }
           }
         } catch (uploadErr) {
           console.error("[Upload] Error:", uploadErr);
@@ -403,6 +408,10 @@ function StudioContent() {
           setLoading(false);
           return;
         }
+      } else if (pendingFiles.length > 0 && !user) {
+        setError('Please sign in to upload files');
+        setLoading(false);
+        return;
       }
 
       // Send chat message to Next.js API route
