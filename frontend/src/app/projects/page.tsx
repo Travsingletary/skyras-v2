@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { projectsDb } from '@/lib/database';
 import { checkProjectGateStatus } from '@/lib/gateStatus';
+import { checkAuth as checkAuthStatus } from '@/lib/auth-utils';
 import type { Project } from '@/types/database';
 import type { ProjectGateStatus } from '@/lib/gateStatus';
 
@@ -19,23 +20,29 @@ export default function ProjectsDashboard() {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check auth and get user ID
-    const checkAuth = async () => {
+    // Check auth and get user ID with retry logic
+    const performAuthCheck = async () => {
       try {
-        const response = await fetch('/api/auth/user');
-        if (!response.ok) {
-          router.push('/login');
-          return;
+        const result = await checkAuthStatus(2);
+
+        if (result.error) {
+          console.error('Auth check failed:', result.error);
+          setError(`Authentication error: ${result.error}. Redirecting to login...`);
+          setTimeout(() => router.push('/login?next=/projects'), 2000);
+        } else if (result.authenticated && result.user) {
+          setUserId(result.user.id);
+          setError(null);
+        } else {
+          router.push('/login?next=/projects');
         }
-        const { user } = await response.json();
-        setUserId(user.id);
       } catch (err) {
-        console.error('Auth check failed:', err);
-        router.push('/login');
+        console.error('Unexpected auth error:', err);
+        setError('Unexpected authentication error. Redirecting to login...');
+        setTimeout(() => router.push('/login?next=/projects'), 2000);
       }
     };
 
-    checkAuth();
+    performAuthCheck();
   }, [router]);
 
   useEffect(() => {

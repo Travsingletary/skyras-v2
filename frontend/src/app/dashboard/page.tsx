@@ -45,40 +45,41 @@ export default function Dashboard() {
   }, [router]);
 
   useEffect(() => {
-    // SSR-safe: Only access localStorage in browser
-    if (typeof window === 'undefined') return;
-
-    // Get userId from localStorage
-    const storedUserId = localStorage.getItem("userId");
-    if (!storedUserId) {
-      setError("No user ID found. Please start a conversation with Marcus first.");
-      setLoading(false);
-      return;
-    }
-    setUserId(storedUserId);
-
-    // Fetch workflows
-    const fetchWorkflows = async () => {
+    // Fetch authenticated user from session
+    async function checkAuthAndFetchWorkflows() {
       try {
-        const res = await fetch(`/api/workflows?userId=${storedUserId}`);
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+        const authRes = await fetch('/api/auth/user');
+        const authData = await authRes.json();
+
+        if (!authData.authenticated || !authData.user?.id) {
+          setError("Not authenticated. Please log in.");
+          setLoading(false);
+          return;
         }
-        const data = await res.json();
-        if (data.success) {
-          setWorkflows(data.workflows || []);
+
+        const authenticatedUserId = authData.user.id;
+        setUserId(authenticatedUserId);
+
+        // Fetch workflows using authenticated userId
+        const workflowRes = await fetch(`/api/workflows?userId=${authenticatedUserId}`);
+        if (!workflowRes.ok) {
+          throw new Error(`HTTP ${workflowRes.status}: ${await workflowRes.text()}`);
+        }
+        const workflowData = await workflowRes.json();
+        if (workflowData.success) {
+          setWorkflows(workflowData.workflows || []);
         } else {
-          throw new Error(data.error || "Failed to fetch workflows");
+          throw new Error(workflowData.error || "Failed to fetch workflows");
         }
       } catch (err) {
-        console.error("Error fetching workflows:", err);
+        console.error("Error fetching data:", err);
         setError((err as Error).message);
       } finally {
         setLoading(false);
       }
-    };
+    }
 
-    fetchWorkflows();
+    checkAuthAndFetchWorkflows();
   }, []);
 
   if (loading) {

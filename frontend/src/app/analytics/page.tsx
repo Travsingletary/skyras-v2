@@ -10,13 +10,26 @@ export default function AnalyticsPage() {
   const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
-    // SSR-safe: Only access localStorage in browser
-    if (typeof window === 'undefined') return;
+    // Fetch authenticated user from session
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/user');
+        const data = await res.json();
 
-    const storedUserId = localStorage.getItem('userId');
-    if (storedUserId) {
-      setUserId(storedUserId);
+        if (data.authenticated && data.user?.id) {
+          setUserId(data.user.id);
+        } else {
+          // Redirect to login if not authenticated
+          window.location.href = '/login?next=/analytics';
+        }
+      } catch (err) {
+        console.error('Error checking auth:', err);
+        // Show error state but allow fallback
+        setUserId('');
+      }
     }
+
+    checkAuth();
   }, []);
 
   return (

@@ -7,6 +7,7 @@ import AuthLoading from "@/components/AuthLoading";
 import NextActionPrompt from "@/components/NextActionPrompt";
 import WorkflowSuggestions from "@/components/WorkflowSuggestions";
 import { uploadFilesDirect } from "@/lib/directUpload";
+import { checkAuth as checkAuthStatus } from "@/lib/auth-utils";
 
 export const dynamic = 'force-dynamic';
 
@@ -85,46 +86,57 @@ function StudioContent() {
   useEffect(() => {
     let isChecking = false; // Prevent concurrent checks
 
-    const checkAuth = async () => {
+    const performAuthCheck = async () => {
       // Prevent concurrent auth checks
       if (isChecking) return;
       isChecking = true;
 
       try {
-        const res = await fetch('/api/auth/user');
-        const data = await res.json();
-        if (data.authenticated && data.user) {
-          setUser(data.user);
-          setAuthChecking(false);
-        } else {
+        // Use auth utility with retry logic
+        const result = await checkAuthStatus(2);
+
+        if (result.error) {
+          // Network or API error - show error and redirect after delay
+          console.error('[Auth] Error checking auth state:', result.error);
+          setError(`Authentication error: ${result.error}. Redirecting to login...`);
+          setTimeout(() => {
+            router.push(`/login?next=${encodeURIComponent('/studio')}`);
+          }, 2000);
           setUser(null);
-          // Not authenticated, redirect to login with next param
-          const currentPath = '/studio';
-          router.push(`/login?next=${encodeURIComponent(currentPath)}`);
+        } else if (result.authenticated && result.user) {
+          // Successfully authenticated
+          setUser(result.user);
+          setAuthChecking(false);
+          setError(null);
+        } else {
+          // Not authenticated, redirect to login
+          setUser(null);
+          router.push(`/login?next=${encodeURIComponent('/studio')}`);
         }
       } catch (err) {
-        console.error('[Auth] Error checking auth state:', err);
+        console.error('[Auth] Unexpected error:', err);
+        setError('Unexpected authentication error. Redirecting to login...');
+        setTimeout(() => {
+          router.push(`/login?next=${encodeURIComponent('/studio')}`);
+        }, 2000);
         setUser(null);
-        // On error, redirect to login with next param
-        const currentPath = '/studio';
-        router.push(`/login?next=${encodeURIComponent(currentPath)}`);
       } finally {
         isChecking = false;
       }
     };
 
     // Initial auth check on mount
-    checkAuth();
+    performAuthCheck();
 
     // Re-check auth on window focus (catches logout from other tabs)
     const handleFocus = () => {
-      checkAuth();
+      performAuthCheck();
     };
 
     // Re-check auth when page becomes visible (catches logout from other tabs)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        checkAuth();
+        performAuthCheck();
       }
     };
 

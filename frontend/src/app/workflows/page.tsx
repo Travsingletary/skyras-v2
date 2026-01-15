@@ -38,17 +38,33 @@ export default function WorkflowsPage() {
   const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
-    // SSR-safe: Only access localStorage in browser
-    if (typeof window === 'undefined') return;
+    // Fetch authenticated user from session
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/user');
+        const data = await res.json();
 
-    const storedUserId = localStorage.getItem('userId');
-    if (storedUserId) {
-      setUserId(storedUserId);
+        if (data.authenticated && data.user?.id) {
+          setUserId(data.user.id);
+        } else {
+          // Redirect to login if not authenticated
+          window.location.href = '/login?next=/workflows';
+        }
+      } catch (err) {
+        console.error('Error checking auth:', err);
+        setError('Failed to verify authentication. Please log in.');
+        setLoading(false);
+      }
     }
+
+    checkAuth();
   }, []);
 
   useEffect(() => {
     if (!userId) return;
+
+    let intervalId: NodeJS.Timeout | null = null;
+    let isVisible = true;
 
     async function fetchWorkflows() {
       try {
@@ -69,11 +85,50 @@ export default function WorkflowsPage() {
       }
     }
 
+    // Initial fetch
     fetchWorkflows();
 
-    // Refresh every 5 seconds
-    const interval = setInterval(fetchWorkflows, 5000);
-    return () => clearInterval(interval);
+    // Refresh every 5 seconds, but only when tab is visible
+    const startPolling = () => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(() => {
+        if (isVisible) {
+          fetchWorkflows();
+        }
+      }, 5000);
+    };
+
+    const stopPolling = () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+
+    // Handle visibility change to pause/resume polling
+    const handleVisibilityChange = () => {
+      isVisible = document.visibilityState === 'visible';
+      if (isVisible) {
+        // Tab became visible - fetch immediately and restart polling
+        fetchWorkflows();
+        startPolling();
+      } else {
+        // Tab hidden - pause polling to save resources
+        stopPolling();
+      }
+    };
+
+    // Start initial polling
+    startPolling();
+
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Cleanup
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [userId]);
 
   const getStatusColor = (status: string) => {
