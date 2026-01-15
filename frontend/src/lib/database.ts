@@ -19,6 +19,24 @@ import type {
   CalendarEvent,
   CalendarEventInsert,
   CalendarEventUpdate,
+  StyleCard,
+  StyleCardInsert,
+  StyleCardUpdate,
+  ReferenceLibrary,
+  ReferenceLibraryInsert,
+  ReferenceLibraryUpdate,
+  StoryboardFrame,
+  StoryboardFrameInsert,
+  StoryboardFrameUpdate,
+  ShotList,
+  ShotListInsert,
+  ShotListUpdate,
+  VideoClip,
+  VideoClipInsert,
+  VideoClipUpdate,
+  TimelineSequence,
+  TimelineSequenceInsert,
+  TimelineSequenceUpdate,
 } from '@/types/database';
 
 const supabase = getSupabaseClient();
@@ -311,5 +329,365 @@ export const calendarEventsDb = {
       { id }
     );
     if (error) throw new Error(`Failed to mark calendar event as failed: ${error.message || JSON.stringify(error)}`);
+  },
+};
+
+// ============================================================================
+// STYLE CARDS
+// ============================================================================
+
+export const styleCardsDb = {
+  async create(styleCard: StyleCardInsert): Promise<StyleCard> {
+    const { data, error } = await supabase.from('style_cards').insert(styleCard);
+    if (error) throw new Error(`Failed to create style card: ${error.message || JSON.stringify(error)}`);
+    return data[0] as StyleCard;
+  },
+
+  async getById(id: string): Promise<StyleCard | null> {
+    const { data, error } = await supabase.from('style_cards').select({ id });
+    if (error) throw new Error(`Failed to get style card: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as StyleCard) || null;
+  },
+
+  async getByProjectId(projectId: string): Promise<StyleCard[]> {
+    const { data, error } = await supabase.from('style_cards').select({ project_id: projectId, deleted_at: null });
+    if (error) throw new Error(`Failed to get project style cards: ${error.message || JSON.stringify(error)}`);
+    const cards = (data as StyleCard[]) || [];
+    return cards.filter(c => !c.deleted_at);
+  },
+
+  async getApprovedByProjectId(projectId: string): Promise<StyleCard | null> {
+    const { data, error } = await supabase.from('style_cards').select({
+      project_id: projectId,
+      approval_status: 'approved',
+      deleted_at: null
+    });
+    if (error) throw new Error(`Failed to get approved style card: ${error.message || JSON.stringify(error)}`);
+    const cards = (data as StyleCard[]) || [];
+    const filtered = cards.filter(c => !c.deleted_at && c.approval_status === 'approved');
+    return filtered[0] || null;
+  },
+
+  async update(id: string, updates: StyleCardUpdate): Promise<StyleCard> {
+    const { data, error } = await supabase.from('style_cards').update(updates, { id });
+    if (error) throw new Error(`Failed to update style card: ${error.message || JSON.stringify(error)}`);
+    return data[0] as StyleCard;
+  },
+
+  async approve(id: string, approvedBy: string): Promise<StyleCard> {
+    return this.update(id, {
+      approval_status: 'approved',
+      is_locked: true,
+      approved_by: approvedBy,
+      approved_at: new Date().toISOString(),
+      locked_at: new Date().toISOString(),
+    });
+  },
+
+  async reject(id: string): Promise<StyleCard> {
+    return this.update(id, {
+      approval_status: 'rejected',
+    });
+  },
+
+  async softDelete(id: string): Promise<void> {
+    const { error } = await supabase.from('style_cards').update(
+      { deleted_at: new Date().toISOString() },
+      { id }
+    );
+    if (error) throw new Error(`Failed to soft delete style card: ${error.message || JSON.stringify(error)}`);
+  },
+};
+
+// ============================================================================
+// REFERENCE LIBRARY
+// ============================================================================
+
+export const referenceLibraryDb = {
+  async create(reference: ReferenceLibraryInsert): Promise<ReferenceLibrary> {
+    const { data, error } = await supabase.from('reference_library').insert(reference);
+    if (error) throw new Error(`Failed to create reference: ${error.message || JSON.stringify(error)}`);
+    return data[0] as ReferenceLibrary;
+  },
+
+  async getById(id: string): Promise<ReferenceLibrary | null> {
+    const { data, error } = await supabase.from('reference_library').select({ id });
+    if (error) throw new Error(`Failed to get reference: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as ReferenceLibrary) || null;
+  },
+
+  async getByProjectId(projectId: string): Promise<ReferenceLibrary[]> {
+    const { data, error } = await supabase.from('reference_library').select({ project_id: projectId });
+    if (error) throw new Error(`Failed to get project references: ${error.message || JSON.stringify(error)}`);
+    const refs = (data as ReferenceLibrary[]) || [];
+    return refs.filter(r => !r.deleted_at);
+  },
+
+  async getApprovedByProjectId(projectId: string): Promise<ReferenceLibrary[]> {
+    const { data, error } = await supabase.from('reference_library').select({
+      project_id: projectId,
+      approval_status: 'approved'
+    });
+    if (error) throw new Error(`Failed to get approved references: ${error.message || JSON.stringify(error)}`);
+    const refs = (data as ReferenceLibrary[]) || [];
+    return refs.filter(r => !r.deleted_at && r.approval_status === 'approved');
+  },
+
+  async update(id: string, updates: ReferenceLibraryUpdate): Promise<ReferenceLibrary> {
+    const { data, error } = await supabase.from('reference_library').update(updates, { id });
+    if (error) throw new Error(`Failed to update reference: ${error.message || JSON.stringify(error)}`);
+    return data[0] as ReferenceLibrary;
+  },
+
+  async approve(id: string, approvedBy: string): Promise<ReferenceLibrary> {
+    return this.update(id, {
+      approval_status: 'approved',
+      approved_by: approvedBy,
+      approved_at: new Date().toISOString(),
+    });
+  },
+
+  async reject(id: string): Promise<ReferenceLibrary> {
+    return this.update(id, {
+      approval_status: 'rejected',
+    });
+  },
+
+  async softDelete(id: string): Promise<void> {
+    const { error } = await supabase.from('reference_library').update(
+      { deleted_at: new Date().toISOString() },
+      { id }
+    );
+    if (error) throw new Error(`Failed to soft delete reference: ${error.message || JSON.stringify(error)}`);
+  },
+};
+
+// ============================================================================
+// STORYBOARD FRAMES
+// ============================================================================
+
+export const storyboardFramesDb = {
+  async create(frame: StoryboardFrameInsert): Promise<StoryboardFrame> {
+    const { data, error } = await supabase.from('storyboard_frames').insert(frame);
+    if (error) throw new Error(`Failed to create storyboard frame: ${error.message || JSON.stringify(error)}`);
+    return data[0] as StoryboardFrame;
+  },
+
+  async createMany(frames: StoryboardFrameInsert[]): Promise<StoryboardFrame[]> {
+    const { data, error } = await supabase.from('storyboard_frames').insert(frames);
+    if (error) throw new Error(`Failed to create storyboard frames: ${error.message || JSON.stringify(error)}`);
+    return data as StoryboardFrame[];
+  },
+
+  async getById(id: string): Promise<StoryboardFrame | null> {
+    const { data, error } = await supabase.from('storyboard_frames').select({ id });
+    if (error) throw new Error(`Failed to get storyboard frame: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as StoryboardFrame) || null;
+  },
+
+  async getByProjectId(projectId: string): Promise<StoryboardFrame[]> {
+    const { data, error } = await supabase.from('storyboard_frames').select({ project_id: projectId });
+    if (error) throw new Error(`Failed to get project storyboard frames: ${error.message || JSON.stringify(error)}`);
+    const frames = (data as StoryboardFrame[]) || [];
+    return frames.filter(f => !f.deleted_at).sort((a, b) => a.frame_number - b.frame_number);
+  },
+
+  async update(id: string, updates: StoryboardFrameUpdate): Promise<StoryboardFrame> {
+    const { data, error } = await supabase.from('storyboard_frames').update(updates, { id });
+    if (error) throw new Error(`Failed to update storyboard frame: ${error.message || JSON.stringify(error)}`);
+    return data[0] as StoryboardFrame;
+  },
+
+  async approve(id: string, approvedBy: string): Promise<StoryboardFrame> {
+    return this.update(id, {
+      approval_status: 'approved',
+      approved_by: approvedBy,
+      approved_at: new Date().toISOString(),
+    });
+  },
+
+  async approveMany(ids: string[], approvedBy: string): Promise<void> {
+    const updates = {
+      approval_status: 'approved' as const,
+      approved_by: approvedBy,
+      approved_at: new Date().toISOString(),
+    };
+
+    for (const id of ids) {
+      await this.update(id, updates);
+    }
+  },
+
+  async needsRevision(id: string, notes?: string): Promise<StoryboardFrame> {
+    return this.update(id, {
+      approval_status: 'needs_revision',
+      revision_notes: notes,
+    });
+  },
+
+  async softDelete(id: string): Promise<void> {
+    const { error } = await supabase.from('storyboard_frames').update(
+      { deleted_at: new Date().toISOString() },
+      { id }
+    );
+    if (error) throw new Error(`Failed to soft delete storyboard frame: ${error.message || JSON.stringify(error)}`);
+  },
+
+  async areAllApproved(projectId: string): Promise<boolean> {
+    const frames = await this.getByProjectId(projectId);
+    if (frames.length === 0) return false;
+    return frames.every(f => f.approval_status === 'approved');
+  },
+};
+
+// ============================================================================
+// SHOT LISTS
+// ============================================================================
+
+export const shotListsDb = {
+  async create(shotList: ShotListInsert): Promise<ShotList> {
+    const { data, error } = await supabase.from('shot_lists').insert(shotList);
+    if (error) throw new Error(`Failed to create shot list: ${error.message || JSON.stringify(error)}`);
+    return data[0] as ShotList;
+  },
+
+  async createMany(shotLists: ShotListInsert[]): Promise<ShotList[]> {
+    const { data, error } = await supabase.from('shot_lists').insert(shotLists);
+    if (error) throw new Error(`Failed to create shot lists: ${error.message || JSON.stringify(error)}`);
+    return data as ShotList[];
+  },
+
+  async getById(id: string): Promise<ShotList | null> {
+    const { data, error } = await supabase.from('shot_lists').select({ id });
+    if (error) throw new Error(`Failed to get shot list: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as ShotList) || null;
+  },
+
+  async getByProjectId(projectId: string): Promise<ShotList[]> {
+    const { data, error } = await supabase.from('shot_lists').select({ project_id: projectId });
+    if (error) throw new Error(`Failed to get project shot lists: ${error.message || JSON.stringify(error)}`);
+    const shotLists = (data as ShotList[]) || [];
+    return shotLists.sort((a, b) => a.shot_number - b.shot_number);
+  },
+
+  async update(id: string, updates: ShotListUpdate): Promise<ShotList> {
+    const { data, error } = await supabase.from('shot_lists').update(updates, { id });
+    if (error) throw new Error(`Failed to update shot list: ${error.message || JSON.stringify(error)}`);
+    return data[0] as ShotList;
+  },
+};
+
+// ============================================================================
+// VIDEO CLIPS
+// ============================================================================
+
+export const videoClipsDb = {
+  async create(clip: VideoClipInsert): Promise<VideoClip> {
+    const { data, error } = await supabase.from('video_clips').insert(clip);
+    if (error) throw new Error(`Failed to create video clip: ${error.message || JSON.stringify(error)}`);
+    return data[0] as VideoClip;
+  },
+
+  async createMany(clips: VideoClipInsert[]): Promise<VideoClip[]> {
+    const { data, error } = await supabase.from('video_clips').insert(clips);
+    if (error) throw new Error(`Failed to create video clips: ${error.message || JSON.stringify(error)}`);
+    return data as VideoClip[];
+  },
+
+  async getById(id: string): Promise<VideoClip | null> {
+    const { data, error } = await supabase.from('video_clips').select({ id });
+    if (error) throw new Error(`Failed to get video clip: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as VideoClip) || null;
+  },
+
+  async getByProjectId(projectId: string): Promise<VideoClip[]> {
+    const { data, error } = await supabase.from('video_clips').select({ project_id: projectId });
+    if (error) throw new Error(`Failed to get project video clips: ${error.message || JSON.stringify(error)}`);
+    const clips = (data as VideoClip[]) || [];
+    return clips.sort((a, b) => a.clip_number - b.clip_number);
+  },
+
+  async getByShotListId(shotListId: string): Promise<VideoClip[]> {
+    const { data, error } = await supabase.from('video_clips').select({ shot_list_id: shotListId });
+    if (error) throw new Error(`Failed to get shot list video clips: ${error.message || JSON.stringify(error)}`);
+    const clips = (data as VideoClip[]) || [];
+    return clips.sort((a, b) => a.clip_number - b.clip_number);
+  },
+
+  async update(id: string, updates: VideoClipUpdate): Promise<VideoClip> {
+    const { data, error } = await supabase.from('video_clips').update(updates, { id });
+    if (error) throw new Error(`Failed to update video clip: ${error.message || JSON.stringify(error)}`);
+    return data[0] as VideoClip;
+  },
+};
+
+// ============================================================================
+// TIMELINE SEQUENCES
+// ============================================================================
+
+export const timelineSequencesDb = {
+  async create(sequence: TimelineSequenceInsert): Promise<TimelineSequence> {
+    const { data, error } = await supabase.from('timeline_sequences').insert(sequence);
+    if (error) throw new Error(`Failed to create timeline sequence: ${error.message || JSON.stringify(error)}`);
+    return data[0] as TimelineSequence;
+  },
+
+  async getById(id: string): Promise<TimelineSequence | null> {
+    const { data, error } = await supabase.from('timeline_sequences').select({ id });
+    if (error) throw new Error(`Failed to get timeline sequence: ${error.message || JSON.stringify(error)}`);
+    return (data[0] as TimelineSequence) || null;
+  },
+
+  async getByProjectId(projectId: string): Promise<TimelineSequence[]> {
+    const { data, error } = await supabase.from('timeline_sequences').select({ project_id: projectId });
+    if (error) throw new Error(`Failed to get project timeline sequences: ${error.message || JSON.stringify(error)}`);
+    return (data as TimelineSequence[]) || [];
+  },
+
+  async update(id: string, updates: TimelineSequenceUpdate): Promise<TimelineSequence> {
+    const { data, error } = await supabase.from('timeline_sequences').update(updates, { id });
+    if (error) throw new Error(`Failed to update timeline sequence: ${error.message || JSON.stringify(error)}`);
+    return data[0] as TimelineSequence;
+  },
+};
+
+// ============================================================================
+// VIDEO JOBS
+// ============================================================================
+
+export const videoJobsDb = {
+  async create(job: VideoJobInsert): Promise<VideoJob> {
+    const { data, error } = await supabase.from('video_jobs').insert(job);
+    if (error) throw new Error(`Failed to create video job: ${error.message || JSON.stringify(error)}`);
+    return data[0] as VideoJob;
+  },
+
+  async getById(id: string, userId: string): Promise<VideoJob | null> {
+    const { data, error } = await supabase.from('video_jobs').select({ id, user_id: userId } as Record<string, unknown>);
+    if (error) throw new Error(`Failed to get video job: ${error.message || JSON.stringify(error)}`);
+    const jobs = (data as VideoJob[]) || [];
+    // Filter client-side to ensure ownership
+    return jobs.find(j => j.id === id && j.user_id === userId) || null;
+  },
+
+  async getByUserId(userId: string): Promise<VideoJob[]> {
+    const { data, error } = await supabase.from('video_jobs').select({ user_id: userId } as Record<string, unknown>);
+    if (error) throw new Error(`Failed to get user video jobs: ${error.message || JSON.stringify(error)}`);
+    const jobs = (data as VideoJob[]) || [];
+    // Filter client-side to ensure ownership
+    return jobs.filter(j => j.user_id === userId).sort((a, b) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  },
+
+  async getByClientRequestId(userId: string, clientRequestId: string): Promise<VideoJob | null> {
+    const jobs = await this.getByUserId(userId);
+    return jobs.find(j => j.client_request_id === clientRequestId) || null;
+  },
+
+  async update(id: string, updates: VideoJobUpdate): Promise<VideoJob> {
+    const { data, error } = await supabase.from('video_jobs').update(updates, { id });
+    if (error) throw new Error(`Failed to update video job: ${error.message || JSON.stringify(error)}`);
+    return data[0] as VideoJob;
   },
 };

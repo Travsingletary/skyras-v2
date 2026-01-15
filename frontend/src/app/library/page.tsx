@@ -19,6 +19,9 @@ import {
   Calendar,
   HardDrive,
 } from 'lucide-react';
+import { AnimateButton } from '@/components/video/AnimateButton';
+import { JobStatusIndicator } from '@/components/video/JobStatusIndicator';
+import { VideoPlayerCard } from '@/components/video/VideoPlayerCard';
 
 type ViewMode = 'grid' | 'list';
 type FileType = 'image' | 'video' | 'audio' | 'document' | 'all';
@@ -46,6 +49,8 @@ export default function AssetLibraryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [animationJobId, setAnimationJobId] = useState<string | null>(null);
+  const [completedVideoUrl, setCompletedVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAssets();
@@ -54,6 +59,14 @@ export default function AssetLibraryPage() {
   useEffect(() => {
     filterAndSortAssets();
   }, [assets, fileType, sortBy, searchQuery]);
+
+  // Reset animation state when selected asset changes
+  useEffect(() => {
+    if (selectedAsset) {
+      setAnimationJobId(null);
+      setCompletedVideoUrl(null);
+    }
+  }, [selectedAsset?.id]);
 
   const fetchAssets = async () => {
     setLoading(true);
@@ -347,21 +360,56 @@ export default function AssetLibraryPage() {
           )}
         </div>
 
-        <div className="flex gap-3">
-          <a
-            href={selectedAsset.public_url}
-            download={selectedAsset.original_name}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </a>
-          <button
-            onClick={() => handleDelete(selectedAsset.id)}
-            className="px-4 py-2 rounded-lg border border-red-600 text-red-600 font-medium hover:bg-red-50"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+        <div className="flex gap-3 flex-col">
+          {/* Animate button for images */}
+          {type === 'image' && (
+            <div className="space-y-2">
+              <AnimateButton
+                imageId={selectedAsset.id}
+                imageUrl={selectedAsset.public_url}
+                onJobCreated={(jobId) => {
+                  setAnimationJobId(jobId);
+                  setCompletedVideoUrl(null);
+                }}
+              />
+              {animationJobId && (
+                <div className="space-y-2">
+                  <JobStatusIndicator
+                    jobId={animationJobId}
+                    onComplete={(videoUrl) => {
+                      setCompletedVideoUrl(videoUrl);
+                    }}
+                    onError={(error) => {
+                      console.error('Animation error:', error);
+                    }}
+                  />
+                  {completedVideoUrl && (
+                    <VideoPlayerCard
+                      videoUrl={completedVideoUrl}
+                      jobId={animationJobId}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <a
+              href={selectedAsset.public_url}
+              download={selectedAsset.original_name}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
+            >
+              <Download className="h-4 w-4" />
+              Download
+            </a>
+            <button
+              onClick={() => handleDelete(selectedAsset.id)}
+              className="px-4 py-2 rounded-lg border border-red-600 text-red-600 font-medium hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     );

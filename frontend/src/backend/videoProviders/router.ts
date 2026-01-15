@@ -1,11 +1,12 @@
 // Video generation provider router
-// Tries providers in order: Kling (if configured) -> Runway (fallback)
+// Tries providers in order: Fal.ai Pika (if configured) -> Kling -> Runway (fallback)
 
 import type { VideoGenerationArgs, VideoProviderResult } from './types';
+import { falPikaAdapter } from './falPikaAdapter';
 import { klingAdapter } from './klingAdapter';
 import { runwayAdapter } from './runwayAdapter';
 
-const PROVIDER_PRIORITY = process.env.VIDEO_PROVIDER_PRIORITY || 'kling,runway';
+const PROVIDER_PRIORITY = process.env.VIDEO_PROVIDER_PRIORITY || 'fal-pika,kling,runway';
 const providers = PROVIDER_PRIORITY.split(',').map((p) => p.trim());
 
 /**
@@ -16,6 +17,23 @@ export async function executeCreate(args: VideoGenerationArgs): Promise<VideoPro
 
   for (const provider of providers) {
     try {
+      // Fal.ai Pika (image-to-video only)
+      if (provider === 'fal-pika' && falPikaAdapter.isConfigured()) {
+        try {
+          // Fal.ai requires imageUrl for image-to-video
+          if (!args.imageUrl) {
+            console.warn('[VideoRouter] Fal.ai Pika requires imageUrl, skipping');
+            errors.push(new Error('Fal.ai Pika requires imageUrl for image-to-video generation'));
+            continue;
+          }
+          return await falPikaAdapter.executeCreate(args);
+        } catch (error) {
+          console.warn(`[VideoRouter] Fal.ai Pika video generation failed: ${error instanceof Error ? error.message : String(error)}`);
+          errors.push(error instanceof Error ? error : new Error(String(error)));
+          continue;
+        }
+      }
+
       if (provider === 'kling' && klingAdapter.isConfigured()) {
         try {
           // Kling requires imageUrl, so check if we have one
