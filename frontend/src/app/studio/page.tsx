@@ -140,6 +140,13 @@ function StudioContent() {
 
   // Fetch plans on mount and when workflows might have changed
   const fetchPlans = async () => {
+    // Only fetch if user is authenticated
+    if (!user) {
+      setPlans([]);
+      setPlansLoading(false);
+      return;
+    }
+
     try {
       setPlansLoading(true);
       // User identity is derived server-side from auth session (no userId parameter)
@@ -149,22 +156,32 @@ function StudioContent() {
       if (data.success) {
         setPlans(data.data || []);
       } else {
-        console.error('[Plans] Error:', data.error);
-        // If auth required, show appropriate message
-        if (data.error === 'Authentication required') {
-          setError('Please sign in to view your plans');
+        // Only log non-auth errors (auth errors are expected when not logged in)
+        if (data.error !== 'Authentication required') {
+          console.error('[Plans] Error:', data.error);
+          setError('Failed to load plans');
         }
+        // Clear plans on auth error
+        setPlans([]);
       }
     } catch (err) {
       console.error('[Plans] Fetch error:', err);
       setError('Failed to load plans');
+      setPlans([]);
     } finally {
       setPlansLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchPlans();
+    // Only fetch plans if user is authenticated
+    if (user) {
+      fetchPlans();
+    } else {
+      // Clear plans when user logs out
+      setPlans([]);
+      setPlansLoading(false);
+    }
   }, [user]); // Refetch plans when auth state changes
 
   // Show loading while checking auth
