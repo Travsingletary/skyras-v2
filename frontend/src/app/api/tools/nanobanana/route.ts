@@ -20,12 +20,16 @@ import {
   updateManifestWithAsset,
   isQnapAvailable,
 } from '@/backend/storage/qnapStorage';
+import { getAuthenticatedUserId } from '@/lib/auth';
+import { storyboardFramesDb } from '@/lib/database';
+import type { StoryboardFrameInsert } from '@/types/database';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for generation
 
 interface NanoBananaRequest {
-  action: 'characterSheet' | 'storyboard' | 'upscale' | 'fixDrift';
+  action?: 'characterSheet' | 'storyboard' | 'upscale' | 'fixDrift';
+  operation?: 'character_sheet' | 'characterSheet' | 'storyboard' | 'upscale' | 'fix_drift' | 'fixDrift';
   // Character sheet params
   prompt?: string;
   characterDescription?: string;
@@ -51,11 +55,15 @@ interface NanoBananaRequest {
 export async function POST(request: NextRequest) {
   try {
     const body: NanoBananaRequest = await request.json();
-    const { action, projectId, workflowId, agentName } = body;
+    // Support both 'action' and 'operation' for compatibility
+    const action = body.action || (body.operation === 'character_sheet' ? 'characterSheet' : 
+                                   body.operation === 'fix_drift' ? 'fixDrift' : 
+                                   body.operation);
+    const { projectId, workflowId, agentName } = body;
 
     if (!action) {
       return NextResponse.json(
-        { success: false, error: 'Action is required (characterSheet, storyboard, upscale, fixDrift)' },
+        { success: false, error: 'Action/operation is required (characterSheet, storyboard, upscale, fixDrift)' },
         { status: 400 }
       );
     }
@@ -127,6 +135,37 @@ export async function POST(request: NextRequest) {
         };
 
         const result = await generateStoryboard(storyboardRequest);
+        
+        // Save storyboard frames to database if projectId is provided
+        if (result.success && result.frames && Array.isArray(result.frames) && projectId) {
+          try {
+            const userId = await getAuthenticatedUserId(request);
+            if (userId) {
+              const framesToInsert: StoryboardFrameInsert[] = result.frames.map((frame: any, index: number) => ({
+                project_id: projectId,
+                user_id: userId,
+                frame_number: frame.index !== undefined ? frame.index + 1 : index + 1,
+                prompt: body.prompt || '',
+                image_url: frame.imageUrl || frame.image_url || undefined,
+                thumbnail_url: frame.thumbnailUrl || frame.thumbnail_url || undefined,
+                description: frame.description || undefined,
+                approval_status: 'pending',
+                reference_ids: [],
+                metadata: {
+                  resolution: body.resolution || '4k',
+                  frameCount: body.frameCount || 9,
+                  characterSheetUrl: body.characterSheetUrl || undefined,
+                },
+              }));
+              
+              await storyboardFramesDb.createMany(framesToInsert);
+              console.log(`[NanoBanana] Saved ${framesToInsert.length} storyboard frames to database for project ${projectId}`);
+            }
+          } catch (error) {
+            console.error('[NanoBanana] Failed to save storyboard frames to database:', error);
+            // Don't fail the request if database save fails
+          }
+        }
         
         // Save to QNAP if configured and workflowId provided
         if (result.success && result.storyboardUrl && projectId && workflowId) {

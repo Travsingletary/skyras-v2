@@ -92,6 +92,7 @@ export function NanoBananaControls({ projectId, onGenerate }: NanoBananaControls
           characterSheetUrl: characterSheetUrl || undefined,
           frameCount,
           resolution: storyboardResolution,
+          projectId: projectId || undefined,
         }),
       });
 
