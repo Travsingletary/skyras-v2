@@ -104,10 +104,9 @@ function StudioContent() {
           }, 2000);
           setUser(null);
         } else if (result.authenticated && result.user) {
-          // Successfully authenticated
-          setUser(result.user);
-          setAuthChecking(false);
-          setError(null);
+          // Successfully authenticated - redirect to /start
+          router.push('/start');
+          return;
         } else {
           // Not authenticated, redirect to login
           setUser(null);

@@ -39,9 +39,9 @@ export default function Dashboard() {
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null);
   const [userId, setUserId] = useState<string>("");
 
-  // Redirect to /projects (dashboard is deprecated)
+  // Redirect to /start (dashboard is deprecated)
   useEffect(() => {
-    router.replace('/projects');
+    router.replace('/start');
   }, [router]);
 
   useEffect(() => {

@@ -30,8 +30,8 @@ export default function Home() {
         const data = await res.json();
         if (data.authenticated && data.user) {
           setIsAuthenticated(true);
-          // Redirect authenticated users to projects
-          router.push('/projects');
+          // Redirect authenticated users to start
+          router.push('/start');
         } else {
           setIsAuthenticated(false);
         }
