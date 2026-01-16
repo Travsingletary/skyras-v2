@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { videoClipsDb, projectsDb } from '@/lib/database';
 import { canGenerateVideo } from '@/lib/gateStatus';
 import type { VideoClip } from '@/types/database';
+import Link from 'next/link';
 
 interface FinishViewProps {
   projectId: string;
@@ -313,6 +314,9 @@ export function FinishView({ projectId, userId, onComplete, onUpdate }: FinishVi
               Step 5
             </span>
             <h1 className="text-3xl font-bold text-gray-900">Finish</h1>
+            <span className="ml-auto text-xs text-gray-400 font-mono" title="Build version">
+              v2026.01.16-policy
+            </span>
           </div>
           <p className="text-gray-600 mt-2">
             Generate your final video, review it, and approve when ready to complete your project.
@@ -335,10 +339,21 @@ export function FinishView({ projectId, userId, onComplete, onUpdate }: FinishVi
                 <svg className="w-6 h-6 text-red-600 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
-                <div>
+                <div className="flex-1">
                   <h3 className="text-lg font-medium text-red-800">Video Generation Blocked</h3>
                   <p className="mt-2 text-sm text-red-700">{blockReason}</p>
-                  <p className="mt-2 text-sm text-red-600 font-medium">Go back to Step 4 to complete prerequisites.</p>
+                  {blockReason.includes('Create storyboard frames first') ? (
+                    <div className="mt-4">
+                      <Link
+                        href={`/projects/${projectId}?intent=create&step=storyboard`}
+                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Go to Step 3 (Storyboard)
+                      </Link>
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-sm text-red-600 font-medium">Go back to Step 4 to complete prerequisites.</p>
+                  )}
                 </div>
               </div>
             </div>

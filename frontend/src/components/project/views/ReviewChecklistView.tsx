@@ -93,28 +93,32 @@ export function ReviewChecklistView({ projectId, userId, onContinue, onUpdate }:
           : 'Create and approve a Style Card',
       });
 
-      // 4. If storyboard frames exist, all are approved
+      // 4. Storyboard frames generated and all approved (REQUIRED: >= 1 frame)
       const storyboardFrames = await storyboardFramesDb.getByProjectId(projectId);
       const totalFrames = storyboardFrames?.length || 0;
       const approvedFrames = storyboardFrames?.filter(f => f.approval_status === 'approved').length || 0;
 
-      let storyboardStatus: 'pass' | 'fail' = 'pass';
-      let storyboardDetails = 'No storyboard frames yet';
+      let storyboardStatus: 'pass' | 'fail' = 'fail';
+      let storyboardDetails = 'Generate at least 1 frame to proceed';
 
-      if (totalFrames > 0) {
-        if (approvedFrames === totalFrames) {
-          storyboardStatus = 'pass';
-          storyboardDetails = `All ${totalFrames} frame${totalFrames > 1 ? 's' : ''} approved`;
-        } else {
-          storyboardStatus = 'fail';
-          storyboardDetails = `Only ${approvedFrames} of ${totalFrames} frames approved`;
-        }
+      if (totalFrames === 0) {
+        // FAIL: No frames generated yet
+        storyboardStatus = 'fail';
+        storyboardDetails = 'Generate at least 1 frame to proceed';
+      } else if (approvedFrames === totalFrames) {
+        // PASS: All frames approved
+        storyboardStatus = 'pass';
+        storyboardDetails = `All ${totalFrames} frame${totalFrames > 1 ? 's' : ''} approved`;
+      } else {
+        // FAIL: Some frames unapproved
+        storyboardStatus = 'fail';
+        storyboardDetails = `Only ${approvedFrames} of ${totalFrames} frames approved`;
       }
 
       items.push({
         id: 'storyboard',
-        label: 'Storyboard Frames',
-        description: 'All storyboard frames are approved (if any exist)',
+        label: 'Storyboard Frames Generated',
+        description: 'At least 1 storyboard frame generated and all frames approved',
         status: storyboardStatus,
         linkTo: storyboardStatus === 'fail' ? { step: 'storyboard', label: 'Go to Storyboard' } : undefined,
         details: storyboardDetails,
@@ -174,6 +178,9 @@ export function ReviewChecklistView({ projectId, userId, onContinue, onUpdate }:
               Step 4
             </span>
             <h1 className="text-3xl font-bold text-gray-900">Review</h1>
+            <span className="ml-auto text-xs text-gray-400 font-mono" title="Build version">
+              v2026.01.16-policy
+            </span>
           </div>
           <p className="text-gray-600 mt-2">
             Verify that all prerequisites are complete before moving to final video generation.
