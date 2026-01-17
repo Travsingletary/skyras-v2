@@ -37,10 +37,29 @@ export async function GET() {
     ];
 
     // Video providers
-    const videoPriority = process.env.VIDEO_PROVIDER_PRIORITY || 'kling,runway';
+    const videoPriority = process.env.VIDEO_PROVIDER_PRIORITY || 'opentune,fal-pika,kling,runway';
     const videoProviders = videoPriority.split(',').map((p) => p.trim());
 
     const videoProvidersData: ProviderInfo[] = [
+      {
+        name: 'opentune',
+        configured: !!process.env.OPENTUNE_API_KEY,
+        priority: videoProviders.indexOf('opentune') + 1,
+        capabilities: ['image-to-video'],
+        envVars: [
+          'OPENTUNE_API_KEY',
+          'OPENTUNE_API_BASE_URL (optional)',
+          'OPENTUNE_IMAGE_TO_VIDEO_ENDPOINT (optional)',
+          'OPENTUNE_STATUS_ENDPOINT (optional)',
+        ],
+      },
+      {
+        name: 'fal-pika',
+        configured: !!process.env.FAL_KEY,
+        priority: videoProviders.indexOf('fal-pika') + 1,
+        capabilities: ['image-to-video'],
+        envVars: ['FAL_KEY'],
+      },
       {
         name: 'kling',
         configured: !!process.env.KLING_API_KEY,

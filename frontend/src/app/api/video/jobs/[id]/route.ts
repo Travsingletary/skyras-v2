@@ -3,6 +3,7 @@ import { getAuthenticatedUserId, logAuthIdentity } from '@/lib/auth';
 import { videoJobsDb } from '@/lib/database';
 import { getSupabaseStorageClient } from '@/backend/supabaseClient';
 import { pollFalRequest } from '@/backend/videoProviders/falPikaAdapter';
+import { pollOpenTuneTask } from '@/backend/videoProviders/openTuneAdapter';
 import { runwayAdapter } from '@/backend/videoProviders/runwayAdapter';
 
 export const runtime = 'nodejs';
@@ -154,6 +155,25 @@ export async function GET(
             providerStatus = { status: 'failed', error: runwayStatus.failure || 'Video generation failed' };
           } else {
             // Still in progress
+            return NextResponse.json({
+              success: true,
+              data: {
+                ...job,
+                status: 'running',
+              },
+            });
+          }
+        } else if (job.provider === 'opentune') {
+          console.log(`[VideoJobs] Polling OpenTune status for job ${jobId}, provider_job_id: ${job.provider_job_id}`);
+          const openTuneStatus = await pollOpenTuneTask(job.provider_job_id);
+          console.log(`[VideoJobs] OpenTune status mapped: ${openTuneStatus.rawStatus || openTuneStatus.status} -> ${openTuneStatus.status === 'SUCCEEDED' ? 'succeeded' : openTuneStatus.status === 'FAILED' ? 'failed' : 'running'}`);
+
+          if (openTuneStatus.status === 'SUCCEEDED' && openTuneStatus.videoUrl) {
+            videoUrl = openTuneStatus.videoUrl;
+            providerStatus = { status: 'succeeded' };
+          } else if (openTuneStatus.status === 'FAILED') {
+            providerStatus = { status: 'failed', error: openTuneStatus.error || 'Video generation failed' };
+          } else {
             return NextResponse.json({
               success: true,
               data: {

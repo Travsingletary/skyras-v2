@@ -206,13 +206,14 @@ export async function POST(request: NextRequest) {
         duration: options.duration,
         aspectRatio: '16:9', // Default aspect ratio
         motionStrength: options.motionStrength as any,
+        waitForCompletion: false,
       });
 
       console.log(`[VideoAnimate] Provider job started: ${providerResult.providerName}, taskId: ${providerResult.taskId}`);
 
       // Update job with provider info and status='running'
       await videoJobsDb.update(job.id, {
-        provider: providerResult.providerName as 'fal-pika' | 'runway',
+        provider: providerResult.providerName as 'fal-pika' | 'runway' | 'kling' | 'opentune',
         provider_job_id: providerResult.taskId,
         status: 'running',
       });

@@ -20,7 +20,7 @@ export type CalendarProvider = 'google' | 'outlook' | 'apple';
 export type SyncStatus = 'synced' | 'pending' | 'failed';
 
 export type ClipStatus = 'pending' | 'generating' | 'completed' | 'failed';
-export type VideoProvider = 'kling' | 'runway';
+export type VideoProvider = 'kling' | 'runway' | 'fal-pika' | 'opentune';
 
 // ============================================================================
 // PROJECT

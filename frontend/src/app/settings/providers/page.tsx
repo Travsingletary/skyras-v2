@@ -301,7 +301,7 @@ export default function ProvidersSettingsPage() {
                 <strong>Priority Configuration:</strong>
                 <pre className="mt-1 p-2 rounded bg-amber-100 overflow-x-auto text-xs">
 {`IMAGE_PROVIDER_PRIORITY=runway,stable-diffusion
-VIDEO_PROVIDER_PRIORITY=kling,runway
+VIDEO_PROVIDER_PRIORITY=opentune,fal-pika,kling,runway
 DEFAULT_STORAGE_PROVIDER=supabase`}
                 </pre>
               </div>
@@ -309,6 +309,8 @@ DEFAULT_STORAGE_PROVIDER=supabase`}
                 <strong>API Keys:</strong>
                 <pre className="mt-1 p-2 rounded bg-amber-100 overflow-x-auto text-xs">
 {`RUNWAY_API_KEY=your-runway-key
+OPENTUNE_API_KEY=your-opentune-key
+FAL_KEY=your-fal-key
 KLING_API_KEY=your-kling-key
 STABLE_DIFFUSION_API_KEY=your-sd-key
 SUPABASE_URL=your-supabase-url
