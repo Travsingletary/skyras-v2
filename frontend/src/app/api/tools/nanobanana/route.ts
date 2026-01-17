@@ -140,31 +140,51 @@ export async function POST(request: NextRequest) {
         if (result.success && result.frames && Array.isArray(result.frames) && projectId) {
           try {
             const userId = await getAuthenticatedUserId(request);
-            if (userId) {
-              const framesToInsert: StoryboardFrameInsert[] = result.frames.map((frame: any, index: number) => ({
-                project_id: projectId,
-                user_id: userId,
-                frame_number: frame.index !== undefined ? frame.index + 1 : index + 1,
-                prompt: body.prompt || '',
-                image_url: frame.imageUrl || frame.image_url || undefined,
-                thumbnail_url: frame.thumbnailUrl || frame.thumbnail_url || undefined,
-                description: frame.description || undefined,
-                approval_status: 'pending',
-                reference_ids: [],
-                metadata: {
-                  resolution: body.resolution || '4k',
-                  frameCount: body.frameCount || 9,
-                  characterSheetUrl: body.characterSheetUrl || undefined,
-                },
-              }));
+            if (!userId) {
+              console.warn('[NanoBanana] No userId found, skipping database save for frames');
+            } else {
+              console.log(`[NanoBanana] Saving ${result.frames.length} frames to database for project ${projectId}, user ${userId}`);
               
-              await storyboardFramesDb.createMany(framesToInsert);
-              console.log(`[NanoBanana] Saved ${framesToInsert.length} storyboard frames to database for project ${projectId}`);
+              const framesToInsert: StoryboardFrameInsert[] = result.frames.map((frame: any, index: number) => {
+                const frameNumber = frame.index !== undefined ? frame.index + 1 : index + 1;
+                const imageUrl = frame.imageUrl || frame.image_url;
+                
+                console.log(`[NanoBanana] Frame ${frameNumber}: imageUrl=${imageUrl}, description=${frame.description || 'none'}`);
+                
+                return {
+                  project_id: projectId,
+                  user_id: userId,
+                  frame_number: frameNumber,
+                  prompt: body.prompt || '',
+                  image_url: imageUrl || undefined,
+                  thumbnail_url: frame.thumbnailUrl || frame.thumbnail_url || undefined,
+                  description: frame.description || undefined,
+                  approval_status: 'pending',
+                  reference_ids: [],
+                  metadata: {
+                    resolution: body.resolution || '4k',
+                    frameCount: body.frameCount || 9,
+                    characterSheetUrl: body.characterSheetUrl || undefined,
+                  },
+                };
+              });
+              
+              const savedFrames = await storyboardFramesDb.createMany(framesToInsert);
+              console.log(`[NanoBanana] Successfully saved ${savedFrames.length} storyboard frames to database for project ${projectId}`);
             }
           } catch (error) {
             console.error('[NanoBanana] Failed to save storyboard frames to database:', error);
-            // Don't fail the request if database save fails
+            console.error('[NanoBanana] Error details:', error instanceof Error ? error.stack : error);
+            // Don't fail the request if database save fails, but log the error
           }
+        } else {
+          console.log('[NanoBanana] Skipping database save:', {
+            success: result.success,
+            hasFrames: !!result.frames,
+            isArray: Array.isArray(result.frames),
+            frameCount: result.frames?.length,
+            hasProjectId: !!projectId,
+          });
         }
         
         // Save to QNAP if configured and workflowId provided

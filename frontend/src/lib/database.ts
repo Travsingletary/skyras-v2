@@ -486,10 +486,17 @@ export const storyboardFramesDb = {
   },
 
   async getByProjectId(projectId: string): Promise<StoryboardFrame[]> {
+    // Use wrapper's select API which accepts filters as object
     const { data, error } = await supabase.from('storyboard_frames').select({ project_id: projectId });
-    if (error) throw new Error(`Failed to get project storyboard frames: ${error.message || JSON.stringify(error)}`);
+    if (error) {
+      console.error('[storyboardFramesDb.getByProjectId] Query error:', error);
+      throw new Error(`Failed to get project storyboard frames: ${error.message || JSON.stringify(error)}`);
+    }
     const frames = (data as StoryboardFrame[]) || [];
-    return frames.filter(f => !f.deleted_at).sort((a, b) => a.frame_number - b.frame_number);
+    // Filter out deleted frames and sort
+    const activeFrames = frames.filter(f => !f.deleted_at).sort((a, b) => a.frame_number - b.frame_number);
+    console.log(`[storyboardFramesDb.getByProjectId] Found ${activeFrames.length} frames for project ${projectId}`);
+    return activeFrames;
   },
 
   async update(id: string, updates: StoryboardFrameUpdate): Promise<StoryboardFrame> {

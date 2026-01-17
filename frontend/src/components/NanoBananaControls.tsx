@@ -97,9 +97,11 @@ export function NanoBananaControls({ projectId, onGenerate }: NanoBananaControls
       });
 
       const data = await response.json();
+      console.log('[NanoBananaControls] Storyboard generation response:', data);
 
       if (data.success) {
         setResult(data);
+        console.log('[NanoBananaControls] Calling onGenerate callback with result');
         onGenerate?.(data);
       } else {
         setError(data.error || 'Failed to generate storyboard');

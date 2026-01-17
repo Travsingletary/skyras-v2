@@ -46,6 +46,7 @@ export function BuildView({ projectId, userId, onContinue, onUpdate }: BuildView
 
       // Load storyboard frames
       const framesData = await storyboardFramesDb.getByProjectId(projectId);
+      console.log('[BuildView] Loaded frames:', { projectId, count: framesData.length, frames: framesData });
       setFrames(framesData);
 
       // Load gate status
