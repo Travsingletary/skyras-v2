@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { AgentDelegation, AgentExecutionContext, AgentRunInput, AgentRunResult, BaseAgent } from "@/agents/core/BaseAgent";
 import { createLogger } from "@/lib/logger";
+import { hasNanoBanana, nanoBananaGenerateText } from "@/lib/nanoBanana";
 import {
   collectStudioNotes,
   createWorkflow,
@@ -47,6 +48,35 @@ class MarcusAgent extends BaseAgent {
     }
   }
 
+  private async generateWithNanoBanana(
+    prompt: string,
+    context: AgentExecutionContext,
+    systemPrompt: string
+  ): Promise<string> {
+    if (!hasNanoBanana()) {
+      return "I'm currently in keyword-based mode. For full AI chat capabilities, please configure ANTHROPIC_API_KEY or NANO_BANANA_API_KEY in your environment.";
+    }
+
+    try {
+      const history = await context.memory.history(20);
+      const conversation = history
+        .map((record) => `${record.role.toUpperCase()}: ${record.content}`)
+        .join("\n\n");
+
+      const fullPrompt = `${conversation}\n\nUSER: ${prompt}`.trim();
+
+      return await nanoBananaGenerateText({
+        systemPrompt,
+        prompt: fullPrompt,
+        temperature: 0.4,
+        maxOutputTokens: 1024,
+      });
+    } catch (error) {
+      context.logger.error("Nano Banana generation failed", { error });
+      return `I encountered an error generating a response: ${(error as Error).message}`;
+    }
+  }
+
   /**
    * Generate an AI response using Claude for general chat queries
    *
@@ -55,7 +85,11 @@ class MarcusAgent extends BaseAgent {
    */
   private async generateAIResponse(prompt: string, context: AgentExecutionContext, userId?: string): Promise<string> {
     if (!this.anthropic) {
-      return "I'm currently in keyword-based mode. For full AI chat capabilities, please configure ANTHROPIC_API_KEY in your environment.";
+      // Fallback to Gemini (Nano Banana) if configured.
+      const preferences = getMarcusPreferences(userId);
+      const preferencesContext = formatPreferencesContext(preferences);
+      const enhancedSystemPrompt = `${SYSTEM_PROMPT}\n\n${preferencesContext}`;
+      return await this.generateWithNanoBanana(prompt, context, enhancedSystemPrompt);
     }
 
     try {
@@ -311,20 +345,13 @@ class MarcusAgent extends BaseAgent {
 
     // If delegations occurred, wrap results with AI-enhanced explanation
     // This applies Prime Directives to delegation results
-    if (delegations.length > 0 && this.anthropic) {
+    if (delegations.length > 0 && (this.anthropic || hasNanoBanana())) {
       const userId = input.metadata?.userId as string | undefined;
       const preferences = getMarcusPreferences(userId);
       const preferencesContext = formatPreferencesContext(preferences);
       const enhancedSystemPrompt = `${SYSTEM_PROMPT}\n\n${preferencesContext}`;
 
       try {
-        // Load conversation history for context-aware wrapping
-        const history = await context.memory.history(20);
-        const conversationMessages = history.map((record) => ({
-          role: record.role,
-          content: record.content,
-        }));
-
         const delegationSummary = outputLines.join('\n');
         
         // Build routing header from delegations
@@ -339,25 +366,36 @@ class MarcusAgent extends BaseAgent {
         
         const wrapperPrompt = `${routingHeader}${delegationSummary}\n\nNow explain to the user what happened, WHY it matters to their goals, and give them ONE clear next step. Keep it direct and action-oriented. Format agent outputs as readable sections, not raw JSON.`;
 
-        // Add wrapper prompt as latest user message
-        conversationMessages.push({
-          role: "user" as const,
-          content: wrapperPrompt,
-        });
+        if (this.anthropic) {
+          // Load conversation history for context-aware wrapping
+          const history = await context.memory.history(20);
+          const conversationMessages = history.map((record) => ({
+            role: record.role,
+            content: record.content,
+          }));
 
-        const message = await this.anthropic.messages.create({
-          model: "claude-3-haiku-20240307",
-          max_tokens: 512,
-          system: enhancedSystemPrompt,
-          messages: conversationMessages,
-        });
+          // Add wrapper prompt as latest user message
+          conversationMessages.push({
+            role: "user" as const,
+            content: wrapperPrompt,
+          });
 
-        const textContent = message.content.find((block) => block.type === "text");
-        if (textContent && textContent.type === "text") {
-          finalResponseText = textContent.text;
+          const message = await this.anthropic.messages.create({
+            model: "claude-3-haiku-20240307",
+            max_tokens: 512,
+            system: enhancedSystemPrompt,
+            messages: conversationMessages,
+          });
+
+          const textContent = message.content.find((block) => block.type === "text");
+          if (textContent && textContent.type === "text") {
+            finalResponseText = textContent.text;
+          } else {
+            // Fallback to outputLines if AI wrapping failed
+            finalResponseText = outputLines.join('\n');
+          }
         } else {
-          // Fallback to outputLines if AI wrapping failed
-          finalResponseText = outputLines.join('\n');
+          finalResponseText = await this.generateWithNanoBanana(wrapperPrompt, context, enhancedSystemPrompt);
         }
       } catch (error) {
         context.logger.error("Failed to wrap delegation results", { error });

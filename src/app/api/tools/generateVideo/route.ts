@@ -11,9 +11,17 @@ import { createClient } from '@supabase/supabase-js';
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes for video generation
 
+const VIDEO_PROVIDER_NAME = process.env.VIDEO_PROVIDER_NAME || 'runway';
+
 const RUNWAY_API_KEY = process.env.RUNWAY_API_KEY || '';
 const RUNWAY_API_BASE_URL = process.env.RUNWAY_API_BASE_URL || 'https://api.dev.runwayml.com';
 const RUNWAY_API_VERSION = '2024-11-06';
+
+const POLLO_API_KEY = process.env.POLLO_API_KEY || '';
+const POLLO_API_BASE_URL = process.env.POLLO_API_BASE_URL || 'https://pollo.ai/api/platform';
+const POLLO_VIDEO_MODEL = process.env.POLLO_VIDEO_MODEL || 'pollo-v1-6';
+const POLLO_VIDEO_RESOLUTION = process.env.POLLO_VIDEO_RESOLUTION || '480p';
+const POLLO_VIDEO_MODE = process.env.POLLO_VIDEO_MODE || 'basic';
 
 interface RunwayTask {
   id: string;
@@ -21,6 +29,23 @@ interface RunwayTask {
   output?: string[];
   failure?: string;
   failureCode?: string;
+}
+
+type PolloTaskStatus = 'waiting' | 'processing' | 'succeed' | 'failed';
+
+interface PolloGenerationStatus {
+  id: string;
+  status: PolloTaskStatus;
+  failMsg: string | null;
+  url: string | null;
+  mediaType: 'image' | 'video' | 'text' | 'audio';
+  createdDate?: string | null;
+  updatedDate?: string | null;
+}
+
+interface PolloStatusResponse {
+  taskId: string;
+  generations: PolloGenerationStatus[];
 }
 
 interface VideoGenerationRequest {
@@ -32,29 +57,22 @@ interface VideoGenerationRequest {
   projectId?: string;
   agentName?: string;
   waitForCompletion?: boolean;
+  provider?: 'runway' | 'pollo';
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify Runway API key
-    if (!RUNWAY_API_KEY) {
-      console.error('[VideoGen] RUNWAY_API_KEY not configured');
-      return NextResponse.json(
-        { success: false, error: 'Runway API key not configured' },
-        { status: 503 }
-      );
-    }
-
     const body: VideoGenerationRequest = await request.json();
     const {
       prompt,
       imageUrl,
       duration = 5,
       aspectRatio = '16:9',
-      model = 'gen3a_turbo',
+      model,
       projectId,
       agentName = 'giorgio',
       waitForCompletion = true,
+      provider,
     } = body;
 
     if (!prompt) {
@@ -64,83 +82,90 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const chosenProvider = provider || (VIDEO_PROVIDER_NAME as VideoGenerationRequest['provider']) || 'runway';
+
     console.log('[VideoGen] Starting video generation:', {
       prompt: prompt.substring(0, 100),
       imageUrl: imageUrl ? 'provided' : 'none',
       duration,
       aspectRatio,
-      model,
+      model: model || '(default)',
+      provider: chosenProvider,
     });
 
-    // Convert aspect ratio to Runway format (width:height)
-    const ratio = convertAspectRatio(aspectRatio);
+    let taskId: string;
+    let providerModel: string;
+    let videoUrl: string;
 
-    // Choose endpoint based on whether we have an image
-    const endpoint = imageUrl ? '/v1/image_to_video' : '/v1/text_to_video';
-    const requestBody = imageUrl
-      ? {
-          model,
-          promptImage: imageUrl,
-          promptText: prompt,
-          duration,
-          ratio,
-        }
-      : {
-          model,
-          promptText: prompt,
-          duration,
-          ratio,
-        };
+    if (chosenProvider === 'pollo') {
+      if (!POLLO_API_KEY) {
+        console.error('[VideoGen] POLLO_API_KEY not configured');
+        return NextResponse.json(
+          { success: false, error: 'Pollo API key not configured' },
+          { status: 503 }
+        );
+      }
 
-    // Create video generation task
-    const taskResponse = await fetch(`${RUNWAY_API_BASE_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RUNWAY_API_KEY}`,
-        'Content-Type': 'application/json',
-        'X-Runway-Version': RUNWAY_API_VERSION,
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!taskResponse.ok) {
-      const errorText = await taskResponse.text();
-      console.error('[VideoGen] Runway API error:', errorText);
-      return NextResponse.json(
-        { success: false, error: `Runway API error: ${taskResponse.status}` },
-        { status: 500 }
-      );
-    }
-
-    const taskData: RunwayTask = await taskResponse.json();
-    console.log('[VideoGen] Task created:', taskData.id);
-
-    // If waitForCompletion is false, return task ID immediately
-    if (!waitForCompletion) {
-      return NextResponse.json({
-        success: true,
-        taskId: taskData.id,
-        status: 'PENDING',
+      const polloModel = model || POLLO_VIDEO_MODEL;
+      providerModel = polloModel;
+      const pollo = await createPolloVideoTask({
+        prompt,
+        imageUrl,
+        duration,
+        model: polloModel,
+        waitForCompletion,
       });
+
+      taskId = pollo.taskId;
+
+      if (!waitForCompletion) {
+        return NextResponse.json({
+          success: true,
+          taskId,
+          status: 'waiting',
+          provider: 'pollo',
+          model: providerModel,
+        });
+      }
+
+      videoUrl = pollo.videoUrl;
+    } else {
+      // Default: Runway
+      if (!RUNWAY_API_KEY) {
+        console.error('[VideoGen] RUNWAY_API_KEY not configured');
+        return NextResponse.json(
+          { success: false, error: 'Runway API key not configured' },
+          { status: 503 }
+        );
+      }
+
+      const runwayModel = model || 'gen3a_turbo';
+      providerModel = runwayModel;
+      const runway = await createRunwayVideoTask({
+        prompt,
+        imageUrl,
+        duration,
+        aspectRatio,
+        model: runwayModel,
+        waitForCompletion,
+      });
+
+      taskId = runway.taskId;
+
+      if (!waitForCompletion) {
+        return NextResponse.json({
+          success: true,
+          taskId,
+          status: 'PENDING',
+          provider: 'runway',
+          model: providerModel,
+        });
+      }
+
+      videoUrl = runway.videoUrl;
     }
 
-    // Poll for completion
-    const result = await pollForCompletion(taskData.id);
-
-    if (result.status !== 'SUCCEEDED' || !result.output || result.output.length === 0) {
-      console.error('[VideoGen] Task failed:', result.failure || 'No output');
-      return NextResponse.json(
-        {
-          success: false,
-          error: result.failure || 'Video generation failed',
-          failureCode: result.failureCode,
-        },
-        { status: 500 }
-      );
-    }
-
-    const videoUrl = result.output[0];
-    console.log('[VideoGen] Video generated:', videoUrl);
+    console.log('[VideoGen] Video generated:', { provider: chosenProvider, taskId });
 
     // Download and store video in Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -160,7 +185,7 @@ export async function POST(request: NextRequest) {
         }
 
         const videoBuffer = await videoResponse.arrayBuffer();
-        const fileName = `${projectId || 'video'}/${Date.now()}-${model}.mp4`;
+        const fileName = `${projectId || 'video'}/${Date.now()}-${chosenProvider}-${providerModel}.mp4`;
 
         // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -190,12 +215,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       video: {
-        id: taskData.id,
+        id: taskId,
         videoUrl: storedVideoUrl,
         thumbnailUrl,
         duration,
-        model,
+        model: providerModel,
         prompt,
+        provider: chosenProvider,
       },
     });
 
@@ -208,10 +234,129 @@ export async function POST(request: NextRequest) {
   }
 }
 
+async function createRunwayVideoTask(params: {
+  prompt: string;
+  imageUrl?: string;
+  duration: number;
+  aspectRatio: string;
+  model: string;
+  waitForCompletion: boolean;
+}): Promise<{ taskId: string; videoUrl: string }> {
+  // Convert aspect ratio to Runway format (width:height)
+  const ratio = convertAspectRatio(params.aspectRatio);
+
+  // Choose endpoint based on whether we have an image
+  const endpoint = params.imageUrl ? '/v1/image_to_video' : '/v1/text_to_video';
+  const requestBody = params.imageUrl
+    ? {
+        model: params.model,
+        promptImage: params.imageUrl,
+        promptText: params.prompt,
+        duration: params.duration,
+        ratio,
+      }
+    : {
+        model: params.model,
+        promptText: params.prompt,
+        duration: params.duration,
+        ratio,
+      };
+
+  // Create video generation task
+  const taskResponse = await fetch(`${RUNWAY_API_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RUNWAY_API_KEY}`,
+      'Content-Type': 'application/json',
+      'X-Runway-Version': RUNWAY_API_VERSION,
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!taskResponse.ok) {
+    const errorText = await taskResponse.text();
+    console.error('[VideoGen] Runway API error:', errorText);
+    throw new Error(`Runway API error: ${taskResponse.status}`);
+  }
+
+  const taskData: RunwayTask = await taskResponse.json();
+  console.log('[VideoGen] Runway task created:', taskData.id);
+
+  if (!params.waitForCompletion) {
+    return { taskId: taskData.id, videoUrl: '' };
+  }
+
+  const result = await pollRunwayForCompletion(taskData.id);
+
+  if (result.status !== 'SUCCEEDED' || !result.output || result.output.length === 0) {
+    throw new Error(result.failure || 'Runway video generation failed');
+  }
+
+  return { taskId: taskData.id, videoUrl: result.output[0] };
+}
+
+async function createPolloVideoTask(params: {
+  prompt: string;
+  imageUrl?: string;
+  duration: number;
+  model: string;
+  waitForCompletion: boolean;
+}): Promise<{ taskId: string; videoUrl: string }> {
+  const input: Record<string, unknown> = {
+    prompt: params.prompt,
+    resolution: POLLO_VIDEO_RESOLUTION,
+    mode: POLLO_VIDEO_MODE,
+    length: params.duration,
+  };
+
+  if (params.imageUrl) {
+    input.image = params.imageUrl;
+  }
+
+  const taskResponse = await fetch(`${POLLO_API_BASE_URL}/generation/pollo/${params.model}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': POLLO_API_KEY,
+    },
+    body: JSON.stringify({ input }),
+  });
+
+  if (!taskResponse.ok) {
+    const errorText = await taskResponse.text();
+    console.error('[VideoGen] Pollo API error:', errorText);
+    throw new Error(`Pollo API error: ${taskResponse.status}`);
+  }
+
+  const taskData = (await taskResponse.json()) as { taskId?: string; status?: string };
+  const taskId = taskData.taskId;
+  if (!taskId) {
+    throw new Error('Pollo API did not return taskId');
+  }
+
+  console.log('[VideoGen] Pollo task created:', taskId);
+
+  if (!params.waitForCompletion) {
+    return { taskId, videoUrl: '' };
+  }
+
+  const status = await pollPolloForCompletion(taskId);
+  const video = status.generations.find(
+    (g) => g.mediaType === 'video' && g.status === 'succeed' && typeof g.url === 'string' && g.url.length > 0
+  );
+
+  if (!video?.url) {
+    const failed = status.generations.find((g) => g.mediaType === 'video' && g.status === 'failed');
+    throw new Error(failed?.failMsg || 'Pollo video generation failed');
+  }
+
+  return { taskId, videoUrl: video.url };
+}
+
 /**
  * Poll Runway task until completion
  */
-async function pollForCompletion(taskId: string, maxAttempts = 120): Promise<RunwayTask> {
+async function pollRunwayForCompletion(taskId: string, maxAttempts = 120): Promise<RunwayTask> {
   let attempts = 0;
 
   while (attempts < maxAttempts) {
@@ -239,6 +384,44 @@ async function pollForCompletion(taskId: string, maxAttempts = 120): Promise<Run
   }
 
   throw new Error('Video generation timed out');
+}
+
+async function pollPolloForCompletion(taskId: string, maxAttempts = 150): Promise<PolloStatusResponse> {
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    const response = await fetch(`${POLLO_API_BASE_URL}/generation/${taskId}/status`, {
+      headers: {
+        'x-api-key': POLLO_API_KEY,
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[VideoGen] Pollo status error:', errorText);
+      throw new Error(`Failed to get Pollo task status: ${response.status}`);
+    }
+
+    const status = (await response.json()) as PolloStatusResponse;
+    const videoGen = status.generations?.find((g) => g.mediaType === 'video');
+    const state = videoGen?.status || 'waiting';
+
+    console.log(`[VideoGen] Pollo task ${taskId} status: ${state} (attempt ${attempts + 1}/${maxAttempts})`);
+
+    if (status.generations?.some((g) => g.mediaType === 'video' && g.status === 'succeed' && g.url)) {
+      return status;
+    }
+
+    if (status.generations?.some((g) => g.mediaType === 'video' && g.status === 'failed')) {
+      return status;
+    }
+
+    // Wait 2 seconds before next poll
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    attempts++;
+  }
+
+  throw new Error('Pollo video generation timed out');
 }
 
 /**

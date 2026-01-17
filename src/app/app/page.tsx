@@ -50,11 +50,8 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(() => {
-    // Check localStorage for voice preference
-    const stored = localStorage.getItem('voiceEnabled');
-    return stored !== null ? stored === 'true' : true; // Default to enabled
-  });
+  // Default to enabled; hydrate from localStorage in an effect (avoids SSR crash).
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -67,6 +64,17 @@ export default function Home() {
   const hasSentRef = useRef<boolean>(false); // Track if we've already sent the message
 
   const requiredAccessCode = process.env.NEXT_PUBLIC_ACCESS_CODE || "";
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("voiceEnabled");
+      if (stored !== null) {
+        setVoiceEnabled(stored === "true");
+      }
+    } catch {
+      // If storage is unavailable, keep default.
+    }
+  }, []);
 
   // Check authentication on mount
   useEffect(() => {
