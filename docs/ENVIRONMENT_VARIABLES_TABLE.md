@@ -78,7 +78,12 @@
 
 | Variable Name | Required | Scope | Default Value | Description | Where to Use |
 |--------------|----------|-------|---------------|-------------|--------------|
-| `VIDEO_PROVIDER_PRIORITY` | ✅ Yes | Server | `kling,runway` | Provider priority (comma-separated) | Vercel, `.env.local` |
+| `VIDEO_PROVIDER_PRIORITY` | ✅ Yes | Server | `opentune,fal-pika,kling,runway` | Provider priority (comma-separated) | Vercel, `.env.local` |
+| `OPENTUNE_API_KEY` | ⚠️ Optional* | Server | - | OpenTune API key (image-to-video) | Vercel, `.env.local` |
+| `OPENTUNE_API_BASE_URL` | ⚠️ Optional | Server | `https://api.opentune.ai` | OpenTune API base URL | Vercel, `.env.local` |
+| `OPENTUNE_IMAGE_TO_VIDEO_ENDPOINT` | ⚠️ Optional | Server | `/v1/image-to-video` | OpenTune image-to-video endpoint | Vercel, `.env.local` |
+| `OPENTUNE_STATUS_ENDPOINT` | ⚠️ Optional | Server | `/v1/video/jobs/{id}` | OpenTune status endpoint | Vercel, `.env.local` |
+| `FAL_KEY` | ⚠️ Optional* | Server | - | Fal.ai API key (image-to-video) | Vercel, `.env.local` |
 | `RUNWAY_API_KEY` | ⚠️ Optional* | Server | - | Runway ML API key | Vercel, `.env.local` |
 | `RUNWAY_API_BASE_URL` | ⚠️ Optional | Server | `https://api.dev.runwayml.com` | Runway API base URL | Vercel, `.env.local` |
 | `RUNWAY_API_VERSION` | ⚠️ Optional | Server | `2024-11-06` | Runway API version | Vercel, `.env.local` |
@@ -89,7 +94,7 @@
 | `GEMINI_IMAGE_MODEL` | ⚠️ Optional | Server | `gemini-2.5-flash-image` | Gemini image model name | Vercel, `.env.local` |
 | `GEMINI_IMAGE_ASPECT_RATIO` | ⚠️ Optional | Server | `1:1` | Gemini image aspect ratio | Vercel, `.env.local` |
 
-**Note:** At least one video provider key (`RUNWAY_API_KEY` or `KLING_API_KEY`) is required for video generation. If both are set, `VIDEO_PROVIDER_PRIORITY` determines which is tried first.
+**Note:** At least one video provider key (`OPENTUNE_API_KEY`, `FAL_KEY`, `RUNWAY_API_KEY`, or `KLING_API_KEY`) is required for video generation. If multiple are set, `VIDEO_PROVIDER_PRIORITY` determines which is tried first.
 
 ---
 

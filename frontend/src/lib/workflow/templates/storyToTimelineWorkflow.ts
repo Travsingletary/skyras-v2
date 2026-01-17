@@ -18,7 +18,7 @@ export interface StoryToTimelineWorkflowConfig {
   frameCount?: number;
   klingModel?: '2.5-turbo' | '1.0' | '2.6';
   aspectRatio?: string;
-  provider?: 'kling' | 'runway';
+  provider?: 'kling' | 'runway' | 'opentune';
 }
 
 /**

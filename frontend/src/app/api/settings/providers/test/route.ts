@@ -51,7 +51,21 @@ export async function POST(request: NextRequest) {
 
     // Video providers
     else if (category === 'video') {
-      if (provider === 'kling') {
+      if (provider === 'opentune') {
+        const apiKey = process.env.OPENTUNE_API_KEY;
+        if (!apiKey) {
+          testResult = { success: false, message: 'OPENTUNE_API_KEY not configured' };
+        } else {
+          testResult = { success: true, message: 'OpenTune API key configured (live test not implemented)' };
+        }
+      } else if (provider === 'fal-pika') {
+        const apiKey = process.env.FAL_KEY;
+        if (!apiKey) {
+          testResult = { success: false, message: 'FAL_KEY not configured' };
+        } else {
+          testResult = { success: true, message: 'Fal.ai API key configured (live test not implemented)' };
+        }
+      } else if (provider === 'kling') {
         const apiKey = process.env.KLING_API_KEY;
         if (!apiKey) {
           testResult = { success: false, message: 'KLING_API_KEY not configured' };

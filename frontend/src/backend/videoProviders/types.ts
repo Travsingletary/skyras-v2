@@ -7,9 +7,11 @@ export type VideoGenerationArgs = {
   aspectRatio?: string;
   model?: string;
   projectId?: string;
+  waitForCompletion?: boolean;
+  motionStrength?: 'low' | 'medium' | 'high' | number;
   // Kling-specific options
   klingModel?: '2.5-turbo' | '1.0' | '2.6';
-  provider?: 'kling' | 'runway';
+  provider?: 'kling' | 'runway' | 'fal-pika' | 'opentune';
   // Post-production editing options (Kling)
   editOptions?: {
     lighting?: string;

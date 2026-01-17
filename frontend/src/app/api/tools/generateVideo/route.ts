@@ -31,9 +31,10 @@ interface VideoGenerationRequest {
   agentName?: string;
   waitForCompletion?: boolean;
   // Provider selection
-  provider?: 'kling' | 'runway';
+  provider?: 'kling' | 'runway' | 'fal-pika' | 'opentune';
   // Kling-specific options
   klingModel?: '2.5-turbo' | '1.0' | '2.6';
+  motionStrength?: 'low' | 'medium' | 'high' | number;
   editOptions?: {
     lighting?: string;
     weather?: string;
@@ -57,13 +58,14 @@ export async function POST(request: NextRequest) {
       imageUrl,
       duration = 5,
       aspectRatio = '16:9',
-      model = 'gen3a_turbo',
+      model,
       projectId,
       workflowId,
       agentName = 'giorgio',
       waitForCompletion = true,
       provider,
       klingModel,
+      motionStrength,
       editOptions,
     } = body;
 
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest) {
       imageUrl: imageUrl ? 'provided' : 'none',
       duration,
       aspectRatio,
-      model,
+      model: model || 'default',
       provider: provider || 'auto',
       klingModel,
     });
@@ -94,6 +96,8 @@ export async function POST(request: NextRequest) {
       projectId,
       provider,
       klingModel,
+      waitForCompletion,
+      motionStrength,
       editOptions,
     };
 
@@ -116,7 +120,7 @@ export async function POST(request: NextRequest) {
       try {
         const qnapAvailable = await isQnapAvailable();
         if (qnapAvailable) {
-          const providerName = result.providerName === 'kling' ? 'kling' : 'runway';
+          const providerName = result.providerName || 'video';
           const modelName = result.modelName.replace(/[^a-zA-Z0-9_-]/g, '_');
           const savedAsset = await saveAssetFromUrl(result.videoUrl, {
             project: projectId,

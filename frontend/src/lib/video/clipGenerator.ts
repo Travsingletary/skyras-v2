@@ -7,7 +7,7 @@ import { videoClipsDb, shotListsDb } from '@/lib/database';
 import type { VideoClipInsert, ShotList } from '@/types/database';
 
 interface ClipGenerationOptions {
-  provider?: 'kling' | 'runway';
+  provider?: 'kling' | 'runway' | 'opentune';
   klingModel?: '2.5-turbo' | '1.0' | '2.6';
   aspectRatio?: string;
   duration?: number;
